@@ -22,10 +22,10 @@
 | 对话 | 对话搜索和分页 | 部分实现 | cwd 过滤与首 100 条列表已实现；搜索和游标 UI 待开发 |
 | 对话 | 分叉任务 | 尚未开发 | thread/fork |
 | 对话 | 长上下文压缩 | 尚未开发 | thread/compact/start |
-| 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 和历史 hydration 已实现；重启 E2E 待补 |
+| 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 与已完成历史 hydration 自动测试通过；真实进程重启 E2E 因账户使用量耗尽待复验 |
 | 智能体 | Codex app-server stdio 生命周期 | 已测试 | Electron E2E 真实自动启动并达到 ready |
 | 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
-| 智能体 | app-server 崩溃检测与恢复 | 部分实现 | 检测/空闲退避重启已实现；崩溃注入测试待补 |
+| 智能体 | app-server 崩溃检测与恢复 | 已测试 | 真实子进程 JSONL 替身注入 exit 23：空闲连接恢复 ready，活动 turn 失败关闭且不重启/重放 |
 | 智能体 | 流式文本、推理和活动时间线 | 已测试 | 真实在线 Codex 文本流 E2E；reducer 27 项测试覆盖乱序 delta 与 1 MiB 截断 |
 | 智能体 | 命令、文件修改、工具调用活动 | 已测试 | 真实 `sleep` 命令、结构化 command 活动、apply_patch 文件落盘与内容断言 E2E 通过 |
 | 智能体 | 追加指令/steer | 已测试 | 真实运行中命令接收 steer，最终返回 `ASTER_STEER_OK` |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 24 个测试文件至少 104 项；真实 Electron 覆盖本地浏览器、文件产物、计划任务、Security preflight、OpenAI、DeepSeek、AGENTS、MCP、审批、Git/diff/worktree 和 PTY 终端 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 25 个测试文件 107 项及 V8 全局门槛；既有真实 Electron 覆盖主要闭环，本轮在线复验被账户使用量外部限制中止；Windows CI 尚待远端执行 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

@@ -81,6 +81,34 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('declines or cancels pending approvals without leaving a resolver behind', async () => {
+    const { database } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    const declined = runtime.requestFromServer('item/fileChange/requestApproval', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'patch-1',
+      grantRoot: '/project',
+    }, { id: 43, method: 'item/fileChange/requestApproval' })
+
+    service.resolveApproval({ requestId: '43', decision: 'decline' })
+    await expect(declined).resolves.toEqual({ decision: 'decline' })
+    expect(() => service.resolveApproval({ requestId: '43', decision: 'accept' })).toThrow(
+      'no longer pending',
+    )
+
+    const cancelled = runtime.requestFromServer('item/commandExecution/requestApproval', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'command-2',
+      command: 'touch should-not-run',
+    }, { id: 44, method: 'item/commandExecution/requestApproval' })
+    service.dispose()
+    await expect(cancelled).resolves.toEqual({ decision: 'cancel' })
+    database.close()
+  })
+
   it('lists, resumes, steers, and interrupts project conversations', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -90,6 +118,11 @@ describe('AgentService', () => {
     expect(loaded.threads.map(({ id }) => id)).toEqual(['thread-1'])
     const selected = await service.selectThread('thread-1')
     expect(selected.selectedThreadId).toBe('thread-1')
+    expect(selected.threadStates['thread-1']).toMatchObject({
+      threadId: 'thread-1',
+      turnId: 'turn-old',
+      turnStatus: 'completed',
+    })
     await service.steerTurn({ threadId: 'thread-1', turnId: 'turn-1', text: 'Also run tests' })
     await service.interruptTurn({ threadId: 'thread-1', turnId: 'turn-1' })
 

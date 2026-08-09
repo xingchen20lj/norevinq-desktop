@@ -1,0 +1,24 @@
+# 测试策略
+
+Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实闭环。
+
+## 本地命令
+
+- `pnpm verify`：严格类型检查、ESLint、脚本语法、单元/集成测试和生产构建。
+- `pnpm verify:ci`：在上述检查中启用 V8 覆盖率门槛。
+- `pnpm test:coverage`：生成 `coverage/index.html`、LCOV 和 JSON summary。
+- `pnpm test:e2e`：构建后运行真实 Electron 桌面回归；需要可用的 Codex app-server 和相应账户凭据。
+
+覆盖率是回归缺口信号，不等同于功能完成。全局最低门槛为 statements 78%、branches 65%、functions 80%、lines 85%；关键安全边界仍要求针对性断言和真实运行证据。
+
+## 自动化层级
+
+1. 单元测试覆盖协议解析、领域 reducer、路径约束、日志脱敏和状态转换。
+2. 集成测试使用真实临时 SQLite、Git 仓库、工作树和 app-server JSONL 替身。
+3. 崩溃注入测试验证空闲 app-server 自动恢复，而活动 turn 失败关闭且绝不自动重放副作用请求。
+4. Electron E2E 使用临时真实仓库，验证沙箱 Renderer、在线 Codex、DeepSeek（存在密钥时）、审批允许/拒绝、Git/diff/worktree、终端、文件预览、本地网页、计划任务和应用重启恢复。
+5. GitHub Actions 在 macOS 与 Windows 上执行 `verify:ci`。CI 构建通过不能替代 Windows 真机 UI、签名或安装程序验证。
+
+## 外部依赖
+
+在线 E2E 只在安全配置凭据的受控环境运行。缺少 DeepSeek Key 时跳过 DeepSeek 在线分支；缺少 Codex 登录时不得把协议替身结果宣称为在线模型验证。Codex Security 扫描受账户权限与费用预算约束，部分产物不作为成功结果导入。
