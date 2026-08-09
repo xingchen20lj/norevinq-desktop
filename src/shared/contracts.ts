@@ -63,6 +63,11 @@ import type {
   SecuritySnapshot,
   SecuritySubscription,
 } from './security.js'
+import type {
+  ScheduledTaskInput,
+  SchedulerSnapshot,
+  SchedulerSubscription,
+} from './scheduler.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -126,6 +131,14 @@ export const IPC_CHANNELS = {
   securityFindingAction: 'security:finding-action',
   securityExport: 'security:export',
   securityChanged: 'security:changed',
+  schedulerState: 'scheduler:state',
+  schedulerSave: 'scheduler:save',
+  schedulerPause: 'scheduler:pause',
+  schedulerDelete: 'scheduler:delete',
+  schedulerRunNow: 'scheduler:run-now',
+  schedulerCancelRun: 'scheduler:cancel-run',
+  schedulerMarkRead: 'scheduler:mark-read',
+  schedulerChanged: 'scheduler:changed',
 } as const
 
 export type ProjectSummary = {
@@ -213,4 +226,12 @@ export type AsterDesktopApi = {
   runSecurityFindingAction: (input: SecurityFindingActionInput) => Promise<SecurityFindingActionResult>
   exportSecurityFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
   onSecurityChanged: (subscription: SecuritySubscription) => () => void
+  getSchedulerState: () => Promise<SchedulerSnapshot>
+  saveScheduledTask: (input: ScheduledTaskInput) => Promise<SchedulerSnapshot>
+  setScheduledTaskPaused: (input: { taskId: string; paused: boolean }) => Promise<SchedulerSnapshot>
+  deleteScheduledTask: (input: { taskId: string }) => Promise<SchedulerSnapshot>
+  runScheduledTaskNow: (input: { taskId: string }) => Promise<SchedulerSnapshot>
+  cancelScheduledRun: (input: { runId: string }) => Promise<SchedulerSnapshot>
+  markScheduledRunsRead: (input: { runIds?: string[] }) => Promise<SchedulerSnapshot>
+  onSchedulerChanged: (subscription: SchedulerSubscription) => () => void
 }

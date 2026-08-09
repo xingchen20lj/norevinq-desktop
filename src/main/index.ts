@@ -20,6 +20,9 @@ import { DiffService } from './git/diffService.js'
 import { TerminalService } from './terminal/terminalService.js'
 import { IntegrationService } from './integrations/integrationService.js'
 import { SecurityService } from './security/securityService.js'
+import { SchedulerService } from './scheduler/schedulerService.js'
+import type { ScheduledTask } from '../shared/scheduler.js'
+import type { ConversationSnapshot } from '../shared/conversation.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -35,6 +38,7 @@ let diffService: DiffService | null = null
 let terminalService: TerminalService | null = null
 let integrationService: IntegrationService | null = null
 let securityService: SecurityService | null = null
+let schedulerService: SchedulerService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -107,12 +111,16 @@ if (!gotLock) {
     })
     providerService = new ProviderService(runtime, credentialStore, environmentDeepSeekKey)
     gitService = new GitService(database)
-    worktreeService = new WorktreeService(database, join(userData, 'worktrees'))
+    const createdWorktreeService = new WorktreeService(database, join(userData, 'worktrees'))
+    worktreeService = createdWorktreeService
     diffService = new DiffService(database, gitService)
     terminalService = new TerminalService(runtime, database)
-    agentService = new AgentService(runtime, database)
+    const createdAgentService = new AgentService(runtime, database)
+    agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)
     securityService = new SecurityService(database, join(userData, 'security'))
+    schedulerService = new SchedulerService(database, (task, projectId, signal) =>
+      executeScheduledTask(createdAgentService, createdWorktreeService, task, projectId, signal))
     unregisterIpc = registerIpc(
       database,
       runtime,
@@ -124,9 +132,10 @@ if (!gotLock) {
       terminalService,
       integrationService,
       securityService,
+      schedulerService,
     )
     mainWindow = createMainWindow()
-    void runtime.start()
+    void runtime.start().then(() => schedulerService?.start())
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow()
@@ -139,10 +148,10 @@ app.on('window-all-closed', () => {
 })
 
 app.on('before-quit', () => {
+  schedulerService?.stop()
+  schedulerService = null
   unregisterIpc?.()
   unregisterIpc = null
-  database?.close()
-  database = null
   agentService?.dispose()
   agentService = null
   providerService = null
@@ -159,6 +168,8 @@ app.on('before-quit', () => {
   runtime = null
   void runtimeLogger?.close()
   runtimeLogger = null
+  database?.close()
+  database = null
 })
 
 function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
@@ -167,4 +178,85 @@ function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
   } catch {
     return null
   }
+}
+
+async function executeScheduledTask(
+  agent: AgentService,
+  worktrees: WorktreeService,
+  task: ScheduledTask,
+  projectId: string,
+  signal: AbortSignal,
+): Promise<{ threadId: string; worktreeId?: string; summary: string }> {
+  const worktree = task.executionTarget === 'worktree'
+    ? await worktrees.create({ projectId, copyIncludes: true })
+    : null
+  if (signal.aborted) throw signal.reason
+  const existingThreadId = task.conversationMode === 'continue' ? task.threadIds[projectId] : undefined
+  const started = await agent.startScheduledConversation({
+    projectId,
+    ...(worktree ? { worktreeId: worktree.id } : {}),
+    text: task.prompt,
+    ...(task.model ? { model: task.model } : {}),
+    ...(task.model?.startsWith('deepseek-') ? { modelProvider: 'deepseek' } : {}),
+    ...(task.reasoningEffort ? { reasoningEffort: task.reasoningEffort } : {}),
+    approvalPolicy: 'never',
+    sandbox: task.sandbox,
+  }, existingThreadId)
+  const summary = await waitForScheduledTurn(agent, started.threadId, started.turnId, signal)
+  return {
+    threadId: started.threadId,
+    ...(worktree ? { worktreeId: worktree.id } : {}),
+    summary,
+  }
+}
+
+function waitForScheduledTurn(
+  agent: AgentService,
+  threadId: string,
+  turnId: string | null,
+  signal: AbortSignal,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const timeout = setTimeout(() => finish(new Error('计划任务超过 6 小时运行上限。')), 6 * 60 * 60 * 1_000)
+    let unsubscribe = (): void => undefined
+    const subscribed = agent.subscribe((snapshot) => inspect(snapshot))
+    installSubscription(subscribed)
+    const abort = (): void => {
+      if (settled) return
+      const state = agent.getSnapshot().threadStates[threadId]
+      const activeTurnId = state?.turnId ?? turnId
+      if (activeTurnId) void agent.interruptTurn({ threadId, turnId: activeTurnId }).catch(() => undefined)
+      else finish(signal.reason instanceof Error ? signal.reason : new Error('计划任务已取消。'))
+    }
+    signal.addEventListener('abort', abort, { once: true })
+    if (signal.aborted) abort()
+
+    function inspect(snapshot: ConversationSnapshot): void {
+      const state = snapshot.threadStates[threadId]
+      if (!state || (turnId && state.turnId !== turnId)) return
+      if (state.turnStatus === 'inProgress' || state.turnStatus === 'idle' || state.turnStatus === 'unknown') return
+      if (state.turnStatus === 'completed') {
+        const message = [...state.activities].reverse().find((activity) => activity.type === 'agentMessage')
+        finish(null, message?.type === 'agentMessage' ? message.text : '计划任务已完成。')
+      } else {
+        finish(new Error(state.lastError?.message ?? `计划任务以 ${state.turnStatus} 结束。`))
+      }
+    }
+
+    function finish(error: Error | null, summary = ''): void {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      signal.removeEventListener('abort', abort)
+      unsubscribe()
+      if (error) reject(error)
+      else resolve(summary)
+    }
+
+    function installSubscription(dispose: () => void): void {
+      unsubscribe = dispose
+      if (settled) unsubscribe()
+    }
+  })
 }

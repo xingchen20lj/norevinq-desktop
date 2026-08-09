@@ -310,6 +310,46 @@ button { color: inherit; }
 .security-artifact header span { flex: 1; color: #d3a94f; font-size: 8.5px; }
 .security-artifact header .icon-button { margin-left: auto; }
 .security-artifact pre { min-width: 0; min-height: 0; overflow: auto; margin: 0; padding: 12px; color: var(--muted); font: 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.secondary-nav > b, .settings-tabs button > b { display: grid; min-width: 16px; height: 16px; margin-left: auto; place-items: center; border-radius: 999px; color: #fff; background: var(--accent); font-size: 8px; }
+.scheduler-workbench { width: min(940px, 100%); }
+.settings-tabs .scheduler-add { margin-left: auto; color: var(--accent-strong); }
+.scheduled-runs, .scheduled-task-list { display: grid; gap: 7px; }
+.scheduled-runs article { display: grid; grid-template-columns: auto minmax(0, 1fr) auto auto; align-items: center; gap: 9px; min-height: 64px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--bg); }
+.scheduled-runs article.unread { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: color-mix(in srgb, var(--accent) 4%, var(--bg)); }
+.scheduled-runs article > i { width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); }
+.scheduled-runs article > i.running { background: var(--accent); }
+.scheduled-runs article > i.succeeded { background: #55b982; }
+.scheduled-runs article > i.failed { background: var(--danger); }
+.scheduled-runs article > div { display: grid; min-width: 0; gap: 3px; }
+.scheduled-runs strong { font-size: 10.5px; }
+.scheduled-runs span { color: var(--subtle); font-size: 8px; }
+.scheduled-runs p { overflow: hidden; margin: 1px 0 0; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.scheduled-runs em { color: var(--muted); font-size: 8.5px; font-style: normal; }
+.scheduled-runs button { border: 0; color: var(--accent-strong); background: transparent; font-size: 8.5px; cursor: pointer; }
+.scheduled-task-list > article { padding: 11px; border: 1px solid var(--border); border-radius: 9px; background: var(--bg); }
+.scheduled-task-list header { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+.scheduled-task-list header > div { display: grid; gap: 3px; }
+.scheduled-task-list header strong { font-size: 11px; }
+.scheduled-task-list header span { color: var(--subtle); font-size: 8.5px; }
+.scheduled-task-list header i { padding: 3px 6px; border-radius: 999px; color: var(--subtle); background: var(--surface-2); font-size: 8px; font-style: normal; }
+.scheduled-task-list header i.active { color: #55b982; }
+.scheduled-task-list article > p { overflow: hidden; margin: 9px 0; color: var(--muted); font-size: 9.5px; line-height: 1.45; text-overflow: ellipsis; white-space: nowrap; }
+.task-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.task-chips span { padding: 3px 6px; border-radius: 5px; color: var(--subtle); background: var(--surface-2); font-size: 8px; }
+.scheduled-task-list footer { display: flex; justify-content: flex-end; gap: 5px; margin-top: 10px; }
+.scheduled-task-list footer button { display: flex; align-items: center; gap: 4px; height: 25px; padding: 0 7px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: var(--surface); font-size: 8.5px; cursor: pointer; }
+.scheduled-task-list footer button.danger-button { color: var(--danger); }
+.scheduler-form { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.scheduler-form > label { display: grid; min-width: 0; gap: 5px; color: var(--muted); font-size: 9px; }
+.scheduler-form .wide { grid-column: 1 / -1; }
+.scheduler-form input, .scheduler-form textarea, .scheduler-form select { width: 100%; border: 1px solid var(--border); border-radius: 7px; outline: 0; color: var(--text); background: var(--bg); font-size: 9.5px; }
+.scheduler-form input, .scheduler-form select { height: 32px; padding: 0 8px; }
+.scheduler-form textarea { resize: vertical; padding: 8px; line-height: 1.5; }
+.scheduler-form small { color: var(--subtle); font-size: 8px; }
+.scheduler-form fieldset { display: flex; flex-wrap: wrap; gap: 7px 14px; margin: 0; padding: 9px; border: 1px solid var(--border); border-radius: 7px; }
+.scheduler-form legend { padding: 0 4px; color: var(--muted); font-size: 9px; }
+.scheduler-form fieldset label { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 9px; }
+.scheduler-form fieldset input { width: auto; height: auto; }
 
 .integration-request-panel { position: fixed; z-index: 6; right: 30px; bottom: 145px; left: 282px; display: grid; gap: 9px; width: min(820px, calc(100% - 312px)); max-height: 340px; overflow: auto; margin: auto; padding: 12px; border: 1px solid color-mix(in srgb, var(--accent) 38%, var(--border)); border-radius: 11px; background: color-mix(in srgb, var(--surface) 97%, transparent); box-shadow: 0 14px 40px rgba(0,0,0,.28); }
 .integration-request-heading { display: flex; align-items: flex-start; gap: 8px; color: var(--accent-strong); }

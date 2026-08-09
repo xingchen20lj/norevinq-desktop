@@ -45,6 +45,7 @@ import type {
   SecuritySnapshot,
   SecuritySubscription,
 } from '../shared/security.js'
+import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -149,6 +150,19 @@ const api: AsterDesktopApi = {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: SecuritySnapshot): void => subscription(snapshot)
     ipcRenderer.on(IPC_CHANNELS.securityChanged, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.securityChanged, listener)
+  },
+  getSchedulerState: () => ipcRenderer.invoke(IPC_CHANNELS.schedulerState),
+  saveScheduledTask: (input: ScheduledTaskInput) => ipcRenderer.invoke(IPC_CHANNELS.schedulerSave, input),
+  setScheduledTaskPaused: (input: { taskId: string; paused: boolean }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.schedulerPause, input),
+  deleteScheduledTask: (input: { taskId: string }) => ipcRenderer.invoke(IPC_CHANNELS.schedulerDelete, input),
+  runScheduledTaskNow: (input: { taskId: string }) => ipcRenderer.invoke(IPC_CHANNELS.schedulerRunNow, input),
+  cancelScheduledRun: (input: { runId: string }) => ipcRenderer.invoke(IPC_CHANNELS.schedulerCancelRun, input),
+  markScheduledRunsRead: (input: { runIds?: string[] }) => ipcRenderer.invoke(IPC_CHANNELS.schedulerMarkRead, input),
+  onSchedulerChanged: (subscription: SchedulerSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: SchedulerSnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.schedulerChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.schedulerChanged, listener)
   },
 }
 

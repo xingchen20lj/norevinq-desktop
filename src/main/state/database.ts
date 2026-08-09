@@ -4,6 +4,7 @@ import { basename } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { ProjectSummary } from '../../shared/contracts.js'
 import type { SecurityScanRecord } from '../../shared/security.js'
+import type { ScheduledRun, ScheduledTask } from '../../shared/scheduler.js'
 import type { ManagedWorktree } from '../../shared/worktree.js'
 
 type ProjectRow = {
@@ -210,6 +211,78 @@ export class StateDatabase {
     return row ? toSecurityScanRecord(row) : null
   }
 
+  upsertScheduledTask(task: ScheduledTask): void {
+    this.#database.prepare(`
+      INSERT INTO scheduled_tasks (id, task_json, status, next_run_at, updated_at)
+      VALUES (?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET task_json=excluded.task_json, status=excluded.status,
+        next_run_at=excluded.next_run_at, updated_at=excluded.updated_at
+    `).run(task.id, JSON.stringify(task), task.status, task.nextRunAt, task.updatedAt)
+  }
+
+  getScheduledTask(taskId: string): ScheduledTask | null {
+    const row = this.#database.prepare('SELECT task_json FROM scheduled_tasks WHERE id = ?')
+      .get(taskId) as { task_json: string } | undefined
+    return row ? JSON.parse(row.task_json) as ScheduledTask : null
+  }
+
+  listScheduledTasks(): ScheduledTask[] {
+    const rows = this.#database.prepare('SELECT task_json FROM scheduled_tasks ORDER BY updated_at DESC')
+      .all() as { task_json: string }[]
+    return rows.map(({ task_json }) => JSON.parse(task_json) as ScheduledTask)
+  }
+
+  deleteScheduledTask(taskId: string): void {
+    this.#database.prepare('DELETE FROM scheduled_tasks WHERE id = ?').run(taskId)
+  }
+
+  upsertScheduledRun(run: ScheduledRun): void {
+    this.#database.prepare(`
+      INSERT INTO scheduled_runs (id, task_id, run_json, status, scheduled_for, unread)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET run_json=excluded.run_json, status=excluded.status,
+        scheduled_for=excluded.scheduled_for, unread=excluded.unread
+    `).run(run.id, run.taskId, JSON.stringify(run), run.status, run.scheduledFor, run.unread ? 1 : 0)
+  }
+
+  listScheduledRuns(limit = 200): ScheduledRun[] {
+    const bounded = Math.max(1, Math.min(1_000, Math.trunc(limit)))
+    const rows = this.#database.prepare('SELECT run_json FROM scheduled_runs ORDER BY scheduled_for DESC LIMIT ?')
+      .all(bounded) as { run_json: string }[]
+    return rows.map(({ run_json }) => JSON.parse(run_json) as ScheduledRun)
+  }
+
+  listDueScheduledRuns(now: string): ScheduledRun[] {
+    const rows = this.#database.prepare(`
+      SELECT run_json FROM scheduled_runs WHERE status = 'queued' AND scheduled_for <= ?
+      ORDER BY scheduled_for ASC LIMIT 100
+    `).all(now) as { run_json: string }[]
+    return rows.map(({ run_json }) => JSON.parse(run_json) as ScheduledRun)
+  }
+
+  markScheduledRunsRead(runIds?: string[]): void {
+    const runs = this.listScheduledRuns(1_000)
+    const selected = runIds ? new Set(runIds) : null
+    for (const run of runs) {
+      if (!run.unread || (selected && !selected.has(run.id))) continue
+      this.upsertScheduledRun({ ...run, unread: false })
+    }
+  }
+
+  recoverInterruptedScheduledRuns(): void {
+    const now = new Date().toISOString()
+    for (const run of this.listScheduledRuns(1_000)) {
+      if (run.status !== 'running') continue
+      this.upsertScheduledRun({
+        ...run,
+        status: 'failed',
+        finishedAt: now,
+        error: '应用在计划任务运行期间退出；为避免重复副作用，未自动重放。',
+        unread: true,
+      })
+    }
+  }
+
   #migrate(): void {
     const version = this.#database.prepare('PRAGMA user_version').get() as { user_version: number }
     if (version.user_version < 1) {
@@ -279,6 +352,31 @@ export class StateDatabase {
         CREATE INDEX IF NOT EXISTS security_scans_project_idx
           ON security_scans(project_id, created_at DESC);
         PRAGMA user_version = 4;
+        COMMIT;
+      `)
+    }
+    if (version.user_version < 5) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS scheduled_tasks (
+          id TEXT PRIMARY KEY,
+          task_json TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('active', 'paused')),
+          next_run_at TEXT,
+          updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS scheduled_tasks_due_idx ON scheduled_tasks(status, next_run_at);
+        CREATE TABLE IF NOT EXISTS scheduled_runs (
+          id TEXT PRIMARY KEY,
+          task_id TEXT NOT NULL,
+          run_json TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled', 'skipped')),
+          scheduled_for TEXT NOT NULL,
+          unread INTEGER NOT NULL DEFAULT 0 CHECK (unread IN (0, 1))
+        );
+        CREATE INDEX IF NOT EXISTS scheduled_runs_due_idx ON scheduled_runs(status, scheduled_for);
+        CREATE INDEX IF NOT EXISTS scheduled_runs_task_idx ON scheduled_runs(task_id, scheduled_for DESC);
+        PRAGMA user_version = 5;
         COMMIT;
       `)
     }

@@ -16,6 +16,7 @@ flowchart LR
   Main --> DB["SQLite 状态库"]
   Main --> Keys["系统凭据保险库"]
   Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
+  Main --> Scheduler["SQLite / RRULE<br/>计划任务队列"]
   Runtime --> Providers["OpenAI / DeepSeek / 自定义 Responses Provider"]
 ```
 
@@ -36,7 +37,7 @@ flowchart LR
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。
 - `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.8/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
-- `src/main/scheduler`：RRULE、持久化队列、错过运行和隔离工作树。
+- `src/main/scheduler`：IANA 时区/RFC 5545 RRULE、SQLite 持久化队列、错过运行、重试、取消和真实 app-server/worktree 执行。
 
 ## 关键不变量
 
@@ -52,6 +53,7 @@ flowchart LR
 10. worktree 路径由主进程创建和登记；renderer/agent 只能传 worktree UUID，不能直接注入 cwd。
 11. Security 输出固定在 userData 私有目录且不位于任何被扫工作树内；只有 completed + sealed contract 的扫描可导入 finding、报告或执行验证/修复。
 12. Security validate/patch/false-positive/export 只通过官方 CLI 参数数组调用；patch 要求 UI 显式二次确认，renderer 不能指定路径或原始命令。
+13. 计划任务只执行已登记项目；同一任务不重叠，崩溃后运行标记失败且不自动重放，避免重复文件或命令副作用。
 
 ## 上游与公开资料
 

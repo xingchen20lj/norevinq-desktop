@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
 
 test('starts with a sandboxed renderer and real project action', async () => {
-  test.setTimeout(240_000)
+  test.setTimeout(330_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-e2e-'))
   const projectPath = mkdtempSync(join(profile, 'project-'))
   const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
@@ -97,6 +97,27 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(security).toContainText('产物目录已隔离')
     await window.screenshot({ path: 'test-results/aster-security.png' })
     await window.getByRole('button', { name: '关闭安全工作台' }).click()
+
+    await window.getByRole('button', { name: '计划任务', exact: true }).click()
+    const scheduler = window.getByRole('dialog', { name: '计划任务工作台' })
+    await expect(scheduler).toBeVisible()
+    await scheduler.getByRole('button', { name: '任务', exact: true }).click()
+    await scheduler.getByRole('button', { name: '新建', exact: true }).click()
+    await scheduler.getByLabel('名称').fill('E2E 计划验证')
+    await scheduler.getByLabel('每次运行的持久提示词').fill('Reply with exactly ASTER_SCHEDULED_OK and do not use tools.')
+    await scheduler.getByLabel('执行位置').selectOption('local')
+    await scheduler.getByLabel('沙箱').selectOption('read-only')
+    await scheduler.getByRole('button', { name: '保存计划任务', exact: true }).click()
+    await expect(scheduler).toContainText('E2E 计划验证')
+    await scheduler.getByRole('button', { name: '立即运行', exact: true }).click()
+    await scheduler.getByRole('button', { name: /^收件箱/ }).click()
+    await expect(scheduler).toContainText('ASTER_SCHEDULED_OK', { timeout: 90_000 })
+    await expect(scheduler).toContainText('完成')
+    await expect(scheduler.getByRole('button', { name: '已读', exact: true })).toBeVisible()
+    await window.screenshot({ path: 'test-results/aster-scheduler.png' })
+    await scheduler.getByRole('button', { name: '已读', exact: true }).click()
+    await expect(scheduler.getByRole('button', { name: '已读', exact: true })).toHaveCount(0)
+    await window.getByRole('button', { name: '关闭计划任务' }).click()
 
     await window.getByLabel('任务输入').fill('instruction proof')
     await window.getByRole('button', { name: '发送任务' }).click()

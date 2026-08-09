@@ -139,6 +139,47 @@ export class AgentService {
     return this.#snapshot
   }
 
+  async startScheduledConversation(
+    input: StartConversationInput,
+    existingThreadId?: string,
+  ): Promise<{ threadId: string; turnId: string | null }> {
+    const text = requirePrompt(input.text)
+    await this.#runtime.start()
+    if (existingThreadId) {
+      const resumed = asRecord(await this.#runtime.request('thread/resume', { threadId: existingThreadId }))
+      this.#hydrateThread(asRecord(resumed.thread))
+      const turnId = await this.#startTurn({
+        threadId: existingThreadId,
+        text,
+        ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+      })
+      return { threadId: existingThreadId, turnId }
+    }
+
+    const project = this.#requireProject(input.projectId)
+    const workingPath = input.worktreeId
+      ? this.#requireWorktreePath(input.projectId, input.worktreeId)
+      : project.path
+    const params: Record<string, JsonValue> = {
+      approvalPolicy: input.approvalPolicy ?? 'never',
+      cwd: workingPath,
+      sandbox: input.sandbox ?? 'read-only',
+    }
+    if (input.model) params.model = input.model
+    if (input.modelProvider) params.modelProvider = input.modelProvider
+    const result = asRecord(await this.#runtime.request('thread/start', params))
+    const thread = asRecord(result.thread)
+    const threadId = requireString(thread.id, 'thread.id')
+    this.#database.associateThread(input.projectId, threadId)
+    this.#update({ threads: upsertThread(this.#snapshot.threads, toThreadSummary(thread)) })
+    const turnId = await this.#startTurn({
+      threadId,
+      text,
+      ...(input.reasoningEffort ? { reasoningEffort: input.reasoningEffort } : {}),
+    })
+    return { threadId, turnId }
+  }
+
   async startTurn(input: StartTurnInput): Promise<ConversationSnapshot> {
     await this.#runtime.start()
     await this.#startTurn({ ...input, text: requirePrompt(input.text) })
@@ -180,7 +221,7 @@ export class AgentService {
     this.#subscriptions.clear()
   }
 
-  async #startTurn(input: StartTurnInput): Promise<void> {
+  async #startTurn(input: StartTurnInput): Promise<string | null> {
     const params: Record<string, JsonValue> = {
       clientUserMessageId: randomUUID(),
       input: [textInput(input.text)],
@@ -189,7 +230,8 @@ export class AgentService {
     if (input.reasoningEffort) params.effort = input.reasoningEffort
     this.#runtime.markTurnStarted()
     try {
-      asRecord(await this.#runtime.request('turn/start', params))
+      const result = asRecord(await this.#runtime.request('turn/start', params))
+      return optionalString(asOptionalRecord(result.turn)?.id)
     } catch (error) {
       this.#runtime.markTurnCompleted()
       throw error

@@ -48,6 +48,7 @@ import type {
   SecuritySnapshot,
   SecuritySubscription,
 } from '../shared/security.js'
+import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -139,6 +140,17 @@ export type SecurityController = {
   exportFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
 }
 
+export type SchedulerController = {
+  getSnapshot: () => SchedulerSnapshot
+  subscribe: (subscription: SchedulerSubscription) => () => void
+  saveTask: (input: ScheduledTaskInput) => SchedulerSnapshot
+  setPaused: (taskId: string, paused: boolean) => SchedulerSnapshot
+  deleteTask: (taskId: string) => SchedulerSnapshot
+  runNow: (taskId: string) => SchedulerSnapshot
+  cancelRun: (runId: string) => SchedulerSnapshot
+  markRead: (runIds?: string[]) => SchedulerSnapshot
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -150,6 +162,7 @@ export function registerIpc(
   terminals: TerminalController,
   integrations: IntegrationController,
   security: SecurityController,
+  scheduler: SchedulerController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -175,6 +188,11 @@ export function registerIpc(
   const unsubscribeSecurity = security.subscribe((snapshot) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.securityChanged, snapshot)
+    }
+  })
+  const unsubscribeScheduler = scheduler.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.schedulerChanged, snapshot)
     }
   })
 
@@ -375,6 +393,42 @@ export function registerIpc(
   })
   ipcMain.handle(IPC_CHANNELS.securityExport, (_event, input: unknown) =>
     security.exportFindings(securityExportSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.schedulerState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return scheduler.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.schedulerSave, (_event, input: unknown) => {
+    const parsed = scheduledTaskSchema.parse(input)
+    return scheduler.saveTask({
+      name: parsed.name,
+      prompt: parsed.prompt,
+      projectIds: parsed.projectIds,
+      rrule: parsed.rrule,
+      timezone: parsed.timezone,
+      executionTarget: parsed.executionTarget,
+      conversationMode: parsed.conversationMode,
+      sandbox: parsed.sandbox,
+      missedRunPolicy: parsed.missedRunPolicy,
+      maxAttempts: parsed.maxAttempts,
+      retryBackoffMinutes: parsed.retryBackoffMinutes,
+      ...(parsed.id === undefined ? {} : { id: parsed.id }),
+      ...(parsed.model === undefined ? {} : { model: parsed.model }),
+      ...(parsed.reasoningEffort === undefined ? {} : { reasoningEffort: parsed.reasoningEffort }),
+    })
+  })
+  ipcMain.handle(IPC_CHANNELS.schedulerPause, (_event, input: unknown) => {
+    const parsed = scheduledTaskPauseSchema.parse(input)
+    return scheduler.setPaused(parsed.taskId, parsed.paused)
+  })
+  ipcMain.handle(IPC_CHANNELS.schedulerDelete, (_event, input: unknown) =>
+    scheduler.deleteTask(taskIdSchema.parse(input).taskId))
+  ipcMain.handle(IPC_CHANNELS.schedulerRunNow, (_event, input: unknown) =>
+    scheduler.runNow(taskIdSchema.parse(input).taskId))
+  ipcMain.handle(IPC_CHANNELS.schedulerCancelRun, (_event, input: unknown) =>
+    scheduler.cancelRun(runIdSchema.parse(input).runId))
+  ipcMain.handle(IPC_CHANNELS.schedulerMarkRead, (_event, input: unknown) =>
+    scheduler.markRead(markScheduledReadSchema.parse(input).runIds))
 
   return () => {
     unsubscribeRuntime()
@@ -382,6 +436,7 @@ export function registerIpc(
     unsubscribeTerminal()
     unsubscribeIntegrations()
     unsubscribeSecurity()
+    unsubscribeScheduler()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
   }
@@ -434,6 +489,26 @@ const securityExportSchema = z.object({
   scanId: z.uuid(),
   format: z.enum(['json', 'csv', 'sarif']),
 })
+const scheduledTaskSchema = z.object({
+  id: z.uuid().optional(),
+  name: z.string().trim().min(1).max(160),
+  prompt: z.string().trim().min(1).max(100_000),
+  projectIds: z.array(z.uuid()).min(1).max(20),
+  rrule: z.string().trim().min(1).max(2_000),
+  timezone: z.string().trim().min(1).max(100),
+  executionTarget: z.enum(['local', 'worktree']),
+  conversationMode: z.enum(['new', 'continue']),
+  model: z.string().trim().min(1).max(200).optional(),
+  reasoningEffort: z.string().trim().min(1).max(40).optional(),
+  sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']),
+  missedRunPolicy: z.enum(['run_once', 'skip']),
+  maxAttempts: z.number().int().min(1).max(4),
+  retryBackoffMinutes: z.number().int().min(1).max(1_440),
+})
+const scheduledTaskPauseSchema = z.object({ taskId: z.uuid(), paused: z.boolean() })
+const taskIdSchema = z.object({ taskId: z.uuid() })
+const runIdSchema = z.object({ runId: z.uuid() })
+const markScheduledReadSchema = z.object({ runIds: z.array(z.uuid()).max(500).optional() })
 const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({

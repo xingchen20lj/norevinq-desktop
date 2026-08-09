@@ -74,6 +74,18 @@
 - [Codex Security SDK 官方文档](https://learn.chatgpt.com/docs/security/sdk)
 - [TypeScript SDK 源码](https://github.com/openai/codex-security/tree/main/sdk/typescript)
 
+## Codex 计划任务
+
+- 官方桌面计划任务在本地运行，要求电脑开机且 Codex 桌面应用正在运行；公开文档没有提供由 app-server 管理计划任务的稳定 RPC。
+- 任务可在 Local 或隔离 worktree 中运行；独立自动化每次创建新任务，也可从已有任务上下文创建继续型自动化。
+- 高级调度使用 RFC 5545 RRULE；运行结果进入带未读状态的收件箱。
+- 官方建议保留默认沙箱边界。无人值守运行不能在中途等待审批；组织策略不允许 `never` 时应明确失败，而非静默提升权限。
+- 因此 Aster Code 在主进程实现本地 RRULE/SQLite 调度器，并把实际执行交给 app-server。它不伪装成 Codex CLI 的调度管理接口，也不声称应用退出后仍能后台运行。
+
+来源：
+
+- [Codex Scheduled Tasks](https://learn.chatgpt.com/docs/automations)
+
 ## 本机开发环境
 
 - macOS 15.7.9，Intel x86_64，16 GiB 内存。

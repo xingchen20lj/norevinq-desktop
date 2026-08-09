@@ -43,6 +43,8 @@ import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } 
 import type { SecuritySnapshot } from '../../shared/security'
 import { SettingsWorkbench } from './SettingsWorkbench'
 import { SecurityWorkbench } from './SecurityWorkbench'
+import type { SchedulerSnapshot } from '../../shared/scheduler'
+import { SchedulerWorkbench } from './SchedulerWorkbench'
 
 type Theme = 'dark' | 'light'
 
@@ -62,6 +64,8 @@ export function App(): React.JSX.Element {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [securityOpen, setSecurityOpen] = useState(false)
   const [security, setSecurity] = useState<SecuritySnapshot | null>(null)
+  const [schedulerOpen, setSchedulerOpen] = useState(false)
+  const [scheduler, setScheduler] = useState<SchedulerSnapshot | null>(null)
   const [deepSeekKey, setDeepSeekKey] = useState('')
   const [gitStatus, setGitStatus] = useState<GitRepositorySnapshot | null>(null)
   const [gitOpen, setGitOpen] = useState(false)
@@ -109,6 +113,13 @@ export function App(): React.JSX.Element {
     void window.aster.refreshSecurityRuntime().then(setSecurity)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [securityOpen])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onSchedulerChanged(setScheduler)
+    void window.aster.getSchedulerState().then(setScheduler)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
+  }, [])
 
   useEffect(() => {
     const unsubscribe = window.aster.onIntegrationChanged(setIntegrations)
@@ -375,7 +386,7 @@ export function App(): React.JSX.Element {
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="secondary-nav"><Clock3 size={16} />计划任务</button>
+          <button className="secondary-nav" onClick={() => setSchedulerOpen(true)}><Clock3 size={16} />计划任务{Boolean(scheduler?.unreadRuns) && <b>{scheduler?.unreadRuns}</b>}</button>
           <button className="secondary-nav" onClick={() => setSecurityOpen(true)}><ShieldCheck size={16} />安全{security?.activeScanId && <span className="active-indicator" />}</button>
           <button className="secondary-nav" onClick={() => setSettingsOpen(true)}><Settings size={16} />设置</button>
           <div className="sidebar-footer">
@@ -498,6 +509,13 @@ export function App(): React.JSX.Element {
         snapshot={security}
         project={selectedProject}
         close={() => setSecurityOpen(false)}
+        onError={setError}
+      />}
+      {schedulerOpen && <SchedulerWorkbench
+        snapshot={scheduler}
+        projects={projects}
+        models={runtime?.models ?? []}
+        close={() => setSchedulerOpen(false)}
         onError={setError}
       />}
     </div>
