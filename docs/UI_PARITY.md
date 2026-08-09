@@ -9,7 +9,7 @@
 | 输入区 | 多行输入、附件、模型、推理强度、Local/Worktree、权限、发送/停止 | 部分实现：真实发送、追加指令、模型/强度和停止；附件/Worktree/权限选择待接入 |
 | 顶栏 | 项目/工作树上下文、任务标题、Handoff、Git/终端/预览入口 | 部分实现：真实分支、变更计数和 Git 面板；Worktree/Handoff/预览待开发 |
 | 活动时间线 | agent 消息、推理摘要、命令、文件变更、工具、审批、子任务 | 部分实现：真实文本、命令、文件与中断状态已视觉验证；MCP/子任务和大型活动待压测 |
-| 差异面板 | 文件列表、统计、行内评论、stage/revert、unified/split | 部分实现：真实 working/staged unified diff 和统计；split/评论/区块操作待补 |
+| 差异面板 | 文件列表、统计、行内评论、stage/revert、unified/split | 已测试：真实 working/staged、unified/split、行号、评论→Codex、区块 stage/unstage/revert；整文件 recoverable discard 待文件工作台 |
 | 终端面板 | 多会话、PTY、搜索/清屏、尺寸同步、长输出 | 尚未开发 |
 | 工作树 | 基线分支选择、创建进度、分支占用、Handoff、恢复 | 部分实现：detached/显式分支创建、Local 切换、锁定和移除；Handoff 与基线选择器待补 |
 | 审批 | 明确动作、理由、影响范围、允许一次/会话/拒绝 | 部分实现：真实文件审批允许闭环已验证；命令真实审批、拒绝和会话允许 E2E 待补 |

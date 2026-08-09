@@ -15,7 +15,7 @@ import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtim
 import type { SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type { GitCommitInput, GitPathsInput, GitProjectInput, GitPushInput } from '../shared/git.js'
 import type { CreateWorktreeInput, ListWorktreesInput, RemoveWorktreeInput, WorktreeActionInput } from '../shared/worktree.js'
-import type { GetDiffInput } from '../shared/diff.js'
+import type { ApplyDiffHunkInput, GetDiffInput } from '../shared/diff.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -59,6 +59,7 @@ const api: AsterDesktopApi = {
   unlockWorktree: (input: WorktreeActionInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeUnlock, input),
   removeWorktree: (input: RemoveWorktreeInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeRemove, input),
   getDiff: (input: GetDiffInput) => ipcRenderer.invoke(IPC_CHANNELS.diffGet, input),
+  applyDiffHunk: (input: ApplyDiffHunkInput) => ipcRenderer.invoke(IPC_CHANNELS.diffHunkApply, input),
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

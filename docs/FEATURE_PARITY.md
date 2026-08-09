@@ -50,7 +50,7 @@
 | DeepSeek | 图片、网络能力展示 | 部分实现 | 设置页明确图片/文件否、Web Search 是；搜索逐调用 UI 与真实回归待补 |
 | DeepSeek | 错误、限流、重试和取消 | 部分实现 | 通用 turn 错误/取消路径可用；provider 专属限流分类和重试 UI 待补 |
 | Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
-| Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage 真实测试；revert 与区块操作待 diff 阶段 |
+| Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage、区块 stage/unstage/revert 已真实测试；整文件 recoverable discard 待文件工作台 |
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
 | Git | 创建 PR | 尚未开发 | GitHub CLI/连接器可选 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
@@ -59,10 +59,10 @@
 | 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
 | 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |
 | 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、安全 remove 已实现；未提交快照/Handoff 待补 |
-| 差异 | 文件树和 unified/split diff | 部分实现 | working/staged 文件与 unified viewer 已真实测试；split view 待开发 |
-| 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量边界已实现；虚拟滚动待性能阶段 |
-| 差异 | 行内评论并发送给智能体 | 尚未开发 | 阶段 9 |
-| 差异 | 区块 stage/revert | 尚未开发 | 安全 patch 选择与反向应用仍在阶段 9 |
+| 差异 | 文件树和 unified/split diff | 已测试 | working/staged、准确新旧行号、unified/split 及浅色真实桌面截图通过 |
+| 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量、截断禁用操作与离屏 hunk `content-visibility`；单个超长 hunk 行窗口待性能阶段 |
+| 差异 | 行内评论并发送给智能体 | 已测试 | E2E 选择新增行，携带文件/行号/hunk/代码上下文真实追加并收到 `ASTER_REVIEW_OK` |
+| 差异 | 区块 stage/revert | 已测试 | 主进程不透明快照、`git apply --check`、单次失效；真实 stage/unstage/revert 与桌面 hunk stage 通过 |
 | 终端 | 每任务 PTY 终端 | 尚未开发 | 阶段 10 |
 | 终端 | 输入、调整尺寸、中断、退出 | 尚未开发 | node-pty |
 | 终端 | 输出环形缓冲和脱敏 | 尚未开发 | 防止无限内存增长 |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 尚未开发 | 不伪造扫描结果 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 13 个单测文件 68 项；真实 Electron 同时覆盖 OpenAI、DeepSeek、审批、命令、steer、interrupt |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 17 个测试文件 78 项；真实 Electron 覆盖 OpenAI、DeepSeek、审批、命令、steer、interrupt、Git diff/hunk/评论、worktree |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

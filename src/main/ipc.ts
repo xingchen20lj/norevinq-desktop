@@ -15,7 +15,7 @@ import type { StateDatabase } from './state/database.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type { GitRepositorySnapshot } from '../shared/git.js'
 import type { ManagedWorktree } from '../shared/worktree.js'
-import type { DiffMode, DiffSnapshot } from '../shared/diff.js'
+import type { ApplyDiffHunkInput, DiffMode, DiffSnapshot } from '../shared/diff.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -63,6 +63,7 @@ export type WorktreeController = {
 
 export type DiffController = {
   getDiff: (projectId: string, mode: DiffMode) => Promise<DiffSnapshot>
+  applyHunk: (input: ApplyDiffHunkInput) => Promise<DiffSnapshot>
 }
 
 export function registerIpc(
@@ -171,6 +172,8 @@ export function registerIpc(
     const parsed = diffGetSchema.parse(input)
     return diffs.getDiff(parsed.projectId, parsed.mode)
   })
+  ipcMain.handle(IPC_CHANNELS.diffHunkApply, (_event, input: unknown) =>
+    diffs.applyHunk(diffHunkApplySchema.parse(input)))
 
   return () => {
     unsubscribeRuntime()
@@ -232,3 +235,9 @@ const worktreeCreateSchema = z.object({
 const worktreeActionSchema = z.object({ worktreeId: z.uuid() })
 const worktreeRemoveSchema = z.object({ worktreeId: z.uuid(), force: z.boolean().optional() })
 const diffGetSchema = z.object({ projectId: z.uuid(), mode: z.enum(['working', 'staged']) })
+const diffHunkApplySchema = z.object({
+  projectId: z.uuid(),
+  snapshotId: z.uuid(),
+  hunkId: z.uuid(),
+  action: z.enum(['stage', 'unstage', 'revert']),
+})

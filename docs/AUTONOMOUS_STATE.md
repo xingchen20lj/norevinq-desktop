@@ -4,15 +4,15 @@
 
 ## 当前阶段
 
-阶段 9：代码差异审阅。
+阶段 10：集成终端。
 
 ## 当前任务
 
-- 实现工作区/已暂存 diff 读取、文件列表、统计和二进制检测。
-- 接入 unified/split 代码差异面板和大型 diff 边界。
-- 实现按区块 stage/unstage、显式 revert 与行内评论上下文。
-- 将评论/选中 diff 安全追加给当前智能体任务。
-- 已完成 working/staged unified diff 基础；当前聚焦区块操作、split view 和评论。
+- 调查当前 Electron/Node PTY 可用方案与跨平台原生构建边界。
+- 实现每任务终端会话、真实 PTY 生命周期、输入和尺寸同步。
+- 建立有界输出缓冲、退出状态、搜索、清屏和显式终止。
+- 将终端面板接入当前项目/托管工作树上下文。
+- 为 app-server 提供显式、受限的当前终端输出读取桥。
 
 ## 已完成任务
 
@@ -63,13 +63,19 @@
 - Electron E2E 创建、锁定/解锁、选择 worktree 作为真实 Codex cwd，任务完成后移除并恢复 Local。
 - 完成 working/staged diff、tracked/untracked/binary 归一、增删统计和 200 文件/2 MiB/16 MiB 预算。
 - Electron E2E 实际审阅智能体生成文件的 unified patch 后再暂存提交。
+- 完成结构化 hunk、新旧行号、unified/split 视图与离屏 hunk 原生渲染跳过。
+- 完成主进程随机快照/hunk 令牌、五分钟/64 快照边界、单次失效和截断禁用操作。
+- 完成 `git apply --check` 后的 hunk stage/unstage/revert；拒绝 untracked 破坏性 revert、符号链接跟随与仓库路径逃逸。
+- 真实仓库逐项验证远距离 hunk 单独 stage、unstage、revert、带空格无末尾换行文件和过期快照拒绝。
+- Electron E2E 在 split view 选择新增行，将评论真实追加给 Codex 并收到 `ASTER_REVIEW_OK`，随后 hunk stage 和 commit。
+- 实际检查 1320×840 浅色 split diff 截图，未见溢出、错位或对比度问题。
 
 ## 下一任务
 
-1. 在结构化 patch 上实现安全区块 stage/unstage 与反向 apply 检查。
-2. 增加 split view 和大型 patch 虚拟渲染。
-3. 实现行内评论并追加到当前智能体任务。
-4. 完成 diff 回归后进入集成终端。
+1. 选择并固定支持 macOS/Windows 的 PTY 适配层，隔离 Electron 原生 ABI。
+2. 实现主进程终端会话管理和最小类型化 IPC。
+3. 接入终端面板、项目/工作树 cwd、尺寸同步和有界输出。
+4. 完成真实 shell E2E、退出/终止/长输出回归后进入 MCP、技能和设置。
 
 ## 已做技术决策
 
@@ -86,7 +92,7 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：17 个单元/集成测试文件共 76 项通过；Electron E2E 另覆盖真实 unified diff 审阅；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：17 个单元/集成测试文件共 78 项通过；Electron E2E 真实覆盖 split diff、行内评论→Codex、hunk stage 和 commit；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
@@ -108,6 +114,5 @@
 
 ## 待验证问题
 
-- DeepSeek 经 app-server 完整执行文件修改的闭环仍待桌面运行时验证。
 - app-server 崩溃后 persisted thread 的重新 resume 与订阅恢复语义。
 - Codex Security SDK 当前安装包是否能在 Electron 主进程直接加载，或需要隔离 Node worker。

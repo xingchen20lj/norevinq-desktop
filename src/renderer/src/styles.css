@@ -163,6 +163,7 @@ button { color: inherit; }
 .settings-dialog footer > button:not(.primary-button) { height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: transparent; font-size: 10.5px; cursor: pointer; }
 
 .git-panel { position: absolute; z-index: 10; top: 49px; right: 0; bottom: 0; width: 370px; overflow: auto; padding: 17px; border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 97%, transparent); box-shadow: -18px 0 55px rgba(0,0,0,.22); backdrop-filter: blur(18px); }
+.git-panel.diff-panel { width: min(780px, calc(100vw - 250px)); }
 .git-panel header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
 .git-panel header .eyebrow { margin-bottom: 4px; }
 .git-panel h2 { margin: 0; font-size: 15px; }
@@ -173,13 +174,48 @@ button { color: inherit; }
 .diff-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 7px; }
 .diff-actions button { height: 29px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: transparent; font-size: 9.5px; cursor: pointer; }
 .diff-actions button:disabled { opacity: .35; cursor: default; }
-.diff-review-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--muted); font-size: 9.5px; }
+.diff-review-heading { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; margin-bottom: 10px; color: var(--muted); font-size: 9.5px; }
+.diff-review-heading > span { justify-self: end; }
 .diff-review-heading button { border: 0; color: var(--accent-strong); background: transparent; font-size: 10px; cursor: pointer; }
+.diff-review-heading button:disabled { opacity: .4; cursor: default; }
+.diff-view-toggle { display: flex; padding: 2px; border-radius: 6px; background: var(--surface-2); }
+.diff-view-toggle button { min-width: 38px; height: 22px; border-radius: 5px; color: var(--muted); }
+.diff-view-toggle button.selected { color: var(--text); background: var(--surface-hover); box-shadow: 0 1px 3px rgba(0,0,0,.12); }
 .diff-file { margin-bottom: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; }
 .diff-file header { display: flex; align-items: center; justify-content: space-between; min-height: 31px; padding: 0 9px; color: var(--muted); background: var(--surface-2); font-size: 9px; }
 .diff-file header strong { overflow: hidden; color: var(--text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
 .diff-file pre { max-height: 420px; overflow: auto; margin: 0; padding: 9px; color: var(--muted); background: var(--bg); font: 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
 .diff-file p { margin: 0; padding: 10px; color: var(--muted); font-size: 9.5px; }
+.diff-hunk { content-visibility: auto; contain-intrinsic-size: auto 260px; border-top: 1px solid var(--border); background: var(--bg); }
+.diff-hunk-toolbar { display: flex; min-height: 31px; align-items: center; justify-content: space-between; gap: 8px; padding: 4px 8px; color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 5%, var(--surface-2)); }
+.diff-hunk-toolbar > code { overflow: hidden; font: 9px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.diff-hunk-toolbar > span { display: flex; flex: none; gap: 4px; }
+.diff-hunk-toolbar button { height: 23px; padding: 0 7px; border: 1px solid var(--border); border-radius: 5px; color: var(--accent-strong); background: var(--surface); font-size: 8.5px; cursor: pointer; }
+.diff-hunk-toolbar button.revert { color: var(--danger); }
+.diff-hunk-toolbar button:disabled { opacity: .45; cursor: default; }
+.diff-unified { overflow-x: auto; }
+.diff-line { display: grid; grid-template-columns: 38px 38px minmax(max-content, 1fr); width: 100%; min-height: 20px; padding: 0; border: 0; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+.diff-line > span { padding: 2px 6px; color: var(--subtle); border-right: 1px solid color-mix(in srgb, var(--border) 65%, transparent); font: 8.5px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; user-select: none; }
+.diff-line > code { padding: 2px 7px; font: 9px/16px ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+.diff-line.addition, .diff-split-cell.addition { background: color-mix(in srgb, #46b576 11%, transparent); }
+.diff-line.deletion, .diff-split-cell.deletion { background: color-mix(in srgb, #df6d72 11%, transparent); }
+.diff-line.metadata { color: var(--subtle); }
+.diff-line.selected, .diff-split-cell.selected { outline: 1px solid color-mix(in srgb, var(--accent) 70%, transparent); outline-offset: -1px; background: var(--accent-soft); }
+.diff-line:disabled, .diff-split-cell:disabled { cursor: default; }
+.diff-split { min-width: 620px; overflow-x: auto; }
+.diff-split-row { display: grid; grid-template-columns: 1fr 1fr; }
+.diff-split-cell { display: grid; grid-template-columns: 38px minmax(max-content, 1fr); min-width: 0; min-height: 20px; padding: 0; border: 0; border-right: 1px solid var(--border); color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+.diff-split-cell > span { padding: 2px 6px; color: var(--subtle); border-right: 1px solid color-mix(in srgb, var(--border) 65%, transparent); font: 8.5px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-align: right; user-select: none; }
+.diff-split-cell > code { overflow: hidden; padding: 2px 7px; font: 9px/16px ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: pre; }
+.diff-split-cell.empty { background: color-mix(in srgb, var(--surface-2) 65%, transparent); }
+.diff-comment { display: grid; gap: 6px; padding: 9px; border-top: 1px solid var(--border); background: var(--surface-2); }
+.diff-comment > span { overflow: hidden; color: var(--muted); font: 8.5px ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
+.diff-comment textarea { width: 100%; resize: vertical; padding: 7px; border: 1px solid var(--border); border-radius: 6px; outline: none; color: var(--text); background: var(--bg); font-size: 9.5px; }
+.diff-comment > div { display: flex; justify-content: flex-end; gap: 5px; }
+.diff-comment button { height: 25px; padding: 0 8px; border: 1px solid var(--border); border-radius: 5px; color: var(--muted); background: transparent; font-size: 8.5px; cursor: pointer; }
+.diff-comment button.comment-send { border-color: transparent; color: #fff; background: var(--accent); }
+.diff-comment button:disabled { opacity: .45; cursor: default; }
+.diff-comment small { color: #57bd86; font-size: 8.5px; text-align: right; }
 .git-file-group { margin-top: 17px; }
 .git-file-group h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .git-file-group h3 span { padding: 1px 5px; border-radius: 999px; background: var(--surface-2); font-size: 8px; }

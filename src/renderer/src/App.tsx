@@ -35,7 +35,7 @@ import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitRepositorySnapshot } from '../../shared/git'
 import type { ManagedWorktree } from '../../shared/worktree'
-import type { DiffSnapshot } from '../../shared/diff'
+import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 
 type Theme = 'dark' | 'light'
 
@@ -198,6 +198,31 @@ export function App(): React.JSX.Element {
     }
   }
 
+  async function appendReviewComment(text: string): Promise<void> {
+    if (!selectedThread || newTask) {
+      setComposer((current) => current ? `${current}\n\n${text}` : text)
+      setGitOpen(false)
+      return
+    }
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      const snapshot = activeTurn && activityState.turnId
+        ? await window.aster.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
+        : await window.aster.startTurn({
+          threadId: selectedThread.id,
+          text,
+          ...(effort ? { reasoningEffort: effort } : {}),
+        })
+      setConversations(snapshot)
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+      throw reason
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <aside className="sidebar">
@@ -332,6 +357,7 @@ export function App(): React.JSX.Element {
           close={() => setGitOpen(false)}
           update={setGitStatus}
           onError={setError}
+          onComment={appendReviewComment}
         />}
         {worktreeOpen && selectedProject && <WorktreePanel
           project={selectedProject}
@@ -412,12 +438,13 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
   </aside>
 }
 
-function GitPanel({ project, snapshot, close, update, onError }: {
+function GitPanel({ project, snapshot, close, update, onError, onComment }: {
   project: ProjectSummary
   snapshot: GitRepositorySnapshot | null
   close: () => void
   update: (snapshot: GitRepositorySnapshot) => void
   onError: (message: string | null) => void
+  onComment: (text: string) => Promise<void>
 }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
@@ -441,9 +468,16 @@ function GitPanel({ project, snapshot, close, update, onError }: {
     finally { setBusy(false) }
   }
 
-  return <aside className="git-panel" aria-label="Git 工作区">
+  return <aside className={`git-panel ${diff ? 'diff-panel' : ''}`} aria-label="Git 工作区">
     <header><div><p className="eyebrow">SOURCE CONTROL</p><h2>{snapshot?.branch ?? (snapshot?.initialized ? 'Detached HEAD' : '尚未初始化')}</h2></div><button className="icon-button" onClick={close} aria-label="关闭 Git"><X size={16} /></button></header>
-    {diff ? <DiffReview snapshot={diff} close={() => setDiff(null)} /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
+    {diff ? <DiffReview
+      snapshot={diff}
+      close={() => setDiff(null)}
+      replace={setDiff}
+      refreshRepository={async () => update(await window.aster.getGitStatus({ projectId: project.id }))}
+      onComment={onComment}
+      onError={onError}
+    /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
       <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.aster.getGitStatus({ projectId: project.id }))}>刷新</button></div>
       <div className="diff-actions"><button disabled={busy || unstaged.length === 0} onClick={() => void review('working')}>审阅未暂存</button><button disabled={busy || staged.length === 0} onClick={() => void review('staged')}>审阅已暂存</button></div>
       <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} />
@@ -469,16 +503,190 @@ function GitPanel({ project, snapshot, close, update, onError }: {
   </aside>
 }
 
-function DiffReview({ snapshot, close }: { snapshot: DiffSnapshot; close: () => void }): React.JSX.Element {
+type DiffView = 'unified' | 'split'
+type ReviewLine = { side: 'old' | 'new'; line: number; code: string; kind: DiffLine['kind'] }
+
+function DiffReview({ snapshot, close, replace, refreshRepository, onComment, onError }: {
+  snapshot: DiffSnapshot
+  close: () => void
+  replace: (snapshot: DiffSnapshot) => void
+  refreshRepository: () => Promise<void>
+  onComment: (text: string) => Promise<void>
+  onError: (message: string | null) => void
+}): React.JSX.Element {
+  const [view, setView] = useState<DiffView>('unified')
+  const [busyHunk, setBusyHunk] = useState<string | null>(null)
+
+  async function apply(hunkId: string, action: 'stage' | 'unstage' | 'revert'): Promise<void> {
+    if (action === 'revert' && !window.confirm('仅恢复这个区块的工作区修改？此操作不会影响其他区块。')) return
+    setBusyHunk(hunkId)
+    onError(null)
+    try {
+      replace(await window.aster.applyDiffHunk({
+        projectId: snapshot.projectId,
+        snapshotId: snapshot.id,
+        hunkId,
+        action,
+      }))
+      await refreshRepository()
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setBusyHunk(null)
+    }
+  }
+
   return <section className="diff-review" aria-label="代码差异">
-    <div className="diff-review-heading"><button onClick={close}>← 返回状态</button><span>+{snapshot.totalAdditions} −{snapshot.totalDeletions}</span></div>
+    <div className="diff-review-heading">
+      <button disabled={busyHunk !== null} onClick={close}>← 返回状态</button>
+      <div className="diff-view-toggle"><button className={view === 'unified' ? 'selected' : ''} onClick={() => setView('unified')}>统一</button><button className={view === 'split' ? 'selected' : ''} onClick={() => setView('split')}>分栏</button></div>
+      <span>+{snapshot.totalAdditions} −{snapshot.totalDeletions}</span>
+    </div>
     {snapshot.files.map((file) => <article className="diff-file" key={file.path}>
       <header><strong>{file.path}</strong><span>+{file.additions} −{file.deletions}</span></header>
-      {file.binary ? <p>二进制文件已更改</p> : <pre>{file.patch || '无文本差异'}</pre>}
-      {file.truncated && <p className="danger-text">此文件差异已达到 2 MiB 展示上限。</p>}
+      {file.binary ? <p>二进制或非普通文件已更改</p> : file.hunks.length > 0
+        ? file.hunks.map((hunk) => <DiffHunkView
+          key={hunk.id}
+          filePath={file.path}
+          hunk={hunk}
+          view={view}
+          mode={snapshot.mode}
+          allowRevert={file.status !== '??'}
+          busy={busyHunk === hunk.id}
+          apply={apply}
+          onComment={onComment}
+          onError={onError}
+        />)
+        : <p>{file.patch ? '此差异无法安全拆分为区块。' : '无文本差异'}</p>}
+      {file.truncated && <p className="danger-text">此文件差异已达到 2 MiB 展示上限，已禁用区块操作。</p>}
     </article>)}
     {snapshot.truncated && <p className="danger-text">差异达到全局展示上限；剩余内容未载入。</p>}
   </section>
+}
+
+function DiffHunkView({ filePath, hunk, view, mode, allowRevert, busy, apply, onComment, onError }: {
+  filePath: string
+  hunk: DiffHunk
+  view: DiffView
+  mode: DiffSnapshot['mode']
+  allowRevert: boolean
+  busy: boolean
+  apply: (hunkId: string, action: 'stage' | 'unstage' | 'revert') => Promise<void>
+  onComment: (text: string) => Promise<void>
+  onError: (message: string | null) => void
+}): React.JSX.Element {
+  const [selected, setSelected] = useState<ReviewLine | null>(null)
+  const [comment, setComment] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState(false)
+
+  async function sendComment(): Promise<void> {
+    if (!selected || !comment.trim()) return
+    setSending(true)
+    setSent(false)
+    onError(null)
+    const location = selected.side === 'new' ? `新版本第 ${String(selected.line)} 行` : `旧版本第 ${String(selected.line)} 行`
+    const text = [
+      '请处理下面这条代码审阅意见，并在修改后说明验证结果。',
+      `文件：${filePath}`,
+      `位置：${location}`,
+      `区块：${hunk.header}`,
+      `代码：${selected.code.slice(0, 4_000)}`,
+      `审阅意见：${comment.trim().slice(0, 4_000)}`,
+    ].join('\n')
+    try {
+      await onComment(text)
+      setComment('')
+      setSent(true)
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return <section className="diff-hunk">
+    <div className="diff-hunk-toolbar"><code>{hunk.header}</code><span>
+      {mode === 'working' && <button disabled={busy} onClick={() => void apply(hunk.id, 'stage')}>{busy ? '处理中…' : '暂存区块'}</button>}
+      {mode === 'staged' && <button disabled={busy} onClick={() => void apply(hunk.id, 'unstage')}>{busy ? '处理中…' : '取消暂存'}</button>}
+      {mode === 'working' && allowRevert && <button className="revert" disabled={busy} onClick={() => void apply(hunk.id, 'revert')}>恢复区块</button>}
+    </span></div>
+    {view === 'unified'
+      ? <div className="diff-unified">{hunk.lines.map((line, index) => <DiffLineButton
+        key={`${hunk.id}:${String(index)}`}
+        line={line}
+        selected={selected}
+        select={setSelected}
+      />)}</div>
+      : <div className="diff-split">{splitDiffLines(hunk.lines).map((row, index) => <div className="diff-split-row" key={`${hunk.id}:split:${String(index)}`}>
+        <SplitCell line={row.old} side="old" selected={selected} select={setSelected} />
+        <SplitCell line={row.new} side="new" selected={selected} select={setSelected} />
+      </div>)}</div>}
+    {selected && <div className="diff-comment"><span>{selected.side === 'new' ? '+' : '−'}{selected.line} · {selected.code.slice(0, 100)}</span><textarea aria-label={`评论 ${filePath} 第 ${String(selected.line)} 行`} maxLength={4_000} value={comment} onChange={(event) => { setComment(event.target.value); setSent(false) }} placeholder="写下审阅意见，将真实追加到当前智能体任务…" rows={2} /><div><button onClick={() => setSelected(null)}>取消</button><button className="comment-send" disabled={sending || !comment.trim()} onClick={() => void sendComment()}>{sending ? '正在追加…' : '追加给智能体'}</button></div>{sent && <small>已追加到当前任务。</small>}</div>}
+  </section>
+}
+
+function DiffLineButton({ line, selected, select }: {
+  line: DiffLine
+  selected: ReviewLine | null
+  select: (line: ReviewLine) => void
+}): React.JSX.Element {
+  const review = toReviewLine(line)
+  const isSelected = review !== null && selected?.side === review.side && selected.line === review.line
+  return <button className={`diff-line ${line.kind} ${isSelected ? 'selected' : ''}`} disabled={!review} onClick={() => { if (review) select(review) }}>
+    <span>{line.oldLine ?? ''}</span><span>{line.newLine ?? ''}</span><code>{linePrefix(line.kind)}{line.content}</code>
+  </button>
+}
+
+function SplitCell({ line, side, selected, select }: {
+  line: DiffLine | null
+  side: 'old' | 'new'
+  selected: ReviewLine | null
+  select: (line: ReviewLine) => void
+}): React.JSX.Element {
+  if (!line) return <span className="diff-split-cell empty" />
+  const number = side === 'old' ? line.oldLine : line.newLine
+  const review = number === null ? null : { side, line: number, code: line.content, kind: line.kind } satisfies ReviewLine
+  const isSelected = review !== null && selected?.side === review.side && selected.line === review.line
+  return <button className={`diff-split-cell ${line.kind} ${isSelected ? 'selected' : ''}`} disabled={!review} onClick={() => { if (review) select(review) }}><span>{number ?? ''}</span><code>{line.content}</code></button>
+}
+
+function toReviewLine(line: DiffLine): ReviewLine | null {
+  if (line.newLine !== null) return { side: 'new', line: line.newLine, code: line.content, kind: line.kind }
+  if (line.oldLine !== null) return { side: 'old', line: line.oldLine, code: line.content, kind: line.kind }
+  return null
+}
+
+function linePrefix(kind: DiffLine['kind']): string {
+  if (kind === 'addition') return '+'
+  if (kind === 'deletion') return '−'
+  return ' '
+}
+
+function splitDiffLines(lines: DiffLine[]): { old: DiffLine | null; new: DiffLine | null }[] {
+  const result: { old: DiffLine | null; new: DiffLine | null }[] = []
+  for (let index = 0; index < lines.length;) {
+    const current = lines[index]
+    if (!current) break
+    if (current.kind === 'context' || current.kind === 'metadata') {
+      result.push({ old: current, new: current })
+      index += 1
+      continue
+    }
+    const removed: DiffLine[] = []
+    const added: DiffLine[] = []
+    for (let line = lines[index]; line?.kind === 'deletion'; line = lines[index]) {
+      removed.push(line)
+      index += 1
+    }
+    for (let line = lines[index]; line?.kind === 'addition'; line = lines[index]) {
+      added.push(line)
+      index += 1
+    }
+    const length = Math.max(removed.length, added.length)
+    for (let offset = 0; offset < length; offset += 1) result.push({ old: removed[offset] ?? null, new: added[offset] ?? null })
+  }
+  return result
 }
 
 function GitFileGroup({ title, files, actionLabel, action }: {
