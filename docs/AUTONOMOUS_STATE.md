@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 1：桌面应用基础架构。
+阶段 2：Codex app-server 运行时。
 
 ## 当前任务
 
-- 创建 Electron 主进程、预加载层、React 渲染器和共享协议层。
-- 建立 SQLite migration、项目选择和恢复基础。
-- 建立构建、类型、规范、单元、集成和桌面冒烟测试。
-- 在实际 Electron 运行时验证安全配置和基础窗口。
+- 发现并探测 Codex 二进制版本。
+- 从同一二进制生成 stable TypeScript/JSON Schema 并记录兼容基线。
+- 实现 stdio JSONL supervisor、初始化握手、请求关联、超时、错误与安全日志。
+- 建立 initialize/thread/turn/stream/approval/interrupt 协议契约测试。
 
 ## 已完成任务
 
@@ -26,13 +26,20 @@
 - 完成 OpenAI Codex 0.147.0、Codex Security 0.1.8 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`。
 - 使用已有安全凭据真实验证 `deepseek-v4-flash` 的非流式、SSE、函数调用回传和 Web Search；未记录或输出密钥。
 - 真实确认 `deepseek-v4-pro` 截至 2026-08-10 仍不能调用 Responses API。
+- 创建 Electron 43 + React 19 + TypeScript 6 的主进程、CJS 预加载桥、渲染器和共享领域层。
+- 创建 SQLite schema migration、最近项目去重/恢复和真实系统目录选择入口。
+- 完成独立品牌的响应式桌面外壳，包含项目、任务、安全、计划任务、设置和 composer 信息架构。
+- 在实际 Electron 43 运行时验证 `node:sqlite` 可用。
+- 通过 TypeScript 严格检查、ESLint、单元测试、生产构建和 Playwright Electron 冒烟测试。
+- E2E 确认渲染器没有 `require`/`process`，只暴露最小 `window.aster` IPC 桥。
+- 实际检查 1320×840 浅色界面截图；未发现文本溢出或面板错位。
 
 ## 下一任务
 
-1. 创建 Electron 主进程、预加载层、渲染器与共享协议包。
-2. 建立编译、类型、规范、单元、集成和桌面冒烟测试。
-3. 实现持久化和项目打开的最小真实闭环。
-4. 进入 app-server supervisor、生成协议和流式事件阶段。
+1. 生成并固定当前 Codex app-server stable schema。
+2. 实现 JSONL RPC client 与 app-server supervisor。
+3. 以真实本机 Codex 完成 initialize/model/list/thread/start 探测。
+4. 连接任务 UI 与标准化运行时状态。
 
 ## 已做技术决策
 
@@ -49,13 +56,13 @@
 
 ## 当前失败测试
 
-暂无；测试框架尚未建立。
+暂无。最近一次结果：2 个单元测试文件共 3 项通过；1 个 Electron E2E 通过；类型、规范和生产构建通过。
 
 ## 已知问题
 
-- 当前仓库尚无可运行应用代码。
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
+- 当前渲染器生产主包约 574 kB，后续按工作台路由做代码分割。
 
 ## 当前阻塞
 
@@ -71,6 +78,5 @@
 ## 待验证问题
 
 - DeepSeek 经 app-server 完整执行文件修改的闭环仍待桌面运行时验证。
-- Electron 43 内置 Node 对 `node:sqlite` 的可用性。
 - app-server 异常恢复后，活动 turn 与客户端订阅的恢复语义。
 - Codex Security SDK 当前安装包是否能在 Electron 主进程直接加载，或需要隔离 Node worker。
