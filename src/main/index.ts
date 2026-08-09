@@ -17,6 +17,7 @@ import { CredentialStore } from './security/credentialStore.js'
 import { GitService } from './git/gitService.js'
 import { WorktreeService } from './worktree/worktreeService.js'
 import { DiffService } from './git/diffService.js'
+import { TerminalService } from './terminal/terminalService.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -29,6 +30,7 @@ let providerService: ProviderService | null = null
 let gitService: GitService | null = null
 let worktreeService: WorktreeService | null = null
 let diffService: DiffService | null = null
+let terminalService: TerminalService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -103,8 +105,18 @@ if (!gotLock) {
     gitService = new GitService(database)
     worktreeService = new WorktreeService(database, join(userData, 'worktrees'))
     diffService = new DiffService(database, gitService)
+    terminalService = new TerminalService(runtime, database)
     agentService = new AgentService(runtime, database)
-    unregisterIpc = registerIpc(database, runtime, agentService, providerService, gitService, worktreeService, diffService)
+    unregisterIpc = registerIpc(
+      database,
+      runtime,
+      agentService,
+      providerService,
+      gitService,
+      worktreeService,
+      diffService,
+      terminalService,
+    )
     mainWindow = createMainWindow()
     void runtime.start()
 
@@ -129,6 +141,8 @@ app.on('before-quit', () => {
   gitService = null
   worktreeService = null
   diffService = null
+  terminalService?.dispose()
+  terminalService = null
   void runtime?.stop()
   runtime = null
   void runtimeLogger?.close()

@@ -26,6 +26,16 @@ import type {
   WorktreeActionInput,
 } from './worktree.js'
 import type { ApplyDiffHunkInput, DiffSnapshot, GetDiffInput } from './diff.js'
+import type {
+  CreateTerminalInput,
+  ResizeTerminalInput,
+  TerminalContext,
+  TerminalSession,
+  TerminalSessionInput,
+  TerminalState,
+  TerminalSubscription,
+  WriteTerminalInput,
+} from './terminal.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -57,6 +67,15 @@ export const IPC_CHANNELS = {
   worktreeRemove: 'worktree:remove',
   diffGet: 'diff:get',
   diffHunkApply: 'diff:hunk-apply',
+  terminalState: 'terminal:state',
+  terminalCreate: 'terminal:create',
+  terminalWrite: 'terminal:write',
+  terminalResize: 'terminal:resize',
+  terminalTerminate: 'terminal:terminate',
+  terminalClose: 'terminal:close',
+  terminalClear: 'terminal:clear',
+  terminalContext: 'terminal:context',
+  terminalEvent: 'terminal:event',
 } as const
 
 export type ProjectSummary = {
@@ -112,4 +131,13 @@ export type AsterDesktopApi = {
   removeWorktree: (input: RemoveWorktreeInput) => Promise<ManagedWorktree[]>
   getDiff: (input: GetDiffInput) => Promise<DiffSnapshot>
   applyDiffHunk: (input: ApplyDiffHunkInput) => Promise<DiffSnapshot>
+  getTerminalState: () => Promise<TerminalState>
+  createTerminal: (input: CreateTerminalInput) => Promise<TerminalSession>
+  writeTerminal: (input: WriteTerminalInput) => Promise<void>
+  resizeTerminal: (input: ResizeTerminalInput) => Promise<void>
+  terminateTerminal: (input: TerminalSessionInput) => Promise<void>
+  closeTerminal: (input: TerminalSessionInput) => Promise<TerminalState>
+  clearTerminal: (input: TerminalSessionInput) => Promise<TerminalSession>
+  getTerminalContext: (input: TerminalSessionInput) => Promise<TerminalContext>
+  onTerminalEvent: (subscription: TerminalSubscription) => () => void
 }

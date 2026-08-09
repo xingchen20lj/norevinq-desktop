@@ -16,6 +16,14 @@ import type { SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type { GitCommitInput, GitPathsInput, GitProjectInput, GitPushInput } from '../shared/git.js'
 import type { CreateWorktreeInput, ListWorktreesInput, RemoveWorktreeInput, WorktreeActionInput } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, GetDiffInput } from '../shared/diff.js'
+import type {
+  CreateTerminalInput,
+  ResizeTerminalInput,
+  TerminalEvent,
+  TerminalSessionInput,
+  TerminalSubscription,
+  WriteTerminalInput,
+} from '../shared/terminal.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -60,6 +68,19 @@ const api: AsterDesktopApi = {
   removeWorktree: (input: RemoveWorktreeInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeRemove, input),
   getDiff: (input: GetDiffInput) => ipcRenderer.invoke(IPC_CHANNELS.diffGet, input),
   applyDiffHunk: (input: ApplyDiffHunkInput) => ipcRenderer.invoke(IPC_CHANNELS.diffHunkApply, input),
+  getTerminalState: () => ipcRenderer.invoke(IPC_CHANNELS.terminalState),
+  createTerminal: (input: CreateTerminalInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalCreate, input),
+  writeTerminal: (input: WriteTerminalInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalWrite, input),
+  resizeTerminal: (input: ResizeTerminalInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalResize, input),
+  terminateTerminal: (input: TerminalSessionInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalTerminate, input),
+  closeTerminal: (input: TerminalSessionInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalClose, input),
+  clearTerminal: (input: TerminalSessionInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalClear, input),
+  getTerminalContext: (input: TerminalSessionInput) => ipcRenderer.invoke(IPC_CHANNELS.terminalContext, input),
+  onTerminalEvent: (subscription: TerminalSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, terminalEvent: TerminalEvent): void => subscription(terminalEvent)
+    ipcRenderer.on(IPC_CHANNELS.terminalEvent, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.terminalEvent, listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

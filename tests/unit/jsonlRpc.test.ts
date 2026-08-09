@@ -164,6 +164,22 @@ describe('JsonlRpcPeer', () => {
     }
   })
 
+  it('supports explicitly unbounded requests until response or connection close', async () => {
+    vi.useFakeTimers()
+    try {
+      const { input, messages, peer } = createHarness({ defaultTimeoutMs: 25 })
+      const result = peer.request('terminal/process', undefined, { timeoutMs: null })
+      await vi.advanceTimersByTimeAsync(60_000)
+      expect(peer.pendingRequestCount).toBe(1)
+      send(input, { id: 1, jsonrpc: '2.0', result: { exitCode: 0 } })
+      await expect(result).resolves.toEqual({ exitCode: 0 })
+      expect(messages).toHaveLength(1)
+      peer.close()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('rejects all pending requests on EOF and explicit close', async () => {
     const eofHarness = createHarness()
     const eofResult = eofHarness.peer.request('pending')

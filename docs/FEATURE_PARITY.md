@@ -63,10 +63,10 @@
 | 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量、截断禁用操作与离屏 hunk `content-visibility`；单个超长 hunk 行窗口待性能阶段 |
 | 差异 | 行内评论并发送给智能体 | 已测试 | E2E 选择新增行，携带文件/行号/hunk/代码上下文真实追加并收到 `ASTER_REVIEW_OK` |
 | 差异 | 区块 stage/revert | 已测试 | 主进程不透明快照、`git apply --check`、单次失效；真实 stage/unstage/revert 与桌面 hunk stage 通过 |
-| 终端 | 每任务 PTY 终端 | 尚未开发 | 阶段 10 |
-| 终端 | 输入、调整尺寸、中断、退出 | 尚未开发 | node-pty |
-| 终端 | 输出环形缓冲和脱敏 | 尚未开发 | 防止无限内存增长 |
-| 终端 | app-server 读取当前终端输出 | 尚未开发 | 显式上下文桥接 |
+| 终端 | 每任务 PTY 终端 | 已测试 | app-server `command/exec` PTY，按项目/工作树/任务绑定；xterm 真实键盘 E2E |
+| 终端 | 输入、调整尺寸、中断、退出 | 已测试 | write/resize/terminate/close 真实桌面回归；不依赖 node-pty 原生 ABI |
+| 终端 | 输出环形缓冲和脱敏 | 已测试 | main/renderer 各 4 MiB、10k scrollback、跨分片 UTF-8；共享上下文移除 ANSI/OSC/C0 |
+| 终端 | app-server 读取当前终端输出 | 已测试 | 用户显式共享最近 32 KiB，真实 `turn/start` 后收到 `ASTER_TERMINAL_CONTEXT_OK`；不静默泄露输出 |
 | 文件 | 文件树、文本与代码预览 | 尚未开发 | 阶段 14 |
 | 文件 | 图片、音频、视频、PDF 预览 | 尚未开发 | 阶段 14 |
 | 文件 | 产物链接和外部打开 | 尚未开发 | 安全路径校验 |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 尚未开发 | 不伪造扫描结果 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 17 个测试文件 78 项；真实 Electron 覆盖 OpenAI、DeepSeek、审批、命令、steer、interrupt、Git diff/hunk/评论、worktree |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 18 个测试文件 82 项；真实 Electron 覆盖 OpenAI、DeepSeek、审批、命令、steer、interrupt、Git diff/hunk/评论、worktree、PTY 终端 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

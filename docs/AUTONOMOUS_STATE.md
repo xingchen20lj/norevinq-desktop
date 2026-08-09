@@ -4,15 +4,14 @@
 
 ## 当前阶段
 
-阶段 10：集成终端。
+阶段 11：MCP、技能和设置。
 
 ## 当前任务
 
-- 调查当前 Electron/Node PTY 可用方案与跨平台原生构建边界。
-- 实现每任务终端会话、真实 PTY 生命周期、输入和尺寸同步。
-- 建立有界输出缓冲、退出状态、搜索、清屏和显式终止。
-- 将终端面板接入当前项目/托管工作树上下文。
-- 为 app-server 提供显式、受限的当前终端输出读取桥。
+- 接入 app-server MCP 状态、OAuth、reload、资源读取和直接工具调用。
+- 接入技能发现、刷新、详情与额外根目录，并尊重项目指令/信任边界。
+- 建立设置路由、用户/项目/托管配置层和原始 TOML 安全编辑入口。
+- 完成 MCP 审批、elicitation、错误/空状态和真实/替身回归。
 
 ## 已完成任务
 
@@ -69,13 +68,18 @@
 - 真实仓库逐项验证远距离 hunk 单独 stage、unstage、revert、带空格无末尾换行文件和过期快照拒绝。
 - Electron E2E 在 split view 选择新增行，将评论真实追加给 Codex 并收到 `ASTER_REVIEW_OK`，随后 hunk stage 和 commit。
 - 实际检查 1320×840 浅色 split diff 截图，未见溢出、错位或对比度问题。
+- 采用 app-server `command/exec` PTY，避免 node-pty 原生 ABI；接入 xterm 6、多会话、搜索、清屏、resize、terminate/close。
+- 完成项目/工作树/任务 cwd 绑定、12 会话、4 MiB 双层缓冲、64 KiB 输入、尺寸和输出分片边界。
+- 完成显式终端上下文桥：移除 ANSI/OSC/C0 后仅共享最近 32 KiB，不静默注入模型。
+- Electron E2E 真实键盘运行 `printf`/`pwd`、搜索、输出→Codex (`ASTER_TERMINAL_CONTEXT_OK`)、清屏、终止与关闭会话。
+- 实际检查 1320×840 浅色 xterm drawer 截图，标签、工具栏、搜索、ANSI 输出和光标无明显问题。
 
 ## 下一任务
 
-1. 选择并固定支持 macOS/Windows 的 PTY 适配层，隔离 Electron 原生 ABI。
-2. 实现主进程终端会话管理和最小类型化 IPC。
-3. 接入终端面板、项目/工作树 cwd、尺寸同步和有界输出。
-4. 完成真实 shell E2E、退出/终止/长输出回归后进入 MCP、技能和设置。
+1. 对照当前生成 schema 实现 MCP/技能领域适配器和运行时状态订阅。
+2. 增加 MCP/技能设置工作台、OAuth 和错误状态。
+3. 接入项目指令发现与安全配置层级。
+4. 完成回归后进入 Codex Security 工作台。
 
 ## 已做技术决策
 
@@ -92,13 +96,13 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：17 个单元/集成测试文件共 78 项通过；Electron E2E 真实覆盖 split diff、行内评论→Codex、hunk stage 和 commit；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：18 个单元/集成测试文件共 82 项通过；Electron E2E 真实覆盖 app-server PTY、xterm 输入/搜索、终端输出→Codex、清屏/终止，以及既有全功能回归；类型、规范、脚本语法、peer 依赖和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
-- 当前渲染器生产主包约 611 kB，后续按工作台路由做代码分割。
+- 当前渲染器生产主包约 1.07 MiB（含 xterm），后续按工作台路由和终端动态导入做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞

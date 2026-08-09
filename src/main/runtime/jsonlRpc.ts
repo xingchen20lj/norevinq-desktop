@@ -31,7 +31,8 @@ export type JsonlRpcOptions = {
 }
 
 export type JsonRpcRequestOptions = {
-  readonly timeoutMs?: number
+  /** `null` keeps a long-running request pending until a response or connection close. */
+  readonly timeoutMs?: number | null
 }
 
 type PendingRequest = {
@@ -198,16 +199,15 @@ export class JsonlRpcPeer {
     assertMethod(method)
     if (this.#closedError !== undefined) return Promise.reject(this.#closedError)
 
-    const timeoutMs = validatePositiveInteger(
-      options.timeoutMs ?? this.#defaultTimeoutMs,
-      'timeoutMs',
-    )
+    const timeoutMs = options.timeoutMs === null
+      ? null
+      : validatePositiveInteger(options.timeoutMs ?? this.#defaultTimeoutMs, 'timeoutMs')
     const id = this.#allocateRequestId()
     const message = this.#createMessage({ id, method })
     if (params !== undefined) message.params = params
 
     return new Promise<T>((resolve, reject) => {
-      const timer = setTimeout(() => {
+      const timer = timeoutMs === null ? undefined : setTimeout(() => {
         if (!this.#pending.delete(id)) return
         reject(new JsonRpcTimeoutError(method, timeoutMs))
       }, timeoutMs)

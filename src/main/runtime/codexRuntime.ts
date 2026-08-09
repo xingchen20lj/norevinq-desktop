@@ -7,6 +7,7 @@ import {
   JsonlRpcClosedError,
   JsonlRpcPeer,
   type JsonRpcNotificationHandler,
+  type JsonRpcRequestOptions,
   type JsonRpcRequestHandler,
   type JsonValue,
 } from './jsonlRpc.js'
@@ -63,6 +64,7 @@ export class CodexRuntimeSupervisor {
   #restartTimer: NodeJS.Timeout | null = null
   #stopRequested = false
   #activeTurnCount = 0
+  #activeProcessCount = 0
 
   constructor(options: CodexRuntimeOptions = {}) {
     this.#discover = options.discover ?? (() => discoverCodexBinary(
@@ -108,7 +110,9 @@ export class CodexRuntimeSupervisor {
     childEnvironment?: Readonly<Record<string, string>>
     extraModels?: readonly CodexModelSummary[]
   }): Promise<CodexRuntimeSnapshot> {
-    if (this.#activeTurnCount > 0) throw new Error('Cannot change model providers during an active turn.')
+    if (this.#activeTurnCount > 0 || this.#activeProcessCount > 0) {
+      throw new Error('Cannot change model providers while a turn or terminal process is active.')
+    }
     this.#configOverrides = options.configOverrides ?? []
     this.#childEnvironment = options.childEnvironment ?? {}
     this.#extraModels = options.extraModels ?? []
@@ -130,9 +134,13 @@ export class CodexRuntimeSupervisor {
     return Promise.resolve()
   }
 
-  request<T extends JsonValue = JsonValue>(method: string, params?: JsonValue): Promise<T> {
+  request<T extends JsonValue = JsonValue>(
+    method: string,
+    params?: JsonValue,
+    options?: JsonRpcRequestOptions,
+  ): Promise<T> {
     const peer = this.#requireReadyPeer()
-    return peer.request<T>(method, params)
+    return peer.request<T>(method, params, options)
   }
 
   notify(method: string, params?: JsonValue): Promise<void> {
@@ -172,6 +180,14 @@ export class CodexRuntimeSupervisor {
 
   markTurnCompleted(): void {
     this.#activeTurnCount = Math.max(0, this.#activeTurnCount - 1)
+  }
+
+  markProcessStarted(): void {
+    this.#activeProcessCount += 1
+  }
+
+  markProcessCompleted(): void {
+    this.#activeProcessCount = Math.max(0, this.#activeProcessCount - 1)
   }
 
   async #startOnce(): Promise<CodexRuntimeSnapshot> {
@@ -296,6 +312,10 @@ export class CodexRuntimeSupervisor {
       })
       return
     }
+    // Terminal processes are connection-scoped and already terminated by the
+    // server. They are never replayed, but they must not prevent an idle
+    // app-server from recovering for future work.
+    this.#activeProcessCount = 0
 
     const nextAttempt = this.getSnapshot().restartAttempt + 1
     if (nextAttempt > this.#maxAutomaticRestarts) {

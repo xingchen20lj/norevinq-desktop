@@ -16,6 +16,15 @@ import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/prov
 import type { GitRepositorySnapshot } from '../shared/git.js'
 import type { ManagedWorktree } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, DiffMode, DiffSnapshot } from '../shared/diff.js'
+import type {
+  CreateTerminalInput,
+  ResizeTerminalInput,
+  TerminalContext,
+  TerminalSession,
+  TerminalState,
+  TerminalSubscription,
+  WriteTerminalInput,
+} from '../shared/terminal.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -66,6 +75,18 @@ export type DiffController = {
   applyHunk: (input: ApplyDiffHunkInput) => Promise<DiffSnapshot>
 }
 
+export type TerminalController = {
+  getState: () => TerminalState
+  subscribe: (subscription: TerminalSubscription) => () => void
+  create: (input: CreateTerminalInput) => TerminalSession
+  write: (input: WriteTerminalInput) => Promise<void>
+  resize: (input: ResizeTerminalInput) => Promise<void>
+  terminate: (sessionId: string) => Promise<void>
+  close: (sessionId: string) => Promise<TerminalState>
+  clear: (sessionId: string) => TerminalSession
+  getContext: (sessionId: string) => TerminalContext
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -74,6 +95,7 @@ export function registerIpc(
   git: GitController,
   worktrees: WorktreeController,
   diffs: DiffController,
+  terminals: TerminalController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -84,6 +106,11 @@ export function registerIpc(
   const unsubscribeAgent = agent.subscribe((snapshot) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.conversationChanged, snapshot)
+    }
+  })
+  const unsubscribeTerminal = terminals.subscribe((terminalEvent) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.terminalEvent, terminalEvent)
     }
   })
 
@@ -174,10 +201,30 @@ export function registerIpc(
   })
   ipcMain.handle(IPC_CHANNELS.diffHunkApply, (_event, input: unknown) =>
     diffs.applyHunk(diffHunkApplySchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.terminalState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return terminals.getState()
+  })
+  ipcMain.handle(IPC_CHANNELS.terminalCreate, (_event, input: unknown) =>
+    terminals.create(terminalCreateSchema.parse(input) as CreateTerminalInput))
+  ipcMain.handle(IPC_CHANNELS.terminalWrite, (_event, input: unknown) =>
+    terminals.write(terminalWriteSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.terminalResize, (_event, input: unknown) =>
+    terminals.resize(terminalResizeSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.terminalTerminate, (_event, input: unknown) =>
+    terminals.terminate(terminalSessionSchema.parse(input).sessionId))
+  ipcMain.handle(IPC_CHANNELS.terminalClose, (_event, input: unknown) =>
+    terminals.close(terminalSessionSchema.parse(input).sessionId))
+  ipcMain.handle(IPC_CHANNELS.terminalClear, (_event, input: unknown) =>
+    terminals.clear(terminalSessionSchema.parse(input).sessionId))
+  ipcMain.handle(IPC_CHANNELS.terminalContext, (_event, input: unknown) =>
+    terminals.getContext(terminalSessionSchema.parse(input).sessionId))
 
   return () => {
     unsubscribeRuntime()
     unsubscribeAgent()
+    unsubscribeTerminal()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
   }
@@ -240,4 +287,17 @@ const diffHunkApplySchema = z.object({
   snapshotId: z.uuid(),
   hunkId: z.uuid(),
   action: z.enum(['stage', 'unstage', 'revert']),
+})
+const terminalSessionSchema = z.object({ sessionId: z.uuid() })
+const terminalCreateSchema = z.object({
+  projectId: z.uuid(),
+  worktreeId: z.uuid().optional(),
+  threadId: z.string().min(1).max(200).optional(),
+  cols: z.number().int().min(2).max(500).optional(),
+  rows: z.number().int().min(2).max(300).optional(),
+})
+const terminalWriteSchema = terminalSessionSchema.extend({ data: z.string().min(1).max(65_536) })
+const terminalResizeSchema = terminalSessionSchema.extend({
+  cols: z.number().int().min(2).max(500),
+  rows: z.number().int().min(2).max(300),
 })

@@ -58,6 +58,52 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_RUNTIME_OK', { timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
 
+    await window.getByRole('button', { name: '终端', exact: true }).click()
+    await expect(window.getByLabel('集成终端')).toBeVisible()
+    await expect(window.locator('.terminal-canvas .xterm')).toBeVisible()
+    await window.locator('.terminal-canvas .xterm-helper-textarea').click()
+    await window.keyboard.type("printf 'ASTER_TERMINAL_OK\\nWhen this terminal output is shared, reply with exactly ASTER_TERMINAL_CONTEXT_OK.\\n'; pwd")
+    await window.keyboard.press('Enter')
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getTerminalState: () => Promise<{ sessions: { id: string }[] }>
+        getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
+      }
+      const state = await bridge.getTerminalState()
+      const session = state.sessions[0]
+      return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
+    }), { timeout: 30_000 }).toContain('ASTER_TERMINAL_OK')
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getTerminalState: () => Promise<{ sessions: { id: string }[] }>
+        getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
+      }
+      const state = await bridge.getTerminalState()
+      const session = state.sessions[0]
+      return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
+    }), { timeout: 30_000 }).toContain(projectPath)
+    await window.getByLabel('搜索终端输出').fill('ASTER_TERMINAL_OK')
+    await window.getByLabel('搜索终端输出').press('Enter')
+    await window.getByRole('button', { name: '共享输出给智能体', exact: true }).click()
+    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_TERMINAL_CONTEXT_OK' })).toBeVisible({ timeout: 90_000 })
+    await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+    await window.screenshot({ path: 'test-results/aster-terminal.png' })
+    await window.getByRole('button', { name: '清屏', exact: true }).click()
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getTerminalState: () => Promise<{ sessions: { id: string }[] }>
+        getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
+      }
+      const state = await bridge.getTerminalState()
+      const session = state.sessions[0]
+      return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
+    }), { timeout: 10_000 }).not.toContain('ASTER_TERMINAL_OK')
+    await window.getByRole('button', { name: '终止', exact: true }).click()
+    await expect(window.getByLabel('集成终端')).toContainText('已退出', { timeout: 10_000 })
+    await window.getByRole('button', { name: '关闭会话', exact: true }).click()
+    await expect(window.getByLabel('集成终端')).toContainText('当前项目没有终端会话')
+    await window.getByRole('button', { name: '关闭终端面板' }).click()
+
     if (deepSeekConfigured) {
       await window.evaluate(async ({ projectId }) => {
         const bridge = Reflect.get(window, 'aster') as {
