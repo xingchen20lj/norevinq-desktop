@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, protocol, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, protocol, safeStorage, screen, shell } from 'electron'
 import { registerIpc } from './ipc.js'
 import { createLogger, type JsonlLogger } from './logging/logger.js'
 import { SizeLimitedRotation } from './logging/sizeRotation.js'
@@ -50,10 +50,25 @@ let schedulerService: SchedulerService | null = null
 let fileService: FileService | null = null
 let browserService: BrowserService | null = null
 
+type PersistedWindowState = {
+  x: number
+  y: number
+  width: number
+  height: number
+  maximized: boolean
+  fullScreen: boolean
+}
+
 function createMainWindow(): BrowserWindow {
+  const stored = database?.getAppSetting('window.state') ?? null
+  const restored = validWindowState(stored) ? stored : null
+  const restoredBounds = restored && windowIntersectsDisplay(restored)
+    ? { x: restored.x, y: restored.y, width: restored.width, height: restored.height }
+    : null
   const window = new BrowserWindow({
-    width: 1320,
-    height: 840,
+    width: restoredBounds?.width ?? 1320,
+    height: restoredBounds?.height ?? 840,
+    ...(restoredBounds ? { x: restoredBounds.x, y: restoredBounds.y } : {}),
     minWidth: 960,
     minHeight: 640,
     show: false,
@@ -76,13 +91,43 @@ function createMainWindow(): BrowserWindow {
     const currentUrl = window.webContents.getURL()
     if (url !== currentUrl) event.preventDefault()
   })
-  window.once('ready-to-show', () => window.show())
+  window.once('ready-to-show', () => {
+    if (restored?.maximized) window.maximize()
+    if (restored?.fullScreen) window.setFullScreen(true)
+    window.show()
+  })
+  window.on('close', () => {
+    const bounds = window.getNormalBounds()
+    database?.setAppSetting('window.state', {
+      ...bounds,
+      maximized: window.isMaximized(),
+      fullScreen: window.isFullScreen(),
+    } satisfies PersistedWindowState)
+    browserService?.close()
+  })
 
   const rendererUrl = process.env.ELECTRON_RENDERER_URL
   if (isDevelopment && rendererUrl) void window.loadURL(rendererUrl)
   else void window.loadFile(join(__dirname, '../renderer/index.html'))
 
   return window
+}
+
+function validWindowState(value: unknown): value is PersistedWindowState {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<PersistedWindowState>
+  return [record.x, record.y, record.width, record.height].every((item) => typeof item === 'number' && Number.isFinite(item))
+    && typeof record.width === 'number' && record.width >= 960 && record.width <= 10_000
+    && typeof record.height === 'number' && record.height >= 640 && record.height <= 10_000
+    && typeof record.maximized === 'boolean' && typeof record.fullScreen === 'boolean'
+}
+
+function windowIntersectsDisplay(value: PersistedWindowState): boolean {
+  return screen.getAllDisplays().some(({ workArea }) => {
+    const overlapWidth = Math.min(value.x + value.width, workArea.x + workArea.width) - Math.max(value.x, workArea.x)
+    const overlapHeight = Math.min(value.y + value.height, workArea.y + workArea.height) - Math.max(value.y, workArea.y)
+    return overlapWidth >= 100 && overlapHeight >= 100
+  })
 }
 
 const gotLock = app.requestSingleInstanceLock()
@@ -188,6 +233,9 @@ app.on('before-quit', () => {
   browserService = null
   fileService?.clear()
   fileService = null
+})
+
+app.on('will-quit', () => {
   database?.close()
   database = null
 })

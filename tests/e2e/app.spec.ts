@@ -61,6 +61,14 @@ test('starts with a sandboxed renderer and real project action', async () => {
     }))
     expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasAsterBridge: true })
 
+    await window.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
+    const commandPalette = window.getByRole('dialog', { name: '命令面板' })
+    await expect(commandPalette).toBeVisible()
+    await commandPalette.getByLabel('搜索命令').fill('文件与产物')
+    await expect(commandPalette.getByRole('option', { name: /文件与产物/ })).toBeVisible()
+    await commandPalette.getByLabel('搜索命令').press('Escape')
+    await expect(commandPalette).toHaveCount(0)
+
     await window.getByRole('button', { name: '设置', exact: true }).click()
     const settings = window.getByRole('dialog', { name: '设置工作台' })
     await expect(settings).toBeVisible()
@@ -377,10 +385,23 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.setViewportSize({ width: 960, height: 640 })
     await expect(window.getByLabel('任务输入')).toBeVisible()
     await expect(window.locator('.activity-timeline')).toBeVisible()
+    await window.getByRole('button', { name: '折叠侧栏' }).click()
+    await expect(window.locator('.app-shell')).toHaveClass(/sidebar-collapsed/u)
+    await expect(window.getByRole('button', { name: '展开侧栏' })).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-shell-compact.png' })
+    await window.getByRole('button', { name: '展开侧栏' }).click()
+    const persistedTheme = await window.evaluate(() => window.localStorage.getItem('aster-theme'))
+    await window.reload()
+    await expect(window).toHaveTitle('Aster Code')
+    await expect(window.locator('html')).toHaveAttribute('data-theme', persistedTheme === 'dark' ? 'dark' : 'light')
   } finally {
     await application.close()
     await new Promise<void>((resolve) => previewServer.close(() => resolve()))
+    const persisted = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+    const windowState = persisted.getAppSetting('window.state') as { width?: number; height?: number } | null
+    expect(windowState?.width).toBeGreaterThanOrEqual(960)
+    expect(windowState?.height).toBeGreaterThanOrEqual(640)
+    persisted.close()
     rmSync(profile, { force: true, recursive: true })
   }
 })

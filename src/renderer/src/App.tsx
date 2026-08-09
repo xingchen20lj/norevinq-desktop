@@ -16,6 +16,8 @@ import {
   LoaderCircle,
   MessageSquare,
   Moon,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -50,8 +52,10 @@ import { SchedulerWorkbench } from './SchedulerWorkbench'
 import { FileWorkbench } from './FileWorkbench'
 import type { BrowserSnapshot } from '../../shared/browser'
 import { BrowserWorkbench } from './BrowserWorkbench'
+import { CommandPalette, type CommandAction } from './CommandPalette'
 
 type Theme = 'dark' | 'light'
+type ThemePreference = Theme | 'system'
 
 export function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null)
@@ -84,12 +88,15 @@ export function App(): React.JSX.Element {
   const [initialFilePath, setInitialFilePath] = useState<string | null>(null)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browser, setBrowser] = useState<BrowserSnapshot | null>(null)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aster-sidebar-collapsed') === 'true')
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
-  const [theme, setTheme] = useState<Theme>(() => {
+  const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
     const saved = window.localStorage.getItem('aster-theme')
-    if (saved === 'dark' || saved === 'light') return saved
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+    return saved === 'dark' || saved === 'light' || saved === 'system' ? saved : 'system'
   })
+  const [systemTheme, setSystemTheme] = useState<Theme>(() => window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
+  const theme: Theme = themePreference === 'system' ? systemTheme : themePreference
   const projects = bootstrap?.projects ?? []
   const selectedThread = conversations?.threads.find(({ id }) => id === conversations.selectedThreadId) ?? null
   const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
@@ -106,8 +113,17 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    window.localStorage.setItem('aster-theme', theme)
-  }, [theme])
+    window.localStorage.setItem('aster-theme', themePreference)
+  }, [theme, themePreference])
+
+  useEffect(() => { window.localStorage.setItem('aster-sidebar-collapsed', String(sidebarCollapsed)) }, [sidebarCollapsed])
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-color-scheme: light)')
+    const update = (): void => setSystemTheme(query.matches ? 'light' : 'dark')
+    query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
 
   useEffect(() => {
     void window.aster.getBootstrapState().then((state) => {
@@ -124,6 +140,33 @@ export function App(): React.JSX.Element {
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
+
+  useEffect(() => {
+    const handleKey = (event: KeyboardEvent): void => {
+      const modifier = event.metaKey || event.ctrlKey
+      if (modifier && (event.key.toLocaleLowerCase() === 'k' || (event.shiftKey && event.key.toLocaleLowerCase() === 'p'))) {
+        event.preventDefault()
+        setCommandOpen(true)
+      } else if (modifier && event.key.toLocaleLowerCase() === 'n') {
+        event.preventDefault()
+        if (selectedProject) setNewTask(true)
+      } else if (modifier && event.key === '`') {
+        event.preventDefault()
+        void openTerminal()
+      } else if (event.key === 'Escape' && !commandOpen) {
+        if (browserOpen) { void window.aster.closeBrowser(); setBrowserOpen(false) }
+        else if (filesOpen) setFilesOpen(false)
+        else if (terminalOpen) setTerminalOpen(false)
+        else if (gitOpen) setGitOpen(false)
+        else if (worktreeOpen) setWorktreeOpen(false)
+        else if (settingsOpen) setSettingsOpen(false)
+        else if (securityOpen) setSecurityOpen(false)
+        else if (schedulerOpen) setSchedulerOpen(false)
+      }
+    }
+    window.addEventListener('keydown', handleKey)
+    return () => window.removeEventListener('keydown', handleKey)
+  }, [browserOpen, commandOpen, filesOpen, gitOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
 
   useEffect(() => {
     const unsubscribe = window.aster.onSecurityChanged(setSecurity)
@@ -337,6 +380,22 @@ export function App(): React.JSX.Element {
     await appendReviewComment(text)
   }
 
+  const shortcutModifier = bootstrap?.platform === 'darwin' ? '⌘' : 'Ctrl+'
+  const commands: CommandAction[] = [
+    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Codex 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
+    { id: 'open-project', label: '打开项目', detail: '使用系统目录选择器添加本地项目', run: openProject },
+    { id: 'files', label: '文件与产物', detail: '浏览当前项目或工作树中的真实文件', disabled: !selectedProject, run: () => openFiles() },
+    { id: 'terminal', label: '打开终端', detail: '打开绑定当前任务上下文的 app-server PTY', shortcut: `${shortcutModifier}\``, disabled: !selectedProject, run: openTerminal },
+    { id: 'browser', label: '本地网页预览', detail: '打开受限 loopback WebContentsView', run: () => { setFilesOpen(false); setTerminalOpen(false); setBrowserOpen(true) } },
+    { id: 'git', label: 'Git 工作区', detail: '查看状态、差异、暂存和提交', disabled: !selectedProject, run: () => setGitOpen(true) },
+    { id: 'scheduler', label: '计划任务', detail: '管理自动化与运行收件箱', run: () => setSchedulerOpen(true) },
+    { id: 'security', label: '安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
+    { id: 'settings', label: '设置', detail: '提供商、MCP、技能和配置', run: () => setSettingsOpen(true) },
+    { id: 'theme-system', label: '外观：跟随系统', detail: '实时跟随操作系统深浅外观', run: () => setThemePreference('system') },
+    { id: 'theme-light', label: '外观：浅色', detail: '固定使用浅色主题', run: () => setThemePreference('light') },
+    { id: 'theme-dark', label: '外观：深色', detail: '固定使用深色主题', run: () => setThemePreference('dark') },
+  ]
+
   async function appendReviewComment(text: string): Promise<void> {
     if (!selectedThread || newTask) {
       setComposer((current) => current ? `${current}\n\n${text}` : text)
@@ -363,17 +422,17 @@ export function App(): React.JSX.Element {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''}`}>
       <aside className="sidebar">
         <div className="window-drag-region" />
         <div className="brand-row">
           <div className="brand-mark"><Code2 size={17} strokeWidth={2.2} /></div>
           <span>Aster Code</span>
-          <button className="icon-button sidebar-search" aria-label="搜索"><Search size={16} /></button>
+          <button className="icon-button sidebar-search" aria-label="命令面板" onClick={() => setCommandOpen(true)}><Search size={16} /></button>
         </div>
 
         <button className="new-task-button" disabled={!selectedProject} onClick={() => setNewTask(true)}>
-          <Plus size={16} /> 新任务 <span className="shortcut">⌘N</span>
+          <Plus size={16} /><span className="new-task-label">新任务</span><span className="shortcut">{shortcutModifier}N</span>
         </button>
 
         <nav className="sidebar-nav" aria-label="项目与任务导航">
@@ -414,12 +473,12 @@ export function App(): React.JSX.Element {
         </nav>
 
         <div className="sidebar-bottom">
-          <button className="secondary-nav" onClick={() => setSchedulerOpen(true)}><Clock3 size={16} />计划任务{Boolean(scheduler?.unreadRuns) && <b>{scheduler?.unreadRuns}</b>}</button>
-          <button className="secondary-nav" onClick={() => setSecurityOpen(true)}><ShieldCheck size={16} />安全{security?.activeScanId && <span className="active-indicator" />}</button>
-          <button className="secondary-nav" onClick={() => setSettingsOpen(true)}><Settings size={16} />设置</button>
+          <button className="secondary-nav" onClick={() => setSchedulerOpen(true)}><Clock3 size={16} /><span>计划任务</span>{Boolean(scheduler?.unreadRuns) && <b>{scheduler?.unreadRuns}</b>}</button>
+          <button className="secondary-nav" onClick={() => setSecurityOpen(true)}><ShieldCheck size={16} /><span>安全</span>{security?.activeScanId && <span className="active-indicator" />}</button>
+          <button className="secondary-nav" onClick={() => setSettingsOpen(true)}><Settings size={16} /><span>设置</span></button>
           <div className="sidebar-footer">
             <span>v{bootstrap?.appVersion ?? '0.1.0'}</span>
-            <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="切换主题">
+            <button className="icon-button" title={`当前外观：${themePreference === 'system' ? '跟随系统' : themePreference === 'dark' ? '深色' : '浅色'}`} onClick={() => setThemePreference(theme === 'dark' ? 'light' : 'dark')} aria-label="切换主题">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
           </div>
@@ -439,6 +498,7 @@ export function App(): React.JSX.Element {
             </span>
           </div>
           <div className="topbar-actions">
+            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
             <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
             <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
             <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
@@ -557,6 +617,7 @@ export function App(): React.JSX.Element {
         close={() => setSchedulerOpen(false)}
         onError={setError}
       />}
+      {commandOpen && <CommandPalette actions={commands} close={() => setCommandOpen(false)} onError={setError} />}
     </div>
   )
 }

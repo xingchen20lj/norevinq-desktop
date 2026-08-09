@@ -100,6 +100,24 @@ export class StateDatabase {
     this.#database.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
   }
 
+  getAppSetting(key: string): unknown {
+    validateSettingKey(key)
+    const row = this.#database.prepare('SELECT value_json FROM app_settings WHERE key = ?')
+      .get(key) as { value_json: string } | undefined
+    return row ? JSON.parse(row.value_json) as unknown : null
+  }
+
+  setAppSetting(key: string, value: unknown): void {
+    validateSettingKey(key)
+    const serialized = JSON.stringify(value) as string | undefined
+    if (serialized === undefined) throw new Error('Application setting must be JSON serializable.')
+    if (serialized.length > 64 * 1024) throw new Error('Application setting exceeds 64 KiB.')
+    this.#database.prepare(`
+      INSERT INTO app_settings (key, value_json, updated_at) VALUES (?, ?, ?)
+      ON CONFLICT(key) DO UPDATE SET value_json=excluded.value_json, updated_at=excluded.updated_at
+    `).run(key, serialized, new Date().toISOString())
+  }
+
   setProjectTrust(projectId: string, trusted: boolean): ProjectSummary {
     const result = this.#database
       .prepare('UPDATE projects SET trusted = ? WHERE id = ?')
@@ -380,7 +398,23 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 6) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS app_settings (
+          key TEXT PRIMARY KEY,
+          value_json TEXT NOT NULL,
+          updated_at TEXT NOT NULL
+        );
+        PRAGMA user_version = 6;
+        COMMIT;
+      `)
+    }
   }
+}
+
+function validateSettingKey(key: string): void {
+  if (!/^[a-z][a-z0-9._-]{0,79}$/u.test(key)) throw new Error('Application setting key is invalid.')
 }
 
 function toSecurityScanRecord(row: SecurityScanRow): SecurityScanRecord {
