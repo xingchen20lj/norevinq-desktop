@@ -141,6 +141,26 @@ button { color: inherit; }
 .approval-panel button { display: flex; flex: none; align-items: center; gap: 4px; height: 29px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface-2); font-size: 10.5px; cursor: pointer; }
 .approval-panel button.approve { border-color: transparent; color: #fff; background: var(--accent); }
 
+.modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(4, 6, 9, .58); backdrop-filter: blur(5px); }
+.settings-dialog { width: min(560px, 100%); padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 28px 90px rgba(0,0,0,.4); }
+.settings-dialog header { display: flex; align-items: flex-start; justify-content: space-between; }
+.settings-dialog header .eyebrow { margin-bottom: 5px; }
+.settings-dialog h2 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.provider-state { display: grid; grid-template-columns: 36px 1fr auto; gap: 10px; align-items: center; margin: 20px 0 16px; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-2); }
+.provider-icon { display: grid; width: 34px; height: 34px; place-items: center; border-radius: 9px; color: var(--accent-strong); background: var(--accent-soft); }
+.provider-state strong { font-size: 12px; }
+.provider-state p { margin: 3px 0 0; color: var(--muted); font-size: 10.5px; }
+.provider-state > span { padding: 3px 7px; border-radius: 999px; color: var(--subtle); background: var(--bg); font-size: 9.5px; }
+.provider-state > span.connected { color: #57bd86; }
+.credential-field { display: grid; gap: 6px; color: var(--muted); font-size: 10.5px; }
+.credential-field input { width: 100%; height: 38px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; outline: 0; color: var(--text); background: var(--bg); font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.credential-field input:focus { border-color: color-mix(in srgb, var(--accent) 55%, var(--border)); }
+.settings-note { margin: 12px 0; color: var(--muted); font-size: 10.5px; line-height: 1.55; }
+.provider-warning { display: grid; gap: 3px; padding: 10px 11px; border-left: 2px solid #d3a94f; color: var(--muted); background: color-mix(in srgb, #d3a94f 6%, transparent); font-size: 10px; line-height: 1.45; }
+.provider-warning strong { color: var(--text); font-size: 10.5px; }
+.settings-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
+.settings-dialog footer > button:not(.primary-button) { height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: transparent; font-size: 10.5px; cursor: pointer; }
+
 @media (max-width: 850px) {
   .app-shell { grid-template-columns: 210px 1fr; }
   .composer-shell { left: 240px; }

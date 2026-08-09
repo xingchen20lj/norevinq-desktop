@@ -27,6 +27,9 @@ test('starts with a sandboxed renderer and real project action', async () => {
     expect(runtime.phase).toBe('ready')
     expect(runtime.version).toContain('codex-cli')
     expect(runtime.models.length).toBeGreaterThan(0)
+    const deepSeekConfigured = typeof process.env.DEEPSEEK_API_KEY === 'string' && process.env.DEEPSEEK_API_KEY.trim().length > 0
+    const runtimeModelIds = runtime.models.map((item) => (item as { id?: string }).id)
+    expect(runtimeModelIds.includes('deepseek-v4-flash')).toBe(deepSeekConfigured)
 
     const securityState = await window.evaluate(() => ({
       hasNodeRequire: typeof Reflect.get(globalThis, 'require') !== 'undefined',
@@ -35,10 +38,38 @@ test('starts with a sandboxed renderer and real project action', async () => {
     }))
     expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasAsterBridge: true })
 
+    await window.getByRole('button', { name: '设置', exact: true }).click()
+    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toBeVisible()
+    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toContainText(
+      deepSeekConfigured ? '由进程环境安全提供' : '添加 API Key 以启用',
+    )
+    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toContainText('DeepSeek V4 Pro 暂不可用')
+    await window.getByRole('button', { name: '关闭设置' }).click()
+
     await window.getByLabel('任务输入').fill('Reply with exactly ASTER_RUNTIME_OK and do not use tools.')
     await window.getByRole('button', { name: '发送任务' }).click()
     await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_RUNTIME_OK', { timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+
+    if (deepSeekConfigured) {
+      await window.evaluate(async ({ projectId }) => {
+        const bridge = Reflect.get(window, 'aster') as {
+          startConversation: (input: unknown) => Promise<unknown>
+        }
+        await bridge.startConversation({
+          projectId,
+          model: 'deepseek-v4-flash',
+          modelProvider: 'deepseek',
+          reasoningEffort: 'low',
+          text: 'Use apply_patch to create a file named aster-deepseek-proof.txt in the project root containing exactly DEEPSEEK_TOOL_OK followed by a newline. Do not run shell commands. After the file is created, reply with exactly ASTER_DEEPSEEK_OK.',
+        })
+      }, { projectId: project.id })
+      await expect(window.locator('.activity-card.fileChange, .activity-card.command')
+        .filter({ hasText: /apply_patch|aster-deepseek-proof/ }).first()).toBeVisible({ timeout: 120_000 })
+      await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_DEEPSEEK_OK' })).toBeVisible({ timeout: 120_000 })
+      await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+      expect(readFileSync(join(projectPath, 'aster-deepseek-proof.txt'), 'utf8')).toBe('DEEPSEEK_TOOL_OK\n')
+    }
 
     await window.evaluate(async ({ projectId }) => {
       const bridge = Reflect.get(window, 'aster') as {

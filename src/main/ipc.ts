@@ -12,6 +12,7 @@ import type {
 } from '../shared/conversation.js'
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtime.js'
 import type { StateDatabase } from './state/database.js'
+import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -34,7 +35,18 @@ export type AgentController = {
   resolveApproval: (input: ResolveApprovalInput) => ConversationSnapshot
 }
 
-export function registerIpc(database: StateDatabase, runtime: RuntimeController, agent: AgentController): () => void {
+export type ProviderController = {
+  getStatus: () => ProviderStatus
+  saveDeepSeekCredential: (apiKey: string) => Promise<unknown>
+  deleteDeepSeekCredential: () => Promise<unknown>
+}
+
+export function registerIpc(
+  database: StateDatabase,
+  runtime: RuntimeController,
+  agent: AgentController,
+  providers: ProviderController,
+): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
     for (const contents of webContents) {
@@ -52,6 +64,7 @@ export function registerIpc(database: StateDatabase, runtime: RuntimeController,
     platform: process.platform,
     projects: database.listProjects(),
     runtime: runtime.getSnapshot(),
+    providers: providers.getStatus(),
   }))
 
   ipcMain.handle(IPC_CHANNELS.selectProject, async () => {
@@ -96,6 +109,11 @@ export function registerIpc(database: StateDatabase, runtime: RuntimeController,
     agent.interruptTurn(interruptTurnSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.conversationApprovalResolve, (_event, input: unknown) =>
     agent.resolveApproval(resolveApprovalSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.providerDeepSeekSave, (_event, input: unknown) => {
+    const parsed: SaveDeepSeekCredentialInput = saveDeepSeekCredentialSchema.parse(input)
+    return providers.saveDeepSeekCredential(parsed.apiKey)
+  })
+  ipcMain.handle(IPC_CHANNELS.providerDeepSeekDelete, () => providers.deleteDeepSeekCredential())
 
   return () => {
     unsubscribeRuntime()
@@ -135,3 +153,4 @@ const resolveApprovalSchema = z.object({
   requestId: z.string().min(1).max(200),
   decision: z.enum(['accept', 'acceptForSession', 'decline', 'cancel']),
 })
+const saveDeepSeekCredentialSchema = z.object({ apiKey: z.string().trim().min(16).max(512) })

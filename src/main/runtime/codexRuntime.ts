@@ -1,6 +1,6 @@
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
-import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../../shared/runtime.js'
+import type { CodexModelSummary, CodexRuntimeSnapshot, RuntimeSubscription } from '../../shared/runtime.js'
 import type { JsonlLogger } from '../logging/logger.js'
 import { discoverCodexBinary, type DiscoveredCodexBinary } from './codexDiscovery.js'
 import {
@@ -27,6 +27,9 @@ export type CodexRuntimeOptions = {
   maxAutomaticRestarts?: number
   restartBaseDelayMs?: number
   initializeTimeoutMs?: number
+  configOverrides?: readonly string[]
+  childEnvironment?: Readonly<Record<string, string>>
+  extraModels?: readonly CodexModelSummary[]
 }
 
 type NotificationRegistration = {
@@ -48,6 +51,9 @@ export class CodexRuntimeSupervisor {
   readonly #maxAutomaticRestarts: number
   readonly #restartBaseDelayMs: number
   readonly #initializeTimeoutMs: number
+  #configOverrides: readonly string[]
+  #childEnvironment: Readonly<Record<string, string>>
+  #extraModels: readonly CodexModelSummary[]
   readonly #notificationRegistrations = new Set<NotificationRegistration>()
   readonly #requestHandlers = new Map<string, JsonRpcRequestHandler>()
 
@@ -68,6 +74,9 @@ export class CodexRuntimeSupervisor {
     this.#maxAutomaticRestarts = options.maxAutomaticRestarts ?? 3
     this.#restartBaseDelayMs = options.restartBaseDelayMs ?? 500
     this.#initializeTimeoutMs = options.initializeTimeoutMs ?? 15_000
+    this.#configOverrides = options.configOverrides ?? []
+    this.#childEnvironment = options.childEnvironment ?? {}
+    this.#extraModels = options.extraModels ?? []
   }
 
   getSnapshot(): CodexRuntimeSnapshot {
@@ -92,6 +101,18 @@ export class CodexRuntimeSupervisor {
     this.#state.update({ phase: 'restarting', error: null })
     await this.stop(false)
     return this.start()
+  }
+
+  async updateLaunchConfiguration(options: {
+    configOverrides?: readonly string[]
+    childEnvironment?: Readonly<Record<string, string>>
+    extraModels?: readonly CodexModelSummary[]
+  }): Promise<CodexRuntimeSnapshot> {
+    if (this.#activeTurnCount > 0) throw new Error('Cannot change model providers during an active turn.')
+    this.#configOverrides = options.configOverrides ?? []
+    this.#childEnvironment = options.childEnvironment ?? {}
+    this.#extraModels = options.extraModels ?? []
+    return this.restart()
   }
 
   stop(markStopped = true): Promise<void> {
@@ -183,9 +204,11 @@ export class CodexRuntimeSupervisor {
       error: null,
     })
 
-    const child = this.#spawnProcess(binary.path, ['app-server', '--listen', 'stdio://'], {
+    const configArgs = this.#configOverrides.flatMap((override) => ['-c', override])
+    const child = this.#spawnProcess(binary.path, ['app-server', ...configArgs, '--listen', 'stdio://'], {
       env: {
         ...process.env,
+        ...this.#childEnvironment,
         LOG_FORMAT: 'json',
         RUST_LOG: process.env.RUST_LOG ?? 'warn',
       },
@@ -221,7 +244,7 @@ export class CodexRuntimeSupervisor {
         includeHidden: false,
         limit: 100,
       }, { timeoutMs: this.#initializeTimeoutMs })
-      const models = parseModelListResult(rawModels)
+      const models = mergeModels(parseModelListResult(rawModels), this.#extraModels)
       await this.#log('info', 'Codex app-server initialized', {
         binaryPath: binary.path,
         models: models.map(({ id }) => id),
@@ -348,4 +371,9 @@ function observeStderr(stderr: Readable, onLine: (line: string) => void): void {
 
 function toErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function mergeModels(primary: CodexModelSummary[], extra: readonly CodexModelSummary[]): CodexModelSummary[] {
+  const seen = new Set(primary.map(({ id }) => id))
+  return [...primary, ...extra.filter(({ id }) => !seen.has(id))]
 }

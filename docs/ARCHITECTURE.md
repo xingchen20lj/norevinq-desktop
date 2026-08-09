@@ -27,6 +27,8 @@ flowchart LR
 - `src/shared`：IPC schema、领域事件、模型能力和公共类型。
 - `src/main/runtime`：app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
 - `src/main/agent`：thread/turn 服务、server request 审批、活动 reducer、状态订阅与历史恢复。
+- `src/main/providers`：provider 生命周期、能力目录和仅进程级 Codex 配置；不写用户全局 Codex 配置。
+- `src/main/security/credentialStore.ts`：操作系统加密适配、仓库外 0600 原子凭据文件；不提供读取密钥的 IPC。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。
 - `src/main/security`：SDK worker、扫描状态、artifact 导入与导出。
@@ -42,6 +44,7 @@ flowchart LR
 6. 真实外部能力缺失时返回明确诊断，绝不生成伪造成功数据。
 7. renderer 只提交已登记项目 ID；工作目录在主进程数据库解析，不能借 IPC 指向任意路径。
 8. 命令与文件审批默认保持 pending，只有明确用户决策才向 app-server 回应；关闭时统一 cancel。
+9. provider key 只从环境或 OS 加密保险库进入 app-server 子进程；配置、SQLite、日志、snapshot 和 renderer 均不含明文。
 
 ## 上游与公开资料
 

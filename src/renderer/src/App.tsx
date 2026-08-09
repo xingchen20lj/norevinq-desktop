@@ -10,6 +10,7 @@ import {
   FolderCode,
   FolderOpen,
   GitBranch,
+  KeyRound,
   LoaderCircle,
   MessageSquare,
   Moon,
@@ -29,6 +30,7 @@ import type { AgentActivity, AgentActivityState } from '../../shared/agent'
 import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
 import type { ConversationSnapshot, PendingApproval } from '../../shared/conversation'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
+import type { ProviderStatus } from '../../shared/providers'
 
 type Theme = 'dark' | 'light'
 
@@ -36,6 +38,7 @@ export function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null)
   const [runtime, setRuntime] = useState<CodexRuntimeSnapshot | null>(null)
   const [conversations, setConversations] = useState<ConversationSnapshot | null>(null)
+  const [providers, setProviders] = useState<ProviderStatus | null>(null)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
   const [composer, setComposer] = useState('')
   const [model, setModel] = useState('')
@@ -44,6 +47,8 @@ export function App(): React.JSX.Element {
   const [error, setError] = useState<string | null>(null)
   const [isOpening, setIsOpening] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const [deepSeekKey, setDeepSeekKey] = useState('')
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
     if (saved === 'dark' || saved === 'light') return saved
@@ -59,6 +64,7 @@ export function App(): React.JSX.Element {
     void window.aster.getBootstrapState().then((state) => {
       setBootstrap(state)
       setRuntime(state.runtime)
+      setProviders(state.providers)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [])
@@ -140,6 +146,7 @@ export function App(): React.JSX.Element {
           projectId: selectedProject.id,
           text,
           ...(model ? { model } : {}),
+          ...(model.startsWith('deepseek-') ? { modelProvider: 'deepseek' } : {}),
           ...(effort ? { reasoningEffort: effort } : {}),
         })
         setNewTask(false)
@@ -224,7 +231,7 @@ export function App(): React.JSX.Element {
         <div className="sidebar-bottom">
           <button className="secondary-nav"><Clock3 size={16} />计划任务</button>
           <button className="secondary-nav"><ShieldCheck size={16} />安全</button>
-          <button className="secondary-nav"><Settings size={16} />设置</button>
+          <button className="secondary-nav" onClick={() => setSettingsOpen(true)}><Settings size={16} />设置</button>
           <div className="sidebar-footer">
             <span>v{bootstrap?.appVersion ?? '0.1.0'}</span>
             <button className="icon-button" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} aria-label="切换主题">
@@ -273,8 +280,12 @@ export function App(): React.JSX.Element {
             />
             <div className="composer-footer">
               <div className="composer-options">
-                <select aria-label="模型" value={model} onChange={(event) => setModel(event.target.value)}>
-                  {runtime?.models.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}
+                <select aria-label="模型" value={model} onChange={(event) => {
+                  const nextModel = runtime?.models.find(({ id }) => id === event.target.value)
+                  setModel(event.target.value)
+                  setEffort(nextModel?.defaultReasoningEffort ?? nextModel?.supportedReasoningEfforts[0] ?? '')
+                }}>
+                  {runtime?.models.map((item) => <option value={item.id} key={item.id} disabled={item.hidden}>{item.displayName}</option>)}
                 </select>
                 <select aria-label="推理强度" value={effort} onChange={(event) => setEffort(event.target.value)}>
                   {(selectedModel?.supportedReasoningEfforts ?? []).map((item) => <option value={item} key={item}>{item}</option>)}
@@ -292,8 +303,72 @@ export function App(): React.JSX.Element {
           </div>
         </section>
       </main>
+      {settingsOpen && <ProviderSettings
+        providers={providers}
+        apiKey={deepSeekKey}
+        setApiKey={setDeepSeekKey}
+        close={() => setSettingsOpen(false)}
+        onError={setError}
+        onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
+      />}
     </div>
   )
+}
+
+function ProviderSettings({ providers, apiKey, setApiKey, close, onError, onUpdated }: {
+  providers: ProviderStatus | null
+  apiKey: string
+  setApiKey: (value: string) => void
+  close: () => void
+  onError: (message: string | null) => void
+  onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
+}): React.JSX.Element {
+  const [saving, setSaving] = useState(false)
+  const status = providers?.deepseek
+
+  async function save(): Promise<void> {
+    setSaving(true)
+    onError(null)
+    try {
+      const result = await window.aster.saveDeepSeekCredential({ apiKey })
+      setApiKey('')
+      onUpdated(result)
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function remove(): Promise<void> {
+    setSaving(true)
+    onError(null)
+    try {
+      onUpdated(await window.aster.deleteDeepSeekCredential())
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
+    <section className="settings-dialog" role="dialog" aria-modal="true" aria-label="模型提供商设置">
+      <header><div><p className="eyebrow">MODEL PROVIDERS</p><h2>DeepSeek Responses</h2></div><button className="icon-button" onClick={close} aria-label="关闭设置"><X size={16} /></button></header>
+      <div className="provider-state">
+        <div className="provider-icon"><KeyRound size={17} /></div>
+        <div><strong>{status?.configured ? '已配置' : '未配置'}</strong><p>{status?.credentialSource === 'environment' ? '由进程环境安全提供' : status?.credentialSource === 'os-vault' ? '保存在操作系统加密保险库' : '添加 API Key 以启用'}</p></div>
+        <span className={status?.configured ? 'connected' : ''}>{status?.responsesModel ?? 'deepseek-v4-flash'}</span>
+      </div>
+      <label className="credential-field"><span>API Key</span><input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="仅加密保存，不写入日志或数据库" /></label>
+      <p className="settings-note">支持文本、推理、函数工具、custom apply_patch 与服务端 Web Search。不支持图片、文件输入、MCP、Computer Use、后台任务或 stateful Responses。</p>
+      <div className="provider-warning"><strong>DeepSeek V4 Pro 暂不可用</strong><span>截至 2026-08-10，Responses API 返回 HTTP 400；Aster 不会静默降级到 Chat Completions。</span></div>
+      <footer>
+        {status?.credentialSource === 'os-vault' && <button onClick={() => void remove()} disabled={saving}>删除已保存密钥</button>}
+        <button className="primary-button" onClick={() => void save()} disabled={saving || apiKey.trim().length < 16}>{saving ? '正在重启运行时…' : '安全保存并启用'}</button>
+      </footer>
+    </section>
+  </div>
 }
 
 function Welcome({ selectedProject, runtime, isOpening, openProject }: {

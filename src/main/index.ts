@@ -1,11 +1,19 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, shell } from 'electron'
+import { app, BrowserWindow, safeStorage, shell } from 'electron'
 import { registerIpc } from './ipc.js'
 import { createLogger, type JsonlLogger } from './logging/logger.js'
 import { SizeLimitedRotation } from './logging/sizeRotation.js'
 import { CodexRuntimeSupervisor } from './runtime/codexRuntime.js'
 import { StateDatabase } from './state/database.js'
 import { AgentService } from './agent/agentService.js'
+import {
+  DEEPSEEK_CODEX_CONFIG_OVERRIDES,
+  DEEPSEEK_CODEX_MODELS,
+  DEEPSEEK_ENV_KEY,
+  getDeepSeekEnvironmentValue,
+} from './providers/deepseek.js'
+import { ProviderService } from './providers/providerService.js'
+import { CredentialStore } from './security/credentialStore.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -14,6 +22,7 @@ let unregisterIpc: (() => void) | null = null
 let runtime: CodexRuntimeSupervisor | null = null
 let runtimeLogger: JsonlLogger | null = null
 let agentService: AgentService | null = null
+let providerService: ProviderService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -63,14 +72,30 @@ if (!gotLock) {
   void app.whenReady().then(() => {
     const userData = app.getPath('userData')
     database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
+    const credentialStore = new CredentialStore(join(userData, 'credentials.json'), {
+      isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
+      encryptString: (value) => safeStorage.encryptString(value),
+      decryptString: (value) => safeStorage.decryptString(value),
+    })
     runtimeLogger = createLogger({
       component: 'codex-runtime',
       filePath: join(userData, 'logs', 'runtime.jsonl'),
       rotation: new SizeLimitedRotation(),
     })
-    runtime = new CodexRuntimeSupervisor({ logger: runtimeLogger })
+    const environmentDeepSeekKey = getDeepSeekEnvironmentValue(process.env)
+    const vaultDeepSeekKey = readStoredDeepSeekKey(credentialStore)
+    const deepSeekKey = environmentDeepSeekKey ?? vaultDeepSeekKey
+    runtime = new CodexRuntimeSupervisor({
+      logger: runtimeLogger,
+      ...(deepSeekKey ? {
+        childEnvironment: { [DEEPSEEK_ENV_KEY]: deepSeekKey },
+        configOverrides: DEEPSEEK_CODEX_CONFIG_OVERRIDES,
+        extraModels: DEEPSEEK_CODEX_MODELS,
+      } : {}),
+    })
+    providerService = new ProviderService(runtime, credentialStore, environmentDeepSeekKey)
     agentService = new AgentService(runtime, database)
-    unregisterIpc = registerIpc(database, runtime, agentService)
+    unregisterIpc = registerIpc(database, runtime, agentService, providerService)
     mainWindow = createMainWindow()
     void runtime.start()
 
@@ -91,8 +116,17 @@ app.on('before-quit', () => {
   database = null
   agentService?.dispose()
   agentService = null
+  providerService = null
   void runtime?.stop()
   runtime = null
   void runtimeLogger?.close()
   runtimeLogger = null
 })
+
+function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
+  try {
+    return credentials.get('provider.deepseek.api-key')
+  } catch {
+    return null
+  }
+}

@@ -12,6 +12,7 @@ import type {
   SteerTurnInput,
 } from '../shared/conversation.js'
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtime.js'
+import type { SaveDeepSeekCredentialInput } from '../shared/providers.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -40,6 +41,9 @@ const api: AsterDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.conversationChanged, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.conversationChanged, listener)
   },
+  saveDeepSeekCredential: (input: SaveDeepSeekCredentialInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekSave, input),
+  deleteDeepSeekCredential: () => ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekDelete),
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

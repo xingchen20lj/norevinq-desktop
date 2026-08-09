@@ -41,14 +41,14 @@
 | 模型 | OpenAI API Key 登录 | 尚未开发 | account/login/start |
 | 模型 | ChatGPT 浏览器/设备码登录 | 尚未开发 | app-server auth API |
 | 模型 | 模型列表与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过 |
-| 模型 | 自定义 Responses provider | 尚未开发 | config RPC |
-| DeepSeek | 一级提供商配置 | 尚未开发 | `deepseek-v4-flash` 能力基线已实测 |
-| DeepSeek | 安全保存 API Key | 尚未开发 | OS keychain |
-| DeepSeek | 官方 Responses API 流式连接 | 尚未开发 | 外部 API 已真实验证 SSE；应用尚未接入 |
-| DeepSeek | 工具调用与文件修改闭环 | 尚未开发 | 函数回传已真实验证，app-server/apply_patch 待接入 |
-| DeepSeek | 推理能力/强度映射 | 尚未开发 | 已确认 none/low/high/max 映射，summary 不支持 |
-| DeepSeek | 图片、网络能力展示 | 尚未开发 | 图片否；server Web Search 是但逐调用检查 |
-| DeepSeek | 错误、限流、重试和取消 | 尚未开发 | 阶段 6 |
+| 模型 | 自定义 Responses provider | 已测试 | 进程级 `-c` provider 注册，不污染用户全局配置；DeepSeek 真实闭环通过 |
+| DeepSeek | 一级提供商配置 | 已测试 | 模型选择、provider 路由、设置状态和 app-server Responses 真实运行 |
+| DeepSeek | 安全保存 API Key | 已测试 | Electron safeStorage + 0600 原子文件；renderer 不可读回；环境密钥优先 |
+| DeepSeek | 官方 Responses API 流式连接 | 已测试 | 桌面经 app-server 真实收到 reasoning、工具和最终文本事件 |
+| DeepSeek | 工具调用与文件修改闭环 | 已测试 | custom apply_patch 创建文件，精确断言 `DEEPSEEK_TOOL_OK\n` |
+| DeepSeek | 推理能力/强度映射 | 已测试 | none/low/high/max 能力注册；真实 low reasoning 活动通过，不宣称 summary |
+| DeepSeek | 图片、网络能力展示 | 部分实现 | 设置页明确图片/文件否、Web Search 是；搜索逐调用 UI 与真实回归待补 |
+| DeepSeek | 错误、限流、重试和取消 | 部分实现 | 通用 turn 错误/取消路径可用；provider 专属限流分类和重试 UI 待补 |
 | Git | 状态、分支、远端 | 尚未开发 | 阶段 7 |
 | Git | stage/unstage/revert 文件和区块 | 尚未开发 | 阶段 7/9 |
 | Git | commit/push | 尚未开发 | 阶段 7 |
@@ -78,7 +78,7 @@
 | MCP | 工具审批和 elicitation | 尚未开发 | 阶段 11 |
 | 技能 | 按项目发现、刷新、详情 | 尚未开发 | skills/list/read |
 | 插件 | 市场、安装、卸载和详情 | 尚未开发 | 上游 API 当前标注 under development |
-| 设置 | 模型、推理、权限、外观 | 尚未开发 | 阶段 11 |
+| 设置 | 模型、推理、权限、外观 | 部分实现 | 模型/推理/外观与 DeepSeek 凭据设置已实现；权限集中设置待补 |
 | 设置 | 配置层级和原始 TOML | 尚未开发 | 用户/项目/托管策略分离 |
 | 设置 | 快捷键和命令面板 | 尚未开发 | 阶段 16 |
 | 计划任务 | 创建、编辑、暂停、删除 | 尚未开发 | 本地调度器 |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 尚未开发 | 不伪造扫描结果 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 10 个单测文件 61 项、真实 Electron/app-server/文本/审批/命令/steer/interrupt E2E 通过；持续扩展中 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 13 个单测文件 68 项；真实 Electron 同时覆盖 OpenAI、DeepSeek、审批、命令、steer、interrupt |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

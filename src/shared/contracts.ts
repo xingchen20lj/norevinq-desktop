@@ -10,6 +10,7 @@ import type {
   StartTurnInput,
   SteerTurnInput,
 } from './conversation.js'
+import type { ProviderStatus, SaveDeepSeekCredentialInput } from './providers.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -26,6 +27,8 @@ export const IPC_CHANNELS = {
   conversationInterrupt: 'conversation:interrupt',
   conversationApprovalResolve: 'conversation:approval-resolve',
   conversationChanged: 'conversation:changed',
+  providerDeepSeekSave: 'provider:deepseek-save',
+  providerDeepSeekDelete: 'provider:deepseek-delete',
 } as const
 
 export type ProjectSummary = {
@@ -41,6 +44,7 @@ export type BootstrapState = {
   platform: string
   projects: ProjectSummary[]
   runtime: CodexRuntimeSnapshot
+  providers: ProviderStatus
 }
 
 export type RemoveProjectInput = {
@@ -62,4 +66,9 @@ export type AsterDesktopApi = {
   interruptTurn: (input: InterruptTurnInput) => Promise<ConversationSnapshot>
   resolveApproval: (input: ResolveApprovalInput) => Promise<ConversationSnapshot>
   onConversationChanged: (subscription: ConversationSubscription) => () => void
+  saveDeepSeekCredential: (input: SaveDeepSeekCredentialInput) => Promise<{
+    providers: ProviderStatus
+    runtime: CodexRuntimeSnapshot
+  }>
+  deleteDeepSeekCredential: () => Promise<{ providers: ProviderStatus; runtime: CodexRuntimeSnapshot }>
 }

@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 6：DeepSeek Responses API 一级提供商。
+阶段 7：Git 仓库工作流。
 
 ## 当前任务
 
-- 实现 DeepSeek provider 配置、能力说明、密钥保险库和安全运行时注入。
-- 通过 app-server 使用 `deepseek-v4-flash` 创建真实任务并完成工具/文件修改闭环。
-- 对不支持的模型、参数、图片和 stateful Responses 显式拒绝或解释，不静默降级。
-- 完成 DeepSeek 错误、取消、限流和能力探测测试。
+- 实现受项目根约束的 Git 命令服务与仓库状态解析。
+- 完成分支、远端、文件状态、stage/unstage、commit 和 push 的真实闭环。
+- 为 destructive revert、push 和分支操作建立明确验证与错误状态。
+- 接入 Git 状态侧栏/面板并为大型输出建立边界。
 
 ## 已完成任务
 
@@ -50,13 +50,17 @@
 - 在 read-only 沙箱真实触发 fileChange 审批，UI 允许后 apply_patch 创建文件并精确验证内容。
 - 真实执行 `sleep 8` 命令并在运行中 steer，最终收到 `ASTER_STEER_OK`。
 - 真实中断 `sleep 20` turn，确认未产生 `INTERRUPT_FAILED` 最终消息；修复了中断时上游省略 item/completed 导致活动卡滞留 inProgress 的问题。
+- 以 app-server 进程级配置接入 DeepSeek，不修改用户 `~/.codex/config.toml`。
+- 完成 Electron safeStorage 凭据保险库、0600 原子写入、环境优先级与不可读回 IPC。
+- 设置页显示 DeepSeek 配置来源、能力限制与 V4 Pro Responses HTTP 400 阻塞原因。
+- 真实 `deepseek-v4-flash` Responses 产生 reasoning 和 custom apply_patch，创建文件内容精确为 `DEEPSEEK_TOOL_OK\n`，最终消息为 `ASTER_DEEPSEEK_OK`。
 
 ## 下一任务
 
-1. 创建 provider 配置和 OS 凭据适配层，禁止密钥写入数据库/日志。
-2. 用本机已有安全 DeepSeek 凭据写入临时 Codex provider 配置并执行真实 app-server 任务。
-3. 验证 DeepSeek custom apply_patch、推理事件、取消和错误呈现。
-4. 完成 provider 设置 UI 与能力限制说明。
+1. 创建 Git command runner、路径边界、超时/输出上限和仓库状态领域模型。
+2. 用临时真实仓库测试状态、分支、远端、stage/unstage、commit。
+3. 接入 renderer Git 面板与增量刷新。
+4. 完成阶段 7 后进入托管工作树。
 
 ## 已做技术决策
 
@@ -73,13 +77,13 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：10 个单元测试文件共 61 项通过；1 个 Electron + 真实 app-server E2E 内含文本、文件审批、命令、steer、interrupt 四类在线闭环；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：13 个单元测试文件共 68 项通过；1 个 Electron E2E 内含 OpenAI、DeepSeek Responses/apply_patch、文件审批、命令、steer、interrupt；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
-- 当前渲染器生产主包约 574 kB，后续按工作台路由做代码分割。
+- 当前渲染器生产主包约 596 kB，后续按工作台路由做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞
