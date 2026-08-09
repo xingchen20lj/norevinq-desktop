@@ -1,5 +1,6 @@
 import { _electron as electron, expect, test } from '@playwright/test'
-import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
@@ -11,6 +12,12 @@ test('starts with a sandboxed renderer and real project action', async () => {
   const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
+  execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Aster E2E'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'aster-e2e@example.invalid'], { cwd: projectPath })
+  writeFileSync(join(projectPath, 'README.md'), '# E2E\n')
+  execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
+  execFileSync('git', ['commit', '-m', 'test: baseline'], { cwd: projectPath })
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
     const window = await application.firstWindow()
@@ -87,6 +94,19 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 90_000 })
     expect(existsSync(join(projectPath, 'aster-approval-proof.txt'))).toBe(true)
     expect(readFileSync(join(projectPath, 'aster-approval-proof.txt'), 'utf8')).toBe('ASTER_APPROVAL_OK\n')
+
+    await window.getByRole('button', { name: 'Git 状态' }).click()
+    await expect(window.getByLabel('Git 工作区')).toBeVisible()
+    await window.getByRole('button', { name: '刷新', exact: true }).click()
+    await expect(window.getByRole('button', { name: '暂存 aster-approval-proof.txt' })).toBeVisible()
+    await window.getByRole('button', { name: '暂存 aster-approval-proof.txt' }).click()
+    if (deepSeekConfigured) {
+      await window.getByRole('button', { name: '暂存 aster-deepseek-proof.txt' }).click()
+    }
+    await window.getByLabel('提交说明').fill('test: approval proof')
+    await window.getByRole('button', { name: '提交', exact: true }).click()
+    await expect(window.getByLabel('Git 工作区')).toContainText('工作区干净')
+    await window.getByRole('button', { name: '关闭 Git' }).click()
 
     await window.getByRole('button', { name: /新任务/ }).click()
     await window.getByLabel('任务输入').fill('Run the shell command sleep 8, then reply with FIRST. Do not perform any other action.')

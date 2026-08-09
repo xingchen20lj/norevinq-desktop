@@ -13,6 +13,7 @@ import type {
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtime.js'
 import type { StateDatabase } from './state/database.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
+import type { GitRepositorySnapshot } from '../shared/git.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -41,11 +42,21 @@ export type ProviderController = {
   deleteDeepSeekCredential: () => Promise<unknown>
 }
 
+export type GitController = {
+  getStatus: (input: { projectId: string }) => Promise<GitRepositorySnapshot>
+  initialize: (input: { projectId: string }) => Promise<GitRepositorySnapshot>
+  stage: (input: { projectId: string; paths: string[] }) => Promise<GitRepositorySnapshot>
+  unstage: (input: { projectId: string; paths: string[] }) => Promise<GitRepositorySnapshot>
+  commit: (input: { projectId: string; message: string }) => Promise<GitRepositorySnapshot>
+  push: (input: { projectId: string; remote?: string; branch?: string; setUpstream?: boolean }) => Promise<GitRepositorySnapshot>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
   agent: AgentController,
   providers: ProviderController,
+  git: GitController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -114,6 +125,17 @@ export function registerIpc(
     return providers.saveDeepSeekCredential(parsed.apiKey)
   })
   ipcMain.handle(IPC_CHANNELS.providerDeepSeekDelete, () => providers.deleteDeepSeekCredential())
+  ipcMain.handle(IPC_CHANNELS.gitStatus, (_event, input: unknown) => git.getStatus(projectInputSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitInitialize, (_event, input: unknown) => git.initialize(projectInputSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitStage, (_event, input: unknown) => git.stage(gitPathsSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitUnstage, (_event, input: unknown) => git.unstage(gitPathsSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitCommit, (_event, input: unknown) => git.commit(gitCommitSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitPush, (_event, input: unknown) => git.push(gitPushSchema.parse(input) as {
+    projectId: string
+    remote?: string
+    branch?: string
+    setUpstream?: boolean
+  }))
 
   return () => {
     unsubscribeRuntime()
@@ -154,3 +176,13 @@ const resolveApprovalSchema = z.object({
   decision: z.enum(['accept', 'acceptForSession', 'decline', 'cancel']),
 })
 const saveDeepSeekCredentialSchema = z.object({ apiKey: z.string().trim().min(16).max(512) })
+const gitPathSchema = z.string().min(1).max(4_096).refine((value) => !value.includes('\0'))
+const gitPathsSchema = z.object({ projectId: z.uuid(), paths: z.array(gitPathSchema).min(1).max(10_000) })
+const gitCommitSchema = z.object({ projectId: z.uuid(), message: z.string().trim().min(1).max(5_000) })
+const gitRefSchema = z.string().regex(/^[A-Za-z0-9._/-]{1,255}$/)
+const gitPushSchema = z.object({
+  projectId: z.uuid(),
+  remote: gitRefSchema.optional(),
+  branch: gitRefSchema.optional(),
+  setUpstream: z.boolean().optional(),
+})

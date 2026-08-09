@@ -49,11 +49,11 @@
 | DeepSeek | 推理能力/强度映射 | 已测试 | none/low/high/max 能力注册；真实 low reasoning 活动通过，不宣称 summary |
 | DeepSeek | 图片、网络能力展示 | 部分实现 | 设置页明确图片/文件否、Web Search 是；搜索逐调用 UI 与真实回归待补 |
 | DeepSeek | 错误、限流、重试和取消 | 部分实现 | 通用 turn 错误/取消路径可用；provider 专属限流分类和重试 UI 待补 |
-| Git | 状态、分支、远端 | 尚未开发 | 阶段 7 |
-| Git | stage/unstage/revert 文件和区块 | 尚未开发 | 阶段 7/9 |
-| Git | commit/push | 尚未开发 | 阶段 7 |
+| Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
+| Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage 真实测试；revert 与区块操作待 diff 阶段 |
+| Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
 | Git | 创建 PR | 尚未开发 | GitHub CLI/连接器可选 |
-| Git | 大型仓库增量刷新 | 尚未开发 | 性能阶段 |
+| Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
 | 工作树 | 创建托管 detached 工作树 | 尚未开发 | 阶段 8 |
 | 工作树 | 本地与工作树 Handoff | 尚未开发 | 需安全处理未提交变更 |
 | 工作树 | 分支占用冲突检测 | 尚未开发 | git worktree list |

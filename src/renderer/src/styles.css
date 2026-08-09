@@ -75,7 +75,8 @@ button { color: inherit; }
 .topbar button { -webkit-app-region: no-drag; }
 .topbar-title, .topbar-actions { display: flex; align-items: center; gap: 8px; }
 .topbar-title { font-size: 12.5px; font-weight: 600; }
-.context-pill { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 10.5px; font-weight: 500; }
+.context-pill { display: flex; align-items: center; gap: 4px; height: 22px; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); background: transparent; font-size: 10.5px; font-weight: 500; cursor: pointer; }
+.context-pill b { display: grid; min-width: 14px; height: 14px; place-items: center; border-radius: 999px; color: #fff; background: var(--accent); font-size: 8px; }
 .runtime-pill { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 7px; border: 1px solid var(--border); border-radius: 999px; color: var(--muted); font-size: 10px; font-weight: 500; }
 .runtime-dot { width: 6px; height: 6px; border-radius: 50%; background: #d3a94f; box-shadow: 0 0 0 2px color-mix(in srgb, #d3a94f 16%, transparent); }
 .runtime-pill.ready .runtime-dot { background: #55b982; box-shadow: 0 0 0 2px color-mix(in srgb, #55b982 16%, transparent); }
@@ -161,10 +162,36 @@ button { color: inherit; }
 .settings-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .settings-dialog footer > button:not(.primary-button) { height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: transparent; font-size: 10.5px; cursor: pointer; }
 
+.git-panel { position: absolute; z-index: 10; top: 49px; right: 0; bottom: 0; width: 370px; overflow: auto; padding: 17px; border-left: 1px solid var(--border); background: color-mix(in srgb, var(--surface) 97%, transparent); box-shadow: -18px 0 55px rgba(0,0,0,.22); backdrop-filter: blur(18px); }
+.git-panel header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.git-panel header .eyebrow { margin-bottom: 4px; }
+.git-panel h2 { margin: 0; font-size: 15px; }
+.git-empty { display: grid; min-height: 55vh; place-items: center; align-content: center; gap: 12px; color: var(--muted); text-align: center; font-size: 11px; }
+.git-summary { display: flex; align-items: center; gap: 8px; min-height: 31px; padding: 0 7px; border-radius: 7px; color: var(--muted); background: var(--surface-2); font-size: 9.5px; }
+.git-summary span:first-child { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
+.git-summary button { border: 0; color: var(--accent-strong); background: transparent; font-size: 9.5px; cursor: pointer; }
+.git-file-group { margin-top: 17px; }
+.git-file-group h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.git-file-group h3 span { padding: 1px 5px; border-radius: 999px; background: var(--surface-2); font-size: 8px; }
+.git-file { display: grid; grid-template-columns: 24px minmax(0, 1fr) auto; align-items: center; min-height: 31px; padding: 0 5px; border-radius: 6px; font-size: 10.5px; }
+.git-file:hover { background: var(--surface-hover); }
+.git-file > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.git-code { color: var(--accent-strong); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.git-file button { opacity: 0; border: 0; color: var(--accent-strong); background: transparent; font-size: 9px; cursor: pointer; }
+.git-file:hover button, .git-file button:focus { opacity: 1; }
+.git-clean { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 35px 0; color: #57bd86; font-size: 10.5px; }
+.commit-box { margin-top: 18px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
+.commit-box textarea { width: 100%; resize: vertical; border: 0; outline: 0; padding: 10px; color: var(--text); background: var(--bg); font-size: 10.5px; }
+.commit-box button, .push-button { display: flex; align-items: center; justify-content: center; gap: 6px; height: 31px; border: 0; color: #fff; background: var(--accent); font-size: 10px; cursor: pointer; }
+.commit-box button { width: 100%; }
+.commit-box button:disabled, .push-button:disabled { opacity: .4; cursor: default; }
+.push-button { width: 100%; margin-top: 8px; border-radius: 8px; color: var(--muted); background: var(--surface-2); }
+
 @media (max-width: 850px) {
   .app-shell { grid-template-columns: 210px 1fr; }
   .composer-shell { left: 240px; }
   .approval-panel { left: 240px; width: calc(100% - 270px); }
+  .git-panel { width: 330px; }
   .capability-grid { grid-template-columns: 1fr; }
   .capability-grid article { min-height: 80px; }
   .status-chip { right: 12px; bottom: auto; left: auto; top: 12px; }

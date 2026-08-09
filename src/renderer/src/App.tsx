@@ -10,6 +10,7 @@ import {
   FolderCode,
   FolderOpen,
   GitBranch,
+  GitCommitHorizontal,
   KeyRound,
   LoaderCircle,
   MessageSquare,
@@ -22,6 +23,7 @@ import {
   Square,
   Sun,
   TerminalSquare,
+  Upload,
   Wrench,
   X,
 } from 'lucide-react'
@@ -31,6 +33,7 @@ import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
 import type { ConversationSnapshot, PendingApproval } from '../../shared/conversation'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
+import type { GitRepositorySnapshot } from '../../shared/git'
 
 type Theme = 'dark' | 'light'
 
@@ -49,6 +52,8 @@ export function App(): React.JSX.Element {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [deepSeekKey, setDeepSeekKey] = useState('')
+  const [gitStatus, setGitStatus] = useState<GitRepositorySnapshot | null>(null)
+  const [gitOpen, setGitOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
     if (saved === 'dark' || saved === 'light') return saved
@@ -89,6 +94,13 @@ export function App(): React.JSX.Element {
       })
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [selectedProject, runtime?.phase])
+
+  useEffect(() => {
+    if (!selectedProject) { setGitStatus(null); return }
+    void window.aster.getGitStatus({ projectId: selectedProject.id })
+      .then(setGitStatus)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [selectedProject])
 
   useEffect(() => {
     const defaultModel = runtime?.models.find(({ isDefault }) => isDefault) ?? runtime?.models[0]
@@ -245,7 +257,10 @@ export function App(): React.JSX.Element {
         <header className="topbar">
           <div className="topbar-title">
             <span>{selectedThread?.name ?? selectedProject?.name ?? '欢迎'}</span>
-            {selectedProject && <span className="context-pill"><GitBranch size={13} />Local</span>}
+            {selectedProject && <button className="context-pill" onClick={() => setGitOpen((value) => !value)} aria-label="Git 状态">
+              <GitBranch size={13} />{gitStatus?.branch ?? (gitStatus?.initialized ? 'Detached' : 'Local')}
+              {gitStatus && gitStatus.files.length > 0 && <b>{gitStatus.files.length}</b>}
+            </button>}
             <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? runtime?.binaryPath ?? undefined}>
               <span className="runtime-dot" /> Codex {runtimeLabel(runtime)}
             </span>
@@ -302,6 +317,13 @@ export function App(): React.JSX.Element {
             </div>
           </div>
         </section>
+        {gitOpen && selectedProject && <GitPanel
+          project={selectedProject}
+          snapshot={gitStatus}
+          close={() => setGitOpen(false)}
+          update={setGitStatus}
+          onError={setError}
+        />}
       </main>
       {settingsOpen && <ProviderSettings
         providers={providers}
@@ -313,6 +335,63 @@ export function App(): React.JSX.Element {
       />}
     </div>
   )
+}
+
+function GitPanel({ project, snapshot, close, update, onError }: {
+  project: ProjectSummary
+  snapshot: GitRepositorySnapshot | null
+  close: () => void
+  update: (snapshot: GitRepositorySnapshot) => void
+  onError: (message: string | null) => void
+}): React.JSX.Element {
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState('')
+  const staged = snapshot?.files.filter(({ indexStatus }) => indexStatus !== '.' && indexStatus !== '?') ?? []
+  const unstaged = snapshot?.files.filter(({ worktreeStatus, kind }) => worktreeStatus !== '.' || kind === 'untracked') ?? []
+
+  async function act(action: () => Promise<GitRepositorySnapshot>): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try { update(await action()) }
+    catch (reason) { onError(toErrorMessage(reason)) }
+    finally { setBusy(false) }
+  }
+
+  return <aside className="git-panel" aria-label="Git 工作区">
+    <header><div><p className="eyebrow">SOURCE CONTROL</p><h2>{snapshot?.branch ?? (snapshot?.initialized ? 'Detached HEAD' : '尚未初始化')}</h2></div><button className="icon-button" onClick={close} aria-label="关闭 Git"><X size={16} /></button></header>
+    {!snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
+      <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.aster.getGitStatus({ projectId: project.id }))}>刷新</button></div>
+      <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} />
+      <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.aster.stageGitPaths({ projectId: project.id, paths: [path] }))} />
+      {snapshot.files.length === 0 && <div className="git-clean"><Check size={16} />工作区干净</div>}
+      <div className="commit-box"><textarea aria-label="提交说明" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="提交说明" rows={3} /><button disabled={busy || !message.trim() || staged.length === 0} onClick={() => void act(async () => {
+        const next = await window.aster.commitGit({ projectId: project.id, message })
+        setMessage('')
+        return next
+      })}><GitCommitHorizontal size={14} />提交</button></div>
+      <button className="push-button" disabled={busy || !snapshot.branch || snapshot.remotes.length === 0} onClick={() => {
+        const remote = snapshot.upstream?.split('/')[0] ?? snapshot.remotes[0]?.name
+        const branch = snapshot.branch
+        if (!remote || !branch) return
+        void act(() => window.aster.pushGit({
+          projectId: project.id,
+          remote,
+          branch,
+          setUpstream: snapshot.upstream === null,
+        }))
+      }}><Upload size={14} />推送当前分支</button>
+    </>}
+  </aside>
+}
+
+function GitFileGroup({ title, files, actionLabel, action }: {
+  title: string
+  files: GitRepositorySnapshot['files']
+  actionLabel: string
+  action: (path: string) => Promise<void>
+}): React.JSX.Element {
+  if (files.length === 0) return <></>
+  return <section className="git-file-group"><h3>{title}<span>{files.length}</span></h3>{files.map((file) => <div className="git-file" key={`${title}:${file.path}`}><span className="git-code">{file.indexStatus}{file.worktreeStatus}</span><span title={file.path}>{file.path}</span><button onClick={() => void action(file.path)} aria-label={`${actionLabel} ${file.path}`}>{actionLabel}</button></div>)}</section>
 }
 
 function ProviderSettings({ providers, apiKey, setApiKey, close, onError, onUpdated }: {

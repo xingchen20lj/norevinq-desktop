@@ -11,6 +11,13 @@ import type {
   SteerTurnInput,
 } from './conversation.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from './providers.js'
+import type {
+  GitCommitInput,
+  GitPathsInput,
+  GitProjectInput,
+  GitPushInput,
+  GitRepositorySnapshot,
+} from './git.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -29,6 +36,12 @@ export const IPC_CHANNELS = {
   conversationChanged: 'conversation:changed',
   providerDeepSeekSave: 'provider:deepseek-save',
   providerDeepSeekDelete: 'provider:deepseek-delete',
+  gitStatus: 'git:status',
+  gitInitialize: 'git:initialize',
+  gitStage: 'git:stage',
+  gitUnstage: 'git:unstage',
+  gitCommit: 'git:commit',
+  gitPush: 'git:push',
 } as const
 
 export type ProjectSummary = {
@@ -71,4 +84,10 @@ export type AsterDesktopApi = {
     runtime: CodexRuntimeSnapshot
   }>
   deleteDeepSeekCredential: () => Promise<{ providers: ProviderStatus; runtime: CodexRuntimeSnapshot }>
+  getGitStatus: (input: GitProjectInput) => Promise<GitRepositorySnapshot>
+  initializeGit: (input: GitProjectInput) => Promise<GitRepositorySnapshot>
+  stageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
+  unstageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
+  commitGit: (input: GitCommitInput) => Promise<GitRepositorySnapshot>
+  pushGit: (input: GitPushInput) => Promise<GitRepositorySnapshot>
 }

@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 7：Git 仓库工作流。
+阶段 8：托管 Git 工作树。
 
 ## 当前任务
 
-- 实现受项目根约束的 Git 命令服务与仓库状态解析。
-- 完成分支、远端、文件状态、stage/unstage、commit 和 push 的真实闭环。
-- 为 destructive revert、push 和分支操作建立明确验证与错误状态。
-- 接入 Git 状态侧栏/面板并为大型输出建立边界。
+- 设计仓库外托管 worktree 根、detached HEAD 默认和可恢复元数据。
+- 实现创建、列表、删除、锁定、分支占用检测和孤儿恢复。
+- 实现 `.worktreeinclude` 受控复制与未提交变更安全策略。
+- 接入 Local/Worktree 上下文切换和 Handoff 基础流程。
 
 ## 已完成任务
 
@@ -54,13 +54,16 @@
 - 完成 Electron safeStorage 凭据保险库、0600 原子写入、环境优先级与不可读回 IPC。
 - 设置页显示 DeepSeek 配置来源、能力限制与 V4 Pro Responses HTTP 400 阻塞原因。
 - 真实 `deepseek-v4-flash` Responses 产生 reasoning 和 custom apply_patch，创建文件内容精确为 `DEEPSEEK_TOOL_OK\n`，最终消息为 `ASTER_DEEPSEEK_OK`。
+- 完成项目根约束、参数数组、相对路径校验、无凭据提示、超时与 8 MiB 输出边界的 Git 服务。
+- 完成 porcelain v2 NUL 状态、branch/upstream/ahead/behind、remote、stage/unstage、commit/push。
+- 真实临时仓库执行两次 commit 和本地 bare remote push；Electron E2E 将智能体文件通过 Git 面板暂存并提交至干净状态。
 
 ## 下一任务
 
-1. 创建 Git command runner、路径边界、超时/输出上限和仓库状态领域模型。
-2. 用临时真实仓库测试状态、分支、远端、stage/unstage、commit。
-3. 接入 renderer Git 面板与增量刷新。
-4. 完成阶段 7 后进入托管工作树。
+1. 定义 worktree 数据模型、存储位置与仓库 identity。
+2. 实现 detached worktree 创建/列表/移除和真实仓库测试。
+3. 实现分支冲突、恢复、清理和 `.worktreeinclude`。
+4. 接入任务上下文与 UI。
 
 ## 已做技术决策
 
@@ -77,13 +80,13 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：13 个单元测试文件共 68 项通过；1 个 Electron E2E 内含 OpenAI、DeepSeek Responses/apply_patch、文件审批、命令、steer、interrupt；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：15 个单元/集成测试文件共 72 项通过；Electron E2E 另覆盖真实 Git 刷新、暂存和 commit；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
-- 当前渲染器生产主包约 596 kB，后续按工作台路由做代码分割。
+- 当前渲染器生产主包约 603 kB，后续按工作台路由做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞

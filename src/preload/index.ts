@@ -13,6 +13,7 @@ import type {
 } from '../shared/conversation.js'
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtime.js'
 import type { SaveDeepSeekCredentialInput } from '../shared/providers.js'
+import type { GitCommitInput, GitPathsInput, GitProjectInput, GitPushInput } from '../shared/git.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -44,6 +45,12 @@ const api: AsterDesktopApi = {
   saveDeepSeekCredential: (input: SaveDeepSeekCredentialInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekSave, input),
   deleteDeepSeekCredential: () => ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekDelete),
+  getGitStatus: (input: GitProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.gitStatus, input),
+  initializeGit: (input: GitProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.gitInitialize, input),
+  stageGitPaths: (input: GitPathsInput) => ipcRenderer.invoke(IPC_CHANNELS.gitStage, input),
+  unstageGitPaths: (input: GitPathsInput) => ipcRenderer.invoke(IPC_CHANNELS.gitUnstage, input),
+  commitGit: (input: GitCommitInput) => ipcRenderer.invoke(IPC_CHANNELS.gitCommit, input),
+  pushGit: (input: GitPushInput) => ipcRenderer.invoke(IPC_CHANNELS.gitPush, input),
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

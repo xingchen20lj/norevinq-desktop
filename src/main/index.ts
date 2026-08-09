@@ -14,6 +14,7 @@ import {
 } from './providers/deepseek.js'
 import { ProviderService } from './providers/providerService.js'
 import { CredentialStore } from './security/credentialStore.js'
+import { GitService } from './git/gitService.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -23,6 +24,7 @@ let runtime: CodexRuntimeSupervisor | null = null
 let runtimeLogger: JsonlLogger | null = null
 let agentService: AgentService | null = null
 let providerService: ProviderService | null = null
+let gitService: GitService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -94,8 +96,9 @@ if (!gotLock) {
       } : {}),
     })
     providerService = new ProviderService(runtime, credentialStore, environmentDeepSeekKey)
+    gitService = new GitService(database)
     agentService = new AgentService(runtime, database)
-    unregisterIpc = registerIpc(database, runtime, agentService, providerService)
+    unregisterIpc = registerIpc(database, runtime, agentService, providerService, gitService)
     mainWindow = createMainWindow()
     void runtime.start()
 
@@ -117,6 +120,7 @@ app.on('before-quit', () => {
   agentService?.dispose()
   agentService = null
   providerService = null
+  gitService = null
   void runtime?.stop()
   runtime = null
   void runtimeLogger?.close()
