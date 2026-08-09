@@ -11,7 +11,6 @@ import {
   FolderOpen,
   GitBranch,
   GitCommitHorizontal,
-  KeyRound,
   LoaderCircle,
   MessageSquare,
   Moon,
@@ -40,6 +39,8 @@ import type { GitRepositorySnapshot } from '../../shared/git'
 import type { ManagedWorktree } from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 import type { TerminalEvent, TerminalSession, TerminalState } from '../../shared/terminal'
+import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } from '../../shared/integrations'
+import { SettingsWorkbench } from './SettingsWorkbench'
 
 type Theme = 'dark' | 'light'
 
@@ -66,11 +67,17 @@ export function App(): React.JSX.Element {
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [terminalState, setTerminalState] = useState<TerminalState>({ sessions: [] })
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null)
+  const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
     if (saved === 'dark' || saved === 'light') return saved
     return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
   })
+  const projects = bootstrap?.projects ?? []
+  const selectedThread = conversations?.threads.find(({ id }) => id === conversations.selectedThreadId) ?? null
+  const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
+  const activeTurn = activityState?.turnStatus === 'inProgress'
+  const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -84,6 +91,13 @@ export function App(): React.JSX.Element {
       setProviders(state.providers)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onIntegrationChanged(setIntegrations)
+    void window.aster.getIntegrationState().then(setIntegrations)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -140,18 +154,20 @@ export function App(): React.JSX.Element {
   }, [selectedProject])
 
   useEffect(() => {
+    if (!settingsOpen || !selectedProject || runtime?.phase !== 'ready') return
+    void window.aster.loadIntegrations({
+      projectId: selectedProject.id,
+      ...(selectedThread ? { threadId: selectedThread.id } : {}),
+    }).catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [runtime?.phase, selectedProject, selectedThread, settingsOpen])
+
+  useEffect(() => {
     const defaultModel = runtime?.models.find(({ isDefault }) => isDefault) ?? runtime?.models[0]
     if (defaultModel && !model) {
       setModel(defaultModel.id)
       setEffort(defaultModel.defaultReasoningEffort ?? defaultModel.supportedReasoningEfforts[0] ?? '')
     }
   }, [model, runtime?.models])
-
-  const projects = bootstrap?.projects ?? []
-  const selectedThread = conversations?.threads.find(({ id }) => id === conversations.selectedThreadId) ?? null
-  const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
-  const activeTurn = activityState?.turnStatus === 'inProgress'
-  const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
 
   async function openProject(): Promise<void> {
     setIsOpening(true)
@@ -382,6 +398,9 @@ export function App(): React.JSX.Element {
           {conversations?.approvals.map((approval) => (
             <ApprovalPanel approval={approval} key={approval.requestId} onError={setError} />
           ))}
+          {integrations?.pendingRequests[0] && (
+            <IntegrationRequestPanel request={integrations.pendingRequests[0]} onError={setError} />
+          )}
           <div className="composer-shell">
             <textarea
               aria-label="任务输入"
@@ -447,10 +466,13 @@ export function App(): React.JSX.Element {
           appendContext={appendTerminalContext}
         />}
       </main>
-      {settingsOpen && <ProviderSettings
+      {settingsOpen && <SettingsWorkbench
         providers={providers}
         apiKey={deepSeekKey}
         setApiKey={setDeepSeekKey}
+        project={selectedProject}
+        threadId={selectedThread?.id ?? null}
+        integrations={integrations}
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
@@ -943,62 +965,6 @@ function GitFileGroup({ title, files, actionLabel, action }: {
   return <section className="git-file-group"><h3>{title}<span>{files.length}</span></h3>{files.map((file) => <div className="git-file" key={`${title}:${file.path}`}><span className="git-code">{file.indexStatus}{file.worktreeStatus}</span><span title={file.path}>{file.path}</span><button onClick={() => void action(file.path)} aria-label={`${actionLabel} ${file.path}`}>{actionLabel}</button></div>)}</section>
 }
 
-function ProviderSettings({ providers, apiKey, setApiKey, close, onError, onUpdated }: {
-  providers: ProviderStatus | null
-  apiKey: string
-  setApiKey: (value: string) => void
-  close: () => void
-  onError: (message: string | null) => void
-  onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
-}): React.JSX.Element {
-  const [saving, setSaving] = useState(false)
-  const status = providers?.deepseek
-
-  async function save(): Promise<void> {
-    setSaving(true)
-    onError(null)
-    try {
-      const result = await window.aster.saveDeepSeekCredential({ apiKey })
-      setApiKey('')
-      onUpdated(result)
-    } catch (reason) {
-      onError(toErrorMessage(reason))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  async function remove(): Promise<void> {
-    setSaving(true)
-    onError(null)
-    try {
-      onUpdated(await window.aster.deleteDeepSeekCredential())
-    } catch (reason) {
-      onError(toErrorMessage(reason))
-    } finally {
-      setSaving(false)
-    }
-  }
-
-  return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
-    <section className="settings-dialog" role="dialog" aria-modal="true" aria-label="模型提供商设置">
-      <header><div><p className="eyebrow">MODEL PROVIDERS</p><h2>DeepSeek Responses</h2></div><button className="icon-button" onClick={close} aria-label="关闭设置"><X size={16} /></button></header>
-      <div className="provider-state">
-        <div className="provider-icon"><KeyRound size={17} /></div>
-        <div><strong>{status?.configured ? '已配置' : '未配置'}</strong><p>{status?.credentialSource === 'environment' ? '由进程环境安全提供' : status?.credentialSource === 'os-vault' ? '保存在操作系统加密保险库' : '添加 API Key 以启用'}</p></div>
-        <span className={status?.configured ? 'connected' : ''}>{status?.responsesModel ?? 'deepseek-v4-flash'}</span>
-      </div>
-      <label className="credential-field"><span>API Key</span><input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="仅加密保存，不写入日志或数据库" /></label>
-      <p className="settings-note">支持文本、推理、函数工具、custom apply_patch 与服务端 Web Search。不支持图片、文件输入、MCP、Computer Use、后台任务或 stateful Responses。</p>
-      <div className="provider-warning"><strong>DeepSeek V4 Pro 暂不可用</strong><span>截至 2026-08-10，Responses API 返回 HTTP 400；Aster 不会静默降级到 Chat Completions。</span></div>
-      <footer>
-        {status?.credentialSource === 'os-vault' && <button onClick={() => void remove()} disabled={saving}>删除已保存密钥</button>}
-        <button className="primary-button" onClick={() => void save()} disabled={saving || apiKey.trim().length < 16}>{saving ? '正在重启运行时…' : '安全保存并启用'}</button>
-      </footer>
-    </section>
-  </div>
-}
-
 function Welcome({ selectedProject, runtime, isOpening, openProject }: {
   selectedProject: ProjectSummary | null
   runtime: CodexRuntimeSnapshot | null
@@ -1055,6 +1021,68 @@ function ActivityContent({ activity }: { activity: AgentActivity }): React.JSX.E
   if (activity.type === 'webSearch') return <p>{activity.query}</p>
   if (activity.type === 'dynamicTool') return <p>{activity.namespace ? `${activity.namespace} / ` : ''}{activity.tool}</p>
   return <p>{activity.type}</p>
+}
+
+function IntegrationRequestPanel({ request, onError }: {
+  request: PendingIntegrationRequest
+  onError: (message: string | null) => void
+}): React.JSX.Element {
+  const [formJson, setFormJson] = useState('{}')
+  const [answers, setAnswers] = useState<Record<string, string>>({})
+  const [busy, setBusy] = useState(false)
+
+  async function resolve(action: 'accept' | 'decline' | 'cancel'): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try {
+      if (request.kind === 'mcpElicitation') {
+        let content: IntegrationJson | undefined
+        if (action === 'accept' && request.mode !== 'url') content = JSON.parse(formJson) as IntegrationJson
+        await window.aster.resolveIntegrationRequest({
+          requestId: request.id,
+          action,
+          ...(content === undefined ? {} : { content }),
+        })
+      } else {
+        await window.aster.resolveIntegrationRequest({
+          requestId: request.id,
+          action,
+          ...(action === 'accept'
+            ? { answers: Object.fromEntries(Object.entries(answers).map(([id, value]) => [id, [value]])) }
+            : {}),
+        })
+      }
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <section className="integration-request-panel" aria-label="集成交互请求">
+    <div className="integration-request-heading">
+      <Wrench size={16} />
+      <div>
+        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Codex 请求补充信息'}</strong>
+        <p>{request.kind === 'mcpElicitation' ? request.message : request.questions[0]?.question}</p>
+      </div>
+    </div>
+    {request.kind === 'mcpElicitation' ? (
+      request.mode === 'url' ? <button onClick={() => request.url && window.open(request.url, '_blank')}>打开安全授权页面</button>
+        : <textarea aria-label="MCP 表单 JSON" rows={3} value={formJson} onChange={(event) => setFormJson(event.target.value)} />
+    ) : <div className="integration-questions">{request.questions.map((question) => <label key={question.id}>
+      <span>{question.header} · {question.question}</span>
+      {question.options.length > 0 ? <select value={answers[question.id] ?? ''} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))}>
+        <option value="">请选择</option>
+        {question.options.map((option) => <option key={option.label} value={option.label}>{option.label} — {option.description}</option>)}
+      </select> : <input type={question.secret ? 'password' : 'text'} value={answers[question.id] ?? ''} onChange={(event) => setAnswers((current) => ({ ...current, [question.id]: event.target.value }))} />}
+    </label>)}</div>}
+    <div className="integration-request-actions">
+      <button disabled={busy} onClick={() => void resolve('cancel')}>取消</button>
+      <button disabled={busy} onClick={() => void resolve('decline')}>拒绝</button>
+      <button className="approve" disabled={busy} onClick={() => void resolve('accept')}>提交</button>
+    </div>
+  </section>
 }
 
 function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onError: (message: string) => void }): React.JSX.Element {

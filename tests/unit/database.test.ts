@@ -25,6 +25,7 @@ describe('StateDatabase', () => {
     expect(database.listProjects()).toHaveLength(1)
     expect(database.getProject(first.id)?.path).toBe(realpathSync(projectPath))
     expect(database.getProject('missing')).toBeNull()
+    expect(database.setProjectTrust(first.id, true).trusted).toBe(true)
     database.associateThread(first.id, 'thread-a')
     database.associateThread(first.id, 'thread-b')
     database.associateThread(first.id, 'thread-a')
@@ -33,6 +34,7 @@ describe('StateDatabase', () => {
 
     const reopened = new StateDatabase(databasePath)
     expect(reopened.listProjects()[0]?.path).toBe(realpathSync(projectPath))
+    expect(reopened.getProject(first.id)?.trusted).toBe(true)
     expect(reopened.listProjectThreadIds(first.id)).toEqual(['thread-a', 'thread-b'])
     reopened.removeProject(first.id)
     expect(reopened.listProjects()).toEqual([])

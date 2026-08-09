@@ -36,6 +36,21 @@ import type {
   TerminalSubscription,
   WriteTerminalInput,
 } from './terminal.js'
+import type {
+  IntegrationProjectInput,
+  IntegrationSnapshot,
+  IntegrationSubscription,
+  McpResourceReadInput,
+  McpResourceReadResult,
+  McpServerInput,
+  McpToolCallInput,
+  McpToolCallResult,
+  RemoveSkillRootInput,
+  ResolveIntegrationRequestInput,
+  SetProjectTrustInput,
+  SetSkillEnabledInput,
+  WriteSafeConfigInput,
+} from './integrations.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -76,6 +91,20 @@ export const IPC_CHANNELS = {
   terminalClear: 'terminal:clear',
   terminalContext: 'terminal:context',
   terminalEvent: 'terminal:event',
+  integrationState: 'integration:state',
+  integrationLoad: 'integration:load',
+  integrationRefresh: 'integration:refresh',
+  integrationProjectTrust: 'integration:project-trust',
+  integrationSkillEnabled: 'integration:skill-enabled',
+  integrationSkillRootChoose: 'integration:skill-root-choose',
+  integrationSkillRootRemove: 'integration:skill-root-remove',
+  integrationMcpReload: 'integration:mcp-reload',
+  integrationMcpOAuth: 'integration:mcp-oauth',
+  integrationMcpResourceRead: 'integration:mcp-resource-read',
+  integrationMcpToolCall: 'integration:mcp-tool-call',
+  integrationConfigWrite: 'integration:config-write',
+  integrationRequestResolve: 'integration:request-resolve',
+  integrationChanged: 'integration:changed',
 } as const
 
 export type ProjectSummary = {
@@ -140,4 +169,18 @@ export type AsterDesktopApi = {
   clearTerminal: (input: TerminalSessionInput) => Promise<TerminalSession>
   getTerminalContext: (input: TerminalSessionInput) => Promise<TerminalContext>
   onTerminalEvent: (subscription: TerminalSubscription) => () => void
+  getIntegrationState: () => Promise<IntegrationSnapshot>
+  loadIntegrations: (input: IntegrationProjectInput) => Promise<IntegrationSnapshot>
+  refreshIntegrations: () => Promise<IntegrationSnapshot>
+  setProjectTrust: (input: SetProjectTrustInput) => Promise<IntegrationSnapshot>
+  setSkillEnabled: (input: SetSkillEnabledInput) => Promise<IntegrationSnapshot>
+  chooseExtraSkillRoot: (input: { projectId: string }) => Promise<IntegrationSnapshot | null>
+  removeExtraSkillRoot: (input: RemoveSkillRootInput) => Promise<IntegrationSnapshot>
+  reloadMcpServers: (input: { projectId: string }) => Promise<IntegrationSnapshot>
+  startMcpOAuth: (input: McpServerInput) => Promise<{ authorizationUrl: string }>
+  readMcpResource: (input: McpResourceReadInput) => Promise<McpResourceReadResult>
+  callMcpTool: (input: McpToolCallInput) => Promise<McpToolCallResult>
+  writeSafeConfig: (input: WriteSafeConfigInput) => Promise<IntegrationSnapshot>
+  resolveIntegrationRequest: (input: ResolveIntegrationRequestInput) => Promise<IntegrationSnapshot>
+  onIntegrationChanged: (subscription: IntegrationSubscription) => () => void
 }

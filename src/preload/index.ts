@@ -24,6 +24,19 @@ import type {
   TerminalSubscription,
   WriteTerminalInput,
 } from '../shared/terminal.js'
+import type {
+  IntegrationProjectInput,
+  IntegrationSnapshot,
+  IntegrationSubscription,
+  McpResourceReadInput,
+  McpServerInput,
+  McpToolCallInput,
+  RemoveSkillRootInput,
+  ResolveIntegrationRequestInput,
+  SetProjectTrustInput,
+  SetSkillEnabledInput,
+  WriteSafeConfigInput,
+} from '../shared/integrations.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -80,6 +93,35 @@ const api: AsterDesktopApi = {
     const listener = (_event: Electron.IpcRendererEvent, terminalEvent: TerminalEvent): void => subscription(terminalEvent)
     ipcRenderer.on(IPC_CHANNELS.terminalEvent, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.terminalEvent, listener)
+  },
+  getIntegrationState: () => ipcRenderer.invoke(IPC_CHANNELS.integrationState),
+  loadIntegrations: (input: IntegrationProjectInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationLoad, input),
+  refreshIntegrations: () => ipcRenderer.invoke(IPC_CHANNELS.integrationRefresh),
+  setProjectTrust: (input: SetProjectTrustInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationProjectTrust, input),
+  setSkillEnabled: (input: SetSkillEnabledInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationSkillEnabled, input),
+  chooseExtraSkillRoot: (input: { projectId: string }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationSkillRootChoose, input),
+  removeExtraSkillRoot: (input: RemoveSkillRootInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationSkillRootRemove, input),
+  reloadMcpServers: (input: { projectId: string }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationMcpReload, input),
+  startMcpOAuth: (input: McpServerInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationMcpOAuth, input),
+  readMcpResource: (input: McpResourceReadInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationMcpResourceRead, input),
+  callMcpTool: (input: McpToolCallInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationMcpToolCall, input),
+  writeSafeConfig: (input: WriteSafeConfigInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationConfigWrite, input),
+  resolveIntegrationRequest: (input: ResolveIntegrationRequestInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.integrationRequestResolve, input),
+  onIntegrationChanged: (subscription: IntegrationSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: IntegrationSnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.integrationChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.integrationChanged, listener)
   },
 }
 

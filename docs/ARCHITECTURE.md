@@ -28,6 +28,7 @@ flowchart LR
 - `src/main/runtime`：app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
 - `src/main/agent`：thread/turn 服务、server request 审批、活动 reducer、状态订阅与历史恢复。
 - `src/main/providers`：provider 生命周期、能力目录和仅进程级 Codex 配置；不写用户全局 Codex 配置。
+- `src/main/integrations`：MCP/技能/配置/项目指令适配器、反向交互挂起状态和有界领域模型。
 - `src/main/security/credentialStore.ts`：操作系统加密适配、仓库外 0600 原子凭据文件；不提供读取密钥的 IPC。
 - `src/main/git`：项目根绑定的无 shell Git runner、porcelain v2 NUL parser、超时/输出边界和变更操作。
 - `src/main/git/diffService.ts`：working/staged patch、untracked/二进制归一和 2/16 MiB 展示预算。

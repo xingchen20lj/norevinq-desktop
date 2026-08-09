@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 11：MCP、技能和设置。
+阶段 12：Codex Security。
 
 ## 当前任务
 
-- 接入 app-server MCP 状态、OAuth、reload、资源读取和直接工具调用。
-- 接入技能发现、刷新、详情与额外根目录，并尊重项目指令/信任边界。
-- 建立设置路由、用户/项目/托管配置层和原始 TOML 安全编辑入口。
-- 完成 MCP 审批、elicitation、错误/空状态和真实/替身回归。
+- 集成 `@openai/codex-security` 0.1.8 并隔离其 0.144.6 Codex runtime 依赖。
+- 建立安全总览、扫描、漏洞、仓库和设置工作台。
+- 完成 preflight、standard/deep/working-tree/commit 扫描、进度、取消、历史与 SARIF。
+- 区分缺少认证、Security access 和 Trusted Access，不伪造扫描结果。
 
 ## 已完成任务
 
@@ -45,7 +45,7 @@
 - 完成稳定活动领域模型与不可变 reducer，覆盖消息、推理、命令、文件、MCP、动态工具、搜索、协作、计划、错误和未知协议项。
 - 完成 server→client 命令/文件审批挂起状态机，只有明确 UI 决策才响应，关闭时统一 cancel。
 - 完成真实任务列表、流式活动时间线、模型/推理选择、发送/追加/停止和审批 UI。
-- 使用临时真实项目与已配置 ChatGPT 登录完成在线 Codex 流式 E2E，最终消息为 `ASTER_RUNTIME_OK` 且未调用工具。
+- 使用临时真实项目与已配置 ChatGPT 登录完成在线 Codex 流式 E2E，并验证项目 `AGENTS.md` 使最终消息为 `ASTER_INSTRUCTIONS_OK`。
 - 实际检查 1320×840 浅色和 960×640 深色任务界面，消息、侧栏、输入区无明显溢出。
 - 在 read-only 沙箱真实触发 fileChange 审批，UI 允许后 apply_patch 创建文件并精确验证内容。
 - 真实执行 `sleep 8` 命令并在运行中 steer，最终收到 `ASTER_STEER_OK`。
@@ -73,13 +73,21 @@
 - 完成显式终端上下文桥：移除 ANSI/OSC/C0 后仅共享最近 32 KiB，不静默注入模型。
 - Electron E2E 真实键盘运行 `printf`/`pwd`、搜索、输出→Codex (`ASTER_TERMINAL_CONTEXT_OK`)、清屏、终止与关闭会话。
 - 实际检查 1320×840 浅色 xterm drawer 截图，标签、工具栏、搜索、ANSI 输出和光标无明显问题。
+- 完成稳定 MCP/技能/配置领域层，支持分页 inventory、OAuth、reload、资源读取和显式直接工具调用。
+- 完成 MCP 服务器/thread/工具归属校验、256 KiB 参数、2 MiB 结果和 1 MiB 资源预算。
+- 完成 `mcpServer/elicitation/request` 与 `item/tool/requestUserInput` 挂起、提交/拒绝/取消及退出安全取消。
+- 完成 skills/list/changed/config/write、作用域/依赖/错误、最多 8 个进程级额外根目录和项目信任门。
+- 完成用户/项目/系统/托管配置层、requirements 和五项枚举化原子配置写入，不暴露任意 TOML 覆盖。
+- 完成提供商、MCP、技能、配置四页设置工作台及空状态、错误、loading、OAuth 和结果预览。
+- Electron E2E 真实读取 app-server MCP/技能/配置，持久化项目信任，并通过项目指令返回 `ASTER_INSTRUCTIONS_OK`。
+- 当前环境 `node_repl` MCP 通过 app-server 直接工具调用执行无副作用表达式；elicitation 与用户输入由自动替身闭环覆盖。
 
 ## 下一任务
 
-1. 对照当前生成 schema 实现 MCP/技能领域适配器和运行时状态订阅。
-2. 增加 MCP/技能设置工作台、OAuth 和错误状态。
-3. 接入项目指令发现与安全配置层级。
-4. 完成回归后进入 Codex Security 工作台。
+1. 安装并验证 Codex Security SDK 的 Node/Python preflight 与权限诊断。
+2. 实现隔离扫描服务、进度/取消、artifact 安全目录与持久化历史。
+3. 建立五页安全工作台和 finding/coverage/report/SARIF 展示。
+4. 完成可用账户真实扫描或准确记录外部访问阻塞后进入计划任务。
 
 ## 已做技术决策
 
@@ -96,7 +104,7 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：18 个单元/集成测试文件共 82 项通过；Electron E2E 真实覆盖 app-server PTY、xterm 输入/搜索、终端输出→Codex、清屏/终止，以及既有全功能回归；类型、规范、脚本语法、peer 依赖和生产构建通过。
+暂无。最近一次结果：19 个单元/集成测试文件共 85 项通过；Electron E2E 真实覆盖 AGENTS.md、MCP/技能/配置、app-server PTY、终端输出→Codex，以及既有全功能回归；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 

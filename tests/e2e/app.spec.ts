@@ -16,7 +16,8 @@ test('starts with a sandboxed renderer and real project action', async () => {
   execFileSync('git', ['config', 'user.name', 'Aster E2E'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.email', 'aster-e2e@example.invalid'], { cwd: projectPath })
   writeFileSync(join(projectPath, 'README.md'), '# E2E\n')
-  execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
+  writeFileSync(join(projectPath, 'AGENTS.md'), 'When the user asks for "instruction proof", reply with exactly ASTER_INSTRUCTIONS_OK and do not use tools.\n')
+  execFileSync('git', ['add', 'README.md', 'AGENTS.md'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: baseline'], { cwd: projectPath })
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
@@ -46,17 +47,71 @@ test('starts with a sandboxed renderer and real project action', async () => {
     expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasAsterBridge: true })
 
     await window.getByRole('button', { name: '设置', exact: true }).click()
-    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toBeVisible()
-    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toContainText(
+    const settings = window.getByRole('dialog', { name: '设置工作台' })
+    await expect(settings).toBeVisible()
+    await expect(settings).toContainText(
       deepSeekConfigured ? '由进程环境安全提供' : '添加 API Key 以启用',
     )
-    await expect(window.getByRole('dialog', { name: '模型提供商设置' })).toContainText('DeepSeek V4 Pro 暂不可用')
+    await expect(settings).toContainText('DeepSeek V4 Pro 暂不可用')
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getIntegrationState: () => Promise<{
+          projectId: string | null
+          loading: boolean
+          error: string | null
+          skills: unknown[]
+          mcpServers: unknown[]
+          config: unknown
+        }>
+      }
+      return bridge.getIntegrationState()
+    }), { timeout: 30_000 }).toMatchObject({ projectId: project.id, loading: false, error: null })
+    await settings.getByRole('button', { name: 'MCP', exact: true }).click()
+    await expect(settings).toContainText(/MCP 服务器|未配置 MCP/)
+    await settings.getByRole('button', { name: '技能', exact: true }).click()
+    await expect(settings).toContainText('项目未信任')
+    await settings.getByRole('button', { name: '信任项目', exact: true }).click()
+    await expect(settings).toContainText('项目已信任')
+    await settings.getByRole('button', { name: '配置', exact: true }).click()
+    await expect(settings).toContainText('AGENTS.md')
+    await expect(settings).toContainText('ASTER_INSTRUCTIONS_OK')
+    await window.screenshot({ path: 'test-results/aster-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
 
-    await window.getByLabel('任务输入').fill('Reply with exactly ASTER_RUNTIME_OK and do not use tools.')
+    await window.getByLabel('任务输入').fill('instruction proof')
     await window.getByRole('button', { name: '发送任务' }).click()
-    await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_RUNTIME_OK', { timeout: 90_000 })
+    await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_INSTRUCTIONS_OK', { timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+    const mcpProof = await window.evaluate(async ({ projectId }) => {
+      const bridge = Reflect.get(window, 'aster') as {
+        loadProjectConversations: (input: { projectId: string }) => Promise<{ threads: { id: string }[] }>
+        loadIntegrations: (input: { projectId: string; threadId: string }) => Promise<{
+          mcpServers: { name: string; tools: { name: string }[] }[]
+        }>
+        callMcpTool: (input: unknown) => Promise<{ isError: boolean; content: unknown[] }>
+      }
+      const conversations = await bridge.loadProjectConversations({ projectId })
+      const threadId = conversations.threads[0]?.id
+      if (!threadId) return { executed: false, reason: 'missing-thread', servers: [] }
+      const integrations = await bridge.loadIntegrations({ projectId, threadId })
+      const server = integrations.mcpServers.find(({ name }) => name === 'node_repl')
+      const tool = server?.tools.find(({ name }) => name === 'js')
+      if (!server || !tool) return {
+        executed: false,
+        reason: 'missing-node-repl',
+        servers: integrations.mcpServers.map((item) => ({ name: item.name, tools: item.tools.map(({ name }) => name) })),
+      }
+      const result = await bridge.callMcpTool({
+        projectId,
+        threadId,
+        server: server.name,
+        tool: tool.name,
+        arguments: { code: '1 + 1' },
+        confirmed: true,
+      })
+      return { executed: true, isError: result.isError, content: result.content }
+    }, { projectId: project.id })
+    expect(mcpProof, JSON.stringify(mcpProof)).toMatchObject({ executed: true, isError: false })
 
     await window.getByRole('button', { name: '终端', exact: true }).click()
     await expect(window.getByLabel('集成终端')).toBeVisible()

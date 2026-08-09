@@ -25,6 +25,17 @@ import type {
   TerminalSubscription,
   WriteTerminalInput,
 } from '../shared/terminal.js'
+import type {
+  IntegrationSnapshot,
+  IntegrationSubscription,
+  McpResourceReadInput,
+  McpResourceReadResult,
+  McpServerInput,
+  McpToolCallInput,
+  McpToolCallResult,
+  ResolveIntegrationRequestInput,
+  WriteSafeConfigInput,
+} from '../shared/integrations.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -87,6 +98,23 @@ export type TerminalController = {
   getContext: (sessionId: string) => TerminalContext
 }
 
+export type IntegrationController = {
+  getSnapshot: () => IntegrationSnapshot
+  subscribe: (subscription: IntegrationSubscription) => () => void
+  load: (projectId: string, threadId?: string, forceReload?: boolean) => Promise<IntegrationSnapshot>
+  refresh: (forceReload?: boolean) => Promise<IntegrationSnapshot>
+  setProjectTrust: (projectId: string, trusted: boolean) => IntegrationSnapshot
+  setSkillEnabled: (projectId: string, path: string, enabled: boolean) => Promise<IntegrationSnapshot>
+  addExtraSkillRoot: (projectId: string, path: string) => Promise<IntegrationSnapshot>
+  removeExtraSkillRoot: (projectId: string, path: string) => Promise<IntegrationSnapshot>
+  reloadMcp: (projectId: string) => Promise<IntegrationSnapshot>
+  startMcpOAuth: (input: McpServerInput) => Promise<{ authorizationUrl: string }>
+  readMcpResource: (input: McpResourceReadInput) => Promise<McpResourceReadResult>
+  callMcpTool: (input: McpToolCallInput) => Promise<McpToolCallResult>
+  writeSafeConfig: (input: WriteSafeConfigInput) => Promise<IntegrationSnapshot>
+  resolveRequest: (input: ResolveIntegrationRequestInput) => IntegrationSnapshot
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -96,6 +124,7 @@ export function registerIpc(
   worktrees: WorktreeController,
   diffs: DiffController,
   terminals: TerminalController,
+  integrations: IntegrationController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -111,6 +140,11 @@ export function registerIpc(
   const unsubscribeTerminal = terminals.subscribe((terminalEvent) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.terminalEvent, terminalEvent)
+    }
+  })
+  const unsubscribeIntegrations = integrations.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.integrationChanged, snapshot)
     }
   })
 
@@ -220,11 +254,77 @@ export function registerIpc(
     terminals.clear(terminalSessionSchema.parse(input).sessionId))
   ipcMain.handle(IPC_CHANNELS.terminalContext, (_event, input: unknown) =>
     terminals.getContext(terminalSessionSchema.parse(input).sessionId))
+  ipcMain.handle(IPC_CHANNELS.integrationState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return integrations.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationLoad, (_event, input: unknown) => {
+    const parsed = integrationProjectSchema.parse(input)
+    return integrations.load(parsed.projectId, parsed.threadId)
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationRefresh, () => integrations.refresh(true))
+  ipcMain.handle(IPC_CHANNELS.integrationProjectTrust, (_event, input: unknown) => {
+    const parsed = projectTrustSchema.parse(input)
+    return integrations.setProjectTrust(parsed.projectId, parsed.trusted)
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationSkillEnabled, (_event, input: unknown) => {
+    const parsed = skillEnabledSchema.parse(input)
+    return integrations.setSkillEnabled(parsed.projectId, parsed.path, parsed.enabled)
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationSkillRootChoose, async (_event, input: unknown) => {
+    const parsed = projectInputSchema.parse(input)
+    const result = await dialog.showOpenDialog({
+      title: '选择额外技能目录',
+      buttonLabel: '使用此目录',
+      properties: ['openDirectory'],
+    })
+    const selectedPath = result.filePaths[0]
+    if (result.canceled || selectedPath === undefined) return null
+    return integrations.addExtraSkillRoot(parsed.projectId, selectedPath)
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationSkillRootRemove, (_event, input: unknown) => {
+    const parsed = skillRootRemoveSchema.parse(input)
+    return integrations.removeExtraSkillRoot(parsed.projectId, parsed.path)
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationMcpReload, (_event, input: unknown) =>
+    integrations.reloadMcp(projectInputSchema.parse(input).projectId))
+  ipcMain.handle(IPC_CHANNELS.integrationMcpOAuth, (_event, input: unknown) => {
+    const parsed = mcpServerSchema.parse(input)
+    return integrations.startMcpOAuth({
+      projectId: parsed.projectId,
+      name: parsed.name,
+      ...(parsed.threadId ? { threadId: parsed.threadId } : {}),
+    })
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationMcpResourceRead, (_event, input: unknown) => {
+    const parsed = mcpResourceSchema.parse(input)
+    return integrations.readMcpResource({
+      projectId: parsed.projectId,
+      name: parsed.name,
+      uri: parsed.uri,
+      ...(parsed.threadId ? { threadId: parsed.threadId } : {}),
+    })
+  })
+  ipcMain.handle(IPC_CHANNELS.integrationMcpToolCall, (_event, input: unknown) =>
+    integrations.callMcpTool(mcpToolCallSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.integrationConfigWrite, (_event, input: unknown) =>
+    integrations.writeSafeConfig(safeConfigSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.integrationRequestResolve, (_event, input: unknown) => {
+    const parsed = integrationResolveSchema.parse(input)
+    return integrations.resolveRequest({
+      requestId: parsed.requestId,
+      action: parsed.action,
+      ...(parsed.content === undefined ? {} : { content: parsed.content }),
+      ...(parsed.answers === undefined ? {} : { answers: parsed.answers }),
+    })
+  })
 
   return () => {
     unsubscribeRuntime()
     unsubscribeAgent()
     unsubscribeTerminal()
+    unsubscribeIntegrations()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
   }
@@ -300,4 +400,37 @@ const terminalWriteSchema = terminalSessionSchema.extend({ data: z.string().min(
 const terminalResizeSchema = terminalSessionSchema.extend({
   cols: z.number().int().min(2).max(500),
   rows: z.number().int().min(2).max(300),
+})
+const integrationProjectSchema = projectInputSchema.extend({
+  threadId: z.string().min(1).max(200).optional(),
+})
+const projectTrustSchema = projectInputSchema.extend({ trusted: z.boolean() })
+const safePathSchema = z.string().min(1).max(8_192).refine((value) => !value.includes('\0'))
+const skillEnabledSchema = projectInputSchema.extend({ path: safePathSchema, enabled: z.boolean() })
+const skillRootRemoveSchema = projectInputSchema.extend({ path: safePathSchema })
+const mcpNameSchema = z.string().min(1).max(300)
+const mcpServerSchema = integrationProjectSchema.extend({ name: mcpNameSchema })
+const mcpResourceSchema = mcpServerSchema.extend({ uri: z.string().min(1).max(16_384) })
+const mcpToolCallSchema = projectInputSchema.extend({
+  threadId: z.string().min(1).max(200),
+  server: mcpNameSchema,
+  tool: mcpNameSchema,
+  arguments: z.json(),
+  confirmed: z.literal(true),
+})
+const safeConfigSchema = projectInputSchema.extend({
+  key: z.enum([
+    'approval_policy',
+    'model_reasoning_effort',
+    'model_verbosity',
+    'sandbox_mode',
+    'web_search',
+  ]),
+  value: z.string().min(1).max(100).nullable(),
+})
+const integrationResolveSchema = z.object({
+  requestId: z.string().min(1).max(300),
+  action: z.enum(['accept', 'decline', 'cancel']),
+  content: z.json().optional(),
+  answers: z.record(z.string().min(1).max(200), z.array(z.string().max(4_096)).max(20)).optional(),
 })

@@ -84,6 +84,16 @@ export class StateDatabase {
     this.#database.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
   }
 
+  setProjectTrust(projectId: string, trusted: boolean): ProjectSummary {
+    const result = this.#database
+      .prepare('UPDATE projects SET trusted = ? WHERE id = ?')
+      .run(trusted ? 1 : 0, projectId)
+    if (result.changes !== 1) throw new Error('Project not found.')
+    const project = this.getProject(projectId)
+    if (!project) throw new Error('Project not found.')
+    return project
+  }
+
   associateThread(projectId: string, threadId: string): void {
     this.#database
       .prepare(`
