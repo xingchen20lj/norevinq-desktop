@@ -14,6 +14,7 @@ import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtim
 import type { StateDatabase } from './state/database.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type { GitRepositorySnapshot } from '../shared/git.js'
+import type { ManagedWorktree } from '../shared/worktree.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -51,12 +52,21 @@ export type GitController = {
   push: (input: { projectId: string; remote?: string; branch?: string; setUpstream?: boolean }) => Promise<GitRepositorySnapshot>
 }
 
+export type WorktreeController = {
+  list: (projectId: string) => Promise<ManagedWorktree[]>
+  create: (input: { projectId: string; baseRef?: string; branch?: string; copyIncludes?: boolean }) => Promise<ManagedWorktree>
+  lock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
+  unlock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
+  remove: (input: { worktreeId: string; force?: boolean }) => Promise<ManagedWorktree[]>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
   agent: AgentController,
   providers: ProviderController,
   git: GitController,
+  worktrees: WorktreeController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -136,6 +146,21 @@ export function registerIpc(
     branch?: string
     setUpstream?: boolean
   }))
+  ipcMain.handle(IPC_CHANNELS.worktreeList, (_event, input: unknown) => {
+    const parsed = projectInputSchema.parse(input)
+    return worktrees.list(parsed.projectId)
+  })
+  ipcMain.handle(IPC_CHANNELS.worktreeCreate, (_event, input: unknown) =>
+    worktrees.create(worktreeCreateSchema.parse(input) as {
+      projectId: string
+      baseRef?: string
+      branch?: string
+      copyIncludes?: boolean
+    }))
+  ipcMain.handle(IPC_CHANNELS.worktreeLock, (_event, input: unknown) => worktrees.lock(worktreeActionSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.worktreeUnlock, (_event, input: unknown) => worktrees.unlock(worktreeActionSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.worktreeRemove, (_event, input: unknown) =>
+    worktrees.remove(worktreeRemoveSchema.parse(input) as { worktreeId: string; force?: boolean }))
 
   return () => {
     unsubscribeRuntime()
@@ -150,6 +175,7 @@ const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
   projectId: z.uuid(),
+  worktreeId: z.uuid().optional(),
   text: promptSchema,
   model: z.string().min(1).max(200).optional(),
   modelProvider: z.string().min(1).max(200).optional(),
@@ -186,3 +212,12 @@ const gitPushSchema = z.object({
   branch: gitRefSchema.optional(),
   setUpstream: z.boolean().optional(),
 })
+const worktreeRefSchema = z.string().regex(/^[A-Za-z0-9._/@{}^~+-]{1,255}$/)
+const worktreeCreateSchema = z.object({
+  projectId: z.uuid(),
+  baseRef: worktreeRefSchema.optional(),
+  branch: worktreeRefSchema.optional(),
+  copyIncludes: z.boolean().optional(),
+})
+const worktreeActionSchema = z.object({ worktreeId: z.uuid() })
+const worktreeRemoveSchema = z.object({ worktreeId: z.uuid(), force: z.boolean().optional() })

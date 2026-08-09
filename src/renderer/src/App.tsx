@@ -34,6 +34,7 @@ import type { ConversationSnapshot, PendingApproval } from '../../shared/convers
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitRepositorySnapshot } from '../../shared/git'
+import type { ManagedWorktree } from '../../shared/worktree'
 
 type Theme = 'dark' | 'light'
 
@@ -54,6 +55,9 @@ export function App(): React.JSX.Element {
   const [deepSeekKey, setDeepSeekKey] = useState('')
   const [gitStatus, setGitStatus] = useState<GitRepositorySnapshot | null>(null)
   const [gitOpen, setGitOpen] = useState(false)
+  const [worktrees, setWorktrees] = useState<ManagedWorktree[]>([])
+  const [selectedWorktree, setSelectedWorktree] = useState<ManagedWorktree | null>(null)
+  const [worktreeOpen, setWorktreeOpen] = useState(false)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
     if (saved === 'dark' || saved === 'light') return saved
@@ -96,9 +100,12 @@ export function App(): React.JSX.Element {
   }, [selectedProject, runtime?.phase])
 
   useEffect(() => {
-    if (!selectedProject) { setGitStatus(null); return }
-    void window.aster.getGitStatus({ projectId: selectedProject.id })
-      .then(setGitStatus)
+    if (!selectedProject) { setGitStatus(null); setWorktrees([]); setSelectedWorktree(null); return }
+    setSelectedWorktree(null)
+    void Promise.all([
+      window.aster.getGitStatus({ projectId: selectedProject.id }),
+      window.aster.listWorktrees({ projectId: selectedProject.id }),
+    ]).then(([git, items]) => { setGitStatus(git); setWorktrees(items) })
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [selectedProject])
 
@@ -156,6 +163,7 @@ export function App(): React.JSX.Element {
       if (newTask || !selectedThread) {
         snapshot = await window.aster.startConversation({
           projectId: selectedProject.id,
+          ...(selectedWorktree ? { worktreeId: selectedWorktree.id } : {}),
           text,
           ...(model ? { model } : {}),
           ...(model.startsWith('deepseek-') ? { modelProvider: 'deepseek' } : {}),
@@ -305,7 +313,7 @@ export function App(): React.JSX.Element {
                 <select aria-label="推理强度" value={effort} onChange={(event) => setEffort(event.target.value)}>
                   {(selectedModel?.supportedReasoningEfforts ?? []).map((item) => <option value={item} key={item}>{item}</option>)}
                 </select>
-                <span><GitBranch size={13} />Local</span>
+                <button type="button" onClick={() => setWorktreeOpen(true)}><GitBranch size={13} />{selectedWorktree ? 'Worktree' : 'Local'}</button>
               </div>
               {activeTurn ? (
                 <button className="send-button stop-button" onClick={() => void interrupt()} aria-label="停止任务"><Square size={12} fill="currentColor" /></button>
@@ -324,6 +332,15 @@ export function App(): React.JSX.Element {
           update={setGitStatus}
           onError={setError}
         />}
+        {worktreeOpen && selectedProject && <WorktreePanel
+          project={selectedProject}
+          items={worktrees}
+          selected={selectedWorktree}
+          close={() => setWorktreeOpen(false)}
+          update={setWorktrees}
+          select={(item) => { setSelectedWorktree(item); setWorktreeOpen(false) }}
+          onError={setError}
+        />}
       </main>
       {settingsOpen && <ProviderSettings
         providers={providers}
@@ -335,6 +352,63 @@ export function App(): React.JSX.Element {
       />}
     </div>
   )
+}
+
+function WorktreePanel({ project, items, selected, close, update, select, onError }: {
+  project: ProjectSummary
+  items: ManagedWorktree[]
+  selected: ManagedWorktree | null
+  close: () => void
+  update: (items: ManagedWorktree[]) => void
+  select: (item: ManagedWorktree | null) => void
+  onError: (message: string | null) => void
+}): React.JSX.Element {
+  const [branch, setBranch] = useState('')
+  const [busy, setBusy] = useState(false)
+
+  async function act(action: () => Promise<ManagedWorktree[]>): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try { update(await action()) }
+    catch (reason) { onError(toErrorMessage(reason)) }
+    finally { setBusy(false) }
+  }
+
+  async function create(): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try {
+      const created = await window.aster.createWorktree({
+        projectId: project.id,
+        ...(branch.trim() ? { branch: branch.trim() } : {}),
+      })
+      update([created, ...items])
+      setBranch('')
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return <aside className="git-panel worktree-panel" aria-label="工作树">
+    <header><div><p className="eyebrow">MANAGED WORKTREES</p><h2>隔离工作区</h2></div><button className="icon-button" onClick={close} aria-label="关闭工作树"><X size={16} /></button></header>
+    <p className="worktree-note">默认从 HEAD 创建 detached worktree。填写分支名时才创建分支；`.worktreeinclude` 只复制显式匹配的已忽略普通文件。</p>
+    <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选：codex/feature-name" /><button disabled={busy} onClick={() => void create()}><Plus size={13} />创建</button></div>
+    <button className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
+    {items.map((item) => <div className={`worktree-row ${selected?.id === item.id ? 'selected' : ''}`} key={item.id}>
+      <button className="worktree-select" onClick={() => select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small>{item.path}</small></span></button>
+      <div className="worktree-actions">
+        <button disabled={busy || item.missing} onClick={() => void act(() => item.locked ? window.aster.unlockWorktree({ worktreeId: item.id }) : window.aster.lockWorktree({ worktreeId: item.id }))}>{item.locked ? '解锁' : '锁定'}</button>
+        <button disabled={busy || item.locked} onClick={() => void act(async () => {
+          const next = await window.aster.removeWorktree({ worktreeId: item.id })
+          if (selected?.id === item.id) select(null)
+          return next
+        })}>移除</button>
+      </div>
+    </div>)}
+    {items.length === 0 && <div className="git-clean">暂无托管工作树</div>}
+  </aside>
 }
 
 function GitPanel({ project, snapshot, close, update, onError }: {

@@ -1,4 +1,5 @@
 import { mkdtempSync, rmSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -98,6 +99,29 @@ describe('AgentService', () => {
     service.dispose()
     database.close()
   })
+
+  it('resolves a managed worktree UUID to the server cwd without accepting renderer paths', async () => {
+    const { database, projectId, root } = createDatabase()
+    const worktreePath = mkdtempSync(join(root, 'worktree-'))
+    const worktreeId = randomUUID()
+    database.insertManagedWorktree({
+      id: worktreeId,
+      projectId,
+      path: worktreePath,
+      baseRef: 'HEAD',
+      branch: null,
+      createdAt: new Date().toISOString(),
+      copiedIncludeFiles: 0,
+    })
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+
+    await service.startConversation({ projectId, worktreeId, text: 'Use the isolated worktree' })
+
+    expect(runtime.requests.find(({ method }) => method === 'thread/start')?.params).toMatchObject({ cwd: worktreePath })
+    service.dispose()
+    database.close()
+  })
 })
 
 class FakeRuntime {
@@ -155,12 +179,12 @@ class FakeRuntime {
   }
 }
 
-function createDatabase(): { database: StateDatabase; projectId: string } {
+function createDatabase(): { database: StateDatabase; projectId: string; root: string } {
   const root = mkdtempSync(join(tmpdir(), 'aster-agent-test-'))
   temporaryPaths.push(root)
   const projectPath = mkdtempSync(join(root, 'project-'))
   const database = new StateDatabase(join(root, 'state.sqlite3'))
-  return { database, projectId: database.upsertProject(projectPath).id }
+  return { database, projectId: database.upsertProject(projectPath).id, root }
 }
 
 function protocolThread(turns: JsonValue[]): JsonValue {

@@ -54,11 +54,11 @@
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
 | Git | 创建 PR | 尚未开发 | GitHub CLI/连接器可选 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
-| 工作树 | 创建托管 detached 工作树 | 尚未开发 | 阶段 8 |
-| 工作树 | 本地与工作树 Handoff | 尚未开发 | 需安全处理未提交变更 |
-| 工作树 | 分支占用冲突检测 | 尚未开发 | git worktree list |
-| 工作树 | `.worktreeinclude` | 尚未开发 | 只复制匹配的忽略文件 |
-| 工作树 | 快照、恢复和清理策略 | 尚未开发 | 阶段 8 |
+| 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根、默认 detached、可选显式分支；真实仓库/E2E 通过 |
+| 工作树 | 本地与工作树 Handoff | 部分实现 | Local/Worktree composer 上下文切换和新任务 cwd 已实现；已有 turn/未提交修改 Handoff 待补 |
+| 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
+| 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |
+| 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、安全 remove 已实现；未提交快照/Handoff 待补 |
 | 差异 | 文件树和 unified/split diff | 尚未开发 | 阶段 9 |
 | 差异 | 大 diff 虚拟化 | 尚未开发 | 阶段 9/19 |
 | 差异 | 行内评论并发送给智能体 | 尚未开发 | 阶段 9 |

@@ -18,6 +18,13 @@ import type {
   GitPushInput,
   GitRepositorySnapshot,
 } from './git.js'
+import type {
+  CreateWorktreeInput,
+  ListWorktreesInput,
+  ManagedWorktree,
+  RemoveWorktreeInput,
+  WorktreeActionInput,
+} from './worktree.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -42,6 +49,11 @@ export const IPC_CHANNELS = {
   gitUnstage: 'git:unstage',
   gitCommit: 'git:commit',
   gitPush: 'git:push',
+  worktreeList: 'worktree:list',
+  worktreeCreate: 'worktree:create',
+  worktreeLock: 'worktree:lock',
+  worktreeUnlock: 'worktree:unlock',
+  worktreeRemove: 'worktree:remove',
 } as const
 
 export type ProjectSummary = {
@@ -90,4 +102,9 @@ export type AsterDesktopApi = {
   unstageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
   commitGit: (input: GitCommitInput) => Promise<GitRepositorySnapshot>
   pushGit: (input: GitPushInput) => Promise<GitRepositorySnapshot>
+  listWorktrees: (input: ListWorktreesInput) => Promise<ManagedWorktree[]>
+  createWorktree: (input: CreateWorktreeInput) => Promise<ManagedWorktree>
+  lockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
+  unlockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
+  removeWorktree: (input: RemoveWorktreeInput) => Promise<ManagedWorktree[]>
 }

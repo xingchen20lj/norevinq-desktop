@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto'
+import { statSync } from 'node:fs'
 import type { AgentServerEvent } from '../../shared/agent.js'
 import type {
   ConversationSnapshot,
@@ -107,11 +108,14 @@ export class AgentService {
 
   async startConversation(input: StartConversationInput): Promise<ConversationSnapshot> {
     const project = this.#requireProject(input.projectId)
+    const workingPath = input.worktreeId
+      ? this.#requireWorktreePath(input.projectId, input.worktreeId)
+      : project.path
     const text = requirePrompt(input.text)
     await this.#runtime.start()
     const params: Record<string, JsonValue> = {
       approvalPolicy: input.approvalPolicy ?? 'on-request',
-      cwd: project.path,
+      cwd: workingPath,
       sandbox: input.sandbox ?? 'workspace-write',
     }
     if (input.model) params.model = input.model
@@ -301,6 +305,13 @@ export class AgentService {
     const project = this.#database.getProject(projectId)
     if (!project) throw new Error('Project not found.')
     return project
+  }
+
+  #requireWorktreePath(projectId: string, worktreeId: string): string {
+    const worktree = this.#database.getManagedWorktree(worktreeId)
+    if (worktree?.projectId !== projectId) throw new Error('Managed worktree not found for this project.')
+    if (!statSync(worktree.path).isDirectory()) throw new Error('Managed worktree directory is unavailable.')
+    return worktree.path
   }
 
   #update(patch: Partial<ConversationSnapshot>): void {

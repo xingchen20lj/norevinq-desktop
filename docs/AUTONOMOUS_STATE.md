@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 8：托管 Git 工作树。
+阶段 9：代码差异审阅。
 
 ## 当前任务
 
-- 设计仓库外托管 worktree 根、detached HEAD 默认和可恢复元数据。
-- 实现创建、列表、删除、锁定、分支占用检测和孤儿恢复。
-- 实现 `.worktreeinclude` 受控复制与未提交变更安全策略。
-- 接入 Local/Worktree 上下文切换和 Handoff 基础流程。
+- 实现工作区/已暂存 diff 读取、文件列表、统计和二进制检测。
+- 接入 unified/split 代码差异面板和大型 diff 边界。
+- 实现按区块 stage/unstage、显式 revert 与行内评论上下文。
+- 将评论/选中 diff 安全追加给当前智能体任务。
 
 ## 已完成任务
 
@@ -57,13 +57,16 @@
 - 完成项目根约束、参数数组、相对路径校验、无凭据提示、超时与 8 MiB 输出边界的 Git 服务。
 - 完成 porcelain v2 NUL 状态、branch/upstream/ahead/behind、remote、stage/unstage、commit/push。
 - 真实临时仓库执行两次 commit 和本地 bare remote push；Electron E2E 将智能体文件通过 Git 面板暂存并提交至干净状态。
+- 完成仓库外 managed root、detached 默认、显式分支、SQLite 恢复、missing、lock/unlock/remove。
+- 完成 `.worktreeinclude` ignored 候选、glob/排除、普通文件、路径和 10/100 MiB 边界。
+- Electron E2E 创建、锁定/解锁、选择 worktree 作为真实 Codex cwd，任务完成后移除并恢复 Local。
 
 ## 下一任务
 
-1. 定义 worktree 数据模型、存储位置与仓库 identity。
-2. 实现 detached worktree 创建/列表/移除和真实仓库测试。
-3. 实现分支冲突、恢复、清理和 `.worktreeinclude`。
-4. 接入任务上下文与 UI。
+1. 建立安全 diff runner 与结构化文件/区块模型。
+2. 实现工作区/已暂存 diff 读取和真实仓库测试。
+3. 接入 diff panel 与行内评论。
+4. 实现区块操作和回归测试。
 
 ## 已做技术决策
 
@@ -80,13 +83,13 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：15 个单元/集成测试文件共 72 项通过；Electron E2E 另覆盖真实 Git 刷新、暂存和 commit；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：16 个单元/集成测试文件共 75 项通过；Electron E2E 另覆盖真实 managed worktree 生命周期与 Codex 上下文；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
-- 当前渲染器生产主包约 603 kB，后续按工作台路由做代码分割。
+- 当前渲染器生产主包约 608 kB，后续按工作台路由做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞

@@ -108,6 +108,16 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.getByLabel('Git 工作区')).toContainText('工作区干净')
     await window.getByRole('button', { name: '关闭 Git' }).click()
 
+    await window.getByRole('button', { name: 'Local', exact: true }).click()
+    await expect(window.getByRole('complementary', { name: '工作树' })).toBeVisible()
+    await window.getByRole('button', { name: '创建', exact: true }).click()
+    await expect(window.getByRole('button', { name: /Detached/ })).toBeVisible()
+    await window.getByRole('button', { name: '锁定', exact: true }).click()
+    await expect(window.getByRole('button', { name: '解锁', exact: true })).toBeVisible()
+    await window.getByRole('button', { name: '解锁', exact: true }).click()
+    await window.getByRole('button', { name: /Detached/ }).click()
+    await expect(window.getByRole('button', { name: 'Worktree', exact: true })).toBeVisible()
+
     await window.getByRole('button', { name: /新任务/ }).click()
     await window.getByLabel('任务输入').fill('Run the shell command sleep 8, then reply with FIRST. Do not perform any other action.')
     await window.getByRole('button', { name: '发送任务' }).click()
@@ -124,6 +134,9 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByRole('button', { name: '停止任务' }).click()
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
     await expect(window.locator('.activity-card.agentMessage')).not.toContainText('INTERRUPT_FAILED')
+    await window.getByRole('button', { name: 'Worktree', exact: true }).click()
+    await window.getByRole('button', { name: '移除', exact: true }).click()
+    await expect(window.getByRole('button', { name: 'Local', exact: true })).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-shell.png' })
 
     const originalTheme = await window.locator('html').getAttribute('data-theme')

@@ -3,6 +3,7 @@ import { realpathSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { ProjectSummary } from '../../shared/contracts.js'
+import type { ManagedWorktree } from '../../shared/worktree.js'
 
 type ProjectRow = {
   id: string
@@ -10,6 +11,16 @@ type ProjectRow = {
   path: string
   trusted: number
   last_opened_at: string
+}
+
+type WorktreeRow = {
+  id: string
+  project_id: string
+  path: string
+  base_ref: string
+  branch: string | null
+  created_at: string
+  copied_include_files: number
 }
 
 export class StateDatabase {
@@ -92,6 +103,42 @@ export class StateDatabase {
     return rows.map(({ thread_id }) => thread_id)
   }
 
+  insertManagedWorktree(worktree: Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>): void {
+    this.#database.prepare(`
+      INSERT INTO managed_worktrees
+        (id, project_id, path, base_ref, branch, created_at, copied_include_files)
+      VALUES (?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      worktree.id,
+      worktree.projectId,
+      worktree.path,
+      worktree.baseRef,
+      worktree.branch,
+      worktree.createdAt,
+      worktree.copiedIncludeFiles,
+    )
+  }
+
+  listManagedWorktrees(projectId: string): Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>[] {
+    const rows = this.#database.prepare(`
+      SELECT id, project_id, path, base_ref, branch, created_at, copied_include_files
+      FROM managed_worktrees WHERE project_id = ? ORDER BY created_at DESC
+    `).all(projectId) as WorktreeRow[]
+    return rows.map(toManagedWorktreeRecord)
+  }
+
+  getManagedWorktree(worktreeId: string): Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'> | null {
+    const row = this.#database.prepare(`
+      SELECT id, project_id, path, base_ref, branch, created_at, copied_include_files
+      FROM managed_worktrees WHERE id = ?
+    `).get(worktreeId) as WorktreeRow | undefined
+    return row ? toManagedWorktreeRecord(row) : null
+  }
+
+  deleteManagedWorktree(worktreeId: string): void {
+    this.#database.prepare('DELETE FROM managed_worktrees WHERE id = ?').run(worktreeId)
+  }
+
   #migrate(): void {
     const version = this.#database.prepare('PRAGMA user_version').get() as { user_version: number }
     if (version.user_version < 1) {
@@ -122,6 +169,36 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 3) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS managed_worktrees (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          path TEXT NOT NULL UNIQUE,
+          base_ref TEXT NOT NULL,
+          branch TEXT,
+          created_at TEXT NOT NULL,
+          copied_include_files INTEGER NOT NULL DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS managed_worktrees_project_idx
+          ON managed_worktrees(project_id, created_at DESC);
+        PRAGMA user_version = 3;
+        COMMIT;
+      `)
+    }
+  }
+}
+
+function toManagedWorktreeRecord(row: WorktreeRow): Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'> {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    path: row.path,
+    baseRef: row.base_ref,
+    branch: row.branch,
+    createdAt: row.created_at,
+    copiedIncludeFiles: row.copied_include_files,
   }
 }
 

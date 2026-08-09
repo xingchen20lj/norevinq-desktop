@@ -44,6 +44,7 @@ export type ConversationSnapshot = {
 
 export type StartConversationInput = {
   projectId: string
+  worktreeId?: string
   text: string
   model?: string
   modelProvider?: string
