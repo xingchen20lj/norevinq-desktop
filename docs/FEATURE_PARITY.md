@@ -67,9 +67,9 @@
 | 终端 | 输入、调整尺寸、中断、退出 | 已测试 | write/resize/terminate/close 真实桌面回归；不依赖 node-pty 原生 ABI |
 | 终端 | 输出环形缓冲和脱敏 | 已测试 | main/renderer 各 4 MiB、10k scrollback、跨分片 UTF-8；共享上下文移除 ANSI/OSC/C0 |
 | 终端 | app-server 读取当前终端输出 | 已测试 | 用户显式共享最近 32 KiB，真实 `turn/start` 后收到 `ASTER_TERMINAL_CONTEXT_OK`；不静默泄露输出 |
-| 文件 | 文件树、文本与代码预览 | 尚未开发 | 阶段 14 |
-| 文件 | 图片、音频、视频、PDF 预览 | 尚未开发 | 阶段 14 |
-| 文件 | 产物链接和外部打开 | 尚未开发 | 安全路径校验 |
+| 文件 | 文件树、文本与代码预览 | 已测试 | 项目/worktree 根绑定、500 项目录、2 MiB UTF-8、无扩展名检测；单元及真实文本 E2E |
+| 文件 | 图片、音频、视频、PDF 预览 | 部分实现 | 图片自定义协议真实解码；音视频/PDF UI、MIME、Range/HEAD/206/416 已测试，真实格式矩阵待最终回归 |
+| 文件 | 产物链接和外部打开 | 已测试 | fileChange 直达真实文本产物；确认式系统打开、可执行/脚本拒绝和路径边界单测 |
 | 浏览器 | 本地网页预览 | 尚未开发 | 独立受限 BrowserView/WebContentsView |
 | 浏览器 | 导航、刷新、开发日志 | 尚未开发 | 阶段 15 |
 | 浏览器 | 通用 Computer Use | 被私有服务阻塞 | 只采用公开可调用能力，不伪造 |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 21 个测试文件至少 93 项；真实 Electron 覆盖计划任务、Security preflight、OpenAI、DeepSeek、AGENTS、MCP、审批、Git/diff/worktree 和 PTY 终端 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 23 个测试文件至少 101 项；真实 Electron 覆盖文件产物、计划任务、Security preflight、OpenAI、DeepSeek、AGENTS、MCP、审批、Git/diff/worktree 和 PTY 终端 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

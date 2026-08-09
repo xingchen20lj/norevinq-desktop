@@ -68,6 +68,7 @@ import type {
   SchedulerSnapshot,
   SchedulerSubscription,
 } from './scheduler.js'
+import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from './files.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -139,6 +140,9 @@ export const IPC_CHANNELS = {
   schedulerCancelRun: 'scheduler:cancel-run',
   schedulerMarkRead: 'scheduler:mark-read',
   schedulerChanged: 'scheduler:changed',
+  filesList: 'files:list',
+  filesPreview: 'files:preview',
+  filesOpenExternal: 'files:open-external',
 } as const
 
 export type ProjectSummary = {
@@ -234,4 +238,7 @@ export type AsterDesktopApi = {
   cancelScheduledRun: (input: { runId: string }) => Promise<SchedulerSnapshot>
   markScheduledRunsRead: (input: { runIds?: string[] }) => Promise<SchedulerSnapshot>
   onSchedulerChanged: (subscription: SchedulerSubscription) => () => void
+  listProjectDirectory: (input: FilePathInput) => Promise<ProjectDirectory>
+  previewProjectFile: (input: FilePathInput) => Promise<ProjectFilePreview>
+  openProjectFileExternal: (input: FileOpenInput) => Promise<void>
 }

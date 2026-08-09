@@ -1,5 +1,5 @@
 import { join } from 'node:path'
-import { app, BrowserWindow, safeStorage, shell } from 'electron'
+import { app, BrowserWindow, protocol, safeStorage, shell } from 'electron'
 import { registerIpc } from './ipc.js'
 import { createLogger, type JsonlLogger } from './logging/logger.js'
 import { SizeLimitedRotation } from './logging/sizeRotation.js'
@@ -23,6 +23,13 @@ import { SecurityService } from './security/securityService.js'
 import { SchedulerService } from './scheduler/schedulerService.js'
 import type { ScheduledTask } from '../shared/scheduler.js'
 import type { ConversationSnapshot } from '../shared/conversation.js'
+import { FileService } from './files/fileService.js'
+import { serveFilePreview } from './files/fileProtocol.js'
+
+protocol.registerSchemesAsPrivileged([{
+  scheme: 'aster-file',
+  privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
+}])
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -39,6 +46,7 @@ let terminalService: TerminalService | null = null
 let integrationService: IntegrationService | null = null
 let securityService: SecurityService | null = null
 let schedulerService: SchedulerService | null = null
+let fileService: FileService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -88,6 +96,9 @@ if (!gotLock) {
   void app.whenReady().then(() => {
     const userData = app.getPath('userData')
     database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
+    const createdFileService = new FileService(database, { openPath: (path) => shell.openPath(path) })
+    fileService = createdFileService
+    protocol.handle('aster-file', (request) => serveFilePreview(request, createdFileService))
     const credentialStore = new CredentialStore(join(userData, 'credentials.json'), {
       isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
       encryptString: (value) => safeStorage.encryptString(value),
@@ -133,6 +144,7 @@ if (!gotLock) {
       integrationService,
       securityService,
       schedulerService,
+      createdFileService,
     )
     mainWindow = createMainWindow()
     void runtime.start().then(() => schedulerService?.start())
@@ -168,6 +180,8 @@ app.on('before-quit', () => {
   runtime = null
   void runtimeLogger?.close()
   runtimeLogger = null
+  fileService?.clear()
+  fileService = null
   database?.close()
   database = null
 })

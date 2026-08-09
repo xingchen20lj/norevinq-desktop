@@ -450,6 +450,47 @@ button.worktree-row { gap: 8px; cursor: pointer; }
 .worktree-actions button { border: 0; color: var(--accent-strong); background: transparent; font-size: 8.5px; cursor: pointer; }
 .worktree-actions button:disabled { opacity: .35; cursor: default; }
 
+.artifact-link { display: flex; max-width: 100%; align-items: center; gap: 5px; margin: 3px 0; padding: 4px 7px; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; color: var(--accent-strong); background: var(--surface-2); font: 9.5px/1.35 var(--font-mono, monospace); text-align: left; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; }
+.file-workbench { position: absolute; z-index: 15; top: 45px; right: 0; bottom: 0; display: grid; grid-template-rows: 58px 36px minmax(0, 1fr); width: min(900px, 100%); border-left: 1px solid var(--border); background: var(--bg); box-shadow: -20px 0 60px rgba(0,0,0,.24); }
+.file-workbench > header { display: flex; align-items: center; justify-content: space-between; padding: 0 17px; border-bottom: 1px solid var(--border); background: var(--surface); }
+.file-workbench > header h2 { margin: 2px 0 0; font-size: 14px; }
+.file-workbench > header .eyebrow { margin: 0; color: var(--accent-strong); font-size: 8px; font-weight: 700; letter-spacing: .14em; }
+.file-breadcrumbs { display: flex; min-width: 0; align-items: center; gap: 2px; padding: 0 10px; overflow-x: auto; border-bottom: 1px solid var(--border); color: var(--subtle); background: var(--surface-2); }
+.file-breadcrumbs > button, .file-breadcrumbs span { display: flex; flex: none; align-items: center; gap: 3px; }
+.file-breadcrumbs button { height: 24px; padding: 0 5px; border: 0; border-radius: 4px; color: var(--muted); background: transparent; font-size: 9px; cursor: pointer; }
+.file-breadcrumbs button:hover { color: var(--text); background: var(--surface-hover); }
+.file-breadcrumbs .file-refresh { margin-left: auto; }
+.file-workbench-body { display: grid; min-width: 0; min-height: 0; grid-template-columns: 270px minmax(0, 1fr); }
+.file-list { min-width: 0; overflow: auto; padding: 7px; border-right: 1px solid var(--border); background: var(--surface); }
+.file-row { display: flex; width: 100%; min-width: 0; min-height: 39px; align-items: center; gap: 7px; padding: 4px 7px; border: 1px solid transparent; border-radius: 6px; color: var(--muted); background: transparent; text-align: left; cursor: pointer; }
+.file-row:hover, .file-row.selected { border-color: var(--border); background: var(--surface-hover); }
+.file-row.selected { color: var(--accent-strong); background: var(--accent-soft); }
+.file-row:disabled { opacity: .58; cursor: not-allowed; }
+.file-row > span { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.file-row strong, .file-row small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-row strong { color: var(--text); font-size: 9.5px; font-weight: 550; }
+.file-row small { color: var(--subtle); font-size: 7.5px; }
+.file-loading, .file-preview-empty { display: grid; place-items: center; align-content: center; gap: 7px; min-height: 150px; color: var(--subtle); font-size: 9px; text-align: center; }
+.file-limit { padding: 7px; color: var(--danger); font-size: 8px; line-height: 1.5; }
+.file-preview-pane { display: grid; min-width: 0; min-height: 0; grid-template-rows: auto minmax(0, 1fr); overflow: hidden; }
+.file-preview-pane > .file-preview-empty { grid-row: 1 / 3; }
+.file-preview-empty strong { color: var(--text); font-size: 11px; }
+.file-preview-empty p { max-width: 310px; margin: 0; line-height: 1.55; }
+.file-preview-header { display: flex; min-width: 0; align-items: center; justify-content: space-between; gap: 12px; min-height: 51px; padding: 7px 12px; border-bottom: 1px solid var(--border); }
+.file-preview-header > div { display: grid; min-width: 0; gap: 3px; }
+.file-preview-header strong, .file-preview-header span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-preview-header strong { color: var(--text); font-size: 10.5px; }
+.file-preview-header span { color: var(--subtle); font-size: 8px; }
+.file-preview-header button { display: flex; flex: none; align-items: center; gap: 4px; height: 27px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: var(--surface); font-size: 8.5px; cursor: pointer; }
+.text-preview { min-width: 0; min-height: 0; overflow: auto; background: var(--bg); }
+.text-preview pre { min-width: max-content; margin: 0; padding: 14px 16px 40px; color: var(--text); font: 10px/1.58 var(--font-mono, ui-monospace, monospace); tab-size: 2; white-space: pre; }
+.text-preview > p { position: sticky; bottom: 0; margin: 0; padding: 7px 12px; color: #c98a2d; background: color-mix(in srgb, var(--surface) 96%, transparent); font-size: 8.5px; }
+.media-preview { display: grid; min-width: 0; min-height: 0; place-items: center; overflow: auto; padding: 18px; background: repeating-conic-gradient(var(--surface-2) 0 25%, var(--bg) 0 50%) 50% / 18px 18px; }
+.media-preview img, .media-preview video { display: block; max-width: 100%; max-height: 100%; object-fit: contain; background: #111; box-shadow: 0 8px 35px rgba(0,0,0,.22); }
+.media-preview.audio { align-content: center; gap: 16px; background: var(--bg); color: var(--accent-strong); }
+.media-preview audio { width: min(430px, 90%); }
+.pdf-preview { width: 100%; height: 100%; border: 0; background: #ececec; }
+
 .terminal-drawer { position: absolute; z-index: 12; right: 0; bottom: 0; left: 0; display: grid; grid-template-rows: 35px 32px minmax(0, 1fr); height: min(46vh, 430px); border-top: 1px solid var(--border); background: var(--bg); box-shadow: 0 -18px 55px rgba(0,0,0,.22); }
 .terminal-header { display: flex; min-width: 0; align-items: center; padding: 0 7px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .terminal-header > .icon-button { flex: none; width: 26px; height: 26px; }
@@ -488,6 +529,7 @@ button.worktree-row { gap: 8px; cursor: pointer; }
   .capability-grid { grid-template-columns: 1fr; }
   .capability-grid article { min-height: 80px; }
   .status-chip { right: 12px; bottom: auto; left: auto; top: 12px; }
+  .file-workbench-body { grid-template-columns: 220px minmax(0, 1fr); }
 }
 
 @media (prefers-reduced-motion: reduce) {

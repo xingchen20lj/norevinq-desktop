@@ -7,6 +7,7 @@ import {
   Clock3,
   Code2,
   FileCode2,
+  Files,
   FolderCode,
   FolderOpen,
   GitBranch,
@@ -45,6 +46,7 @@ import { SettingsWorkbench } from './SettingsWorkbench'
 import { SecurityWorkbench } from './SecurityWorkbench'
 import type { SchedulerSnapshot } from '../../shared/scheduler'
 import { SchedulerWorkbench } from './SchedulerWorkbench'
+import { FileWorkbench } from './FileWorkbench'
 
 type Theme = 'dark' | 'light'
 
@@ -75,6 +77,8 @@ export function App(): React.JSX.Element {
   const [terminalOpen, setTerminalOpen] = useState(false)
   const [terminalState, setTerminalState] = useState<TerminalState>({ sessions: [] })
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null)
+  const [filesOpen, setFilesOpen] = useState(false)
+  const [initialFilePath, setInitialFilePath] = useState<string | null>(null)
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
@@ -86,6 +90,12 @@ export function App(): React.JSX.Element {
   const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
   const activeTurn = activityState?.turnStatus === 'inProgress'
   const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
+
+  function openFiles(path: string | null = null): void {
+    const root = selectedWorktree?.path ?? selectedProject?.path ?? null
+    setInitialFilePath(path && root ? projectRelativeArtifactPath(path, root) : path)
+    setFilesOpen(true)
+  }
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
@@ -411,6 +421,7 @@ export function App(): React.JSX.Element {
             </span>
           </div>
           <div className="topbar-actions">
+            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
             <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
             <button className="icon-button" aria-label="帮助"><CircleHelp size={17} /></button>
           </div>
@@ -418,7 +429,7 @@ export function App(): React.JSX.Element {
 
         <section className={`workspace ${selectedThread && !newTask ? 'conversation-workspace' : ''}`}>
           {selectedThread && !newTask ? (
-            <ActivityTimeline state={activityState} />
+            <ActivityTimeline state={activityState} openFile={(path) => openFiles(path)} />
           ) : (
             <Welcome selectedProject={selectedProject} runtime={runtime} isOpening={isOpening} openProject={openProject} />
           )}
@@ -492,6 +503,14 @@ export function App(): React.JSX.Element {
           create={() => openTerminal(true)}
           onError={setError}
           appendContext={appendTerminalContext}
+        />}
+        {filesOpen && selectedProject && <FileWorkbench
+          key={`${selectedProject.id}:${selectedWorktree?.id ?? 'local'}:${initialFilePath ?? ''}`}
+          project={selectedProject}
+          worktree={selectedWorktree}
+          initialPath={initialFilePath}
+          close={() => { setFilesOpen(false); setInitialFilePath(null) }}
+          onError={setError}
         />}
       </main>
       {settingsOpen && <SettingsWorkbench
@@ -970,6 +989,12 @@ function linePrefix(kind: DiffLine['kind']): string {
   return ' '
 }
 
+function projectRelativeArtifactPath(path: string, root: string): string {
+  const portablePath = path.replaceAll('\\', '/')
+  const portableRoot = root.replaceAll('\\', '/').replace(/\/$/u, '')
+  return portablePath.startsWith(`${portableRoot}/`) ? portablePath.slice(portableRoot.length + 1) : portablePath
+}
+
 function splitDiffLines(lines: DiffLine[]): { old: DiffLine | null; new: DiffLine | null }[] {
   const result: { old: DiffLine | null; new: DiffLine | null }[] = []
   for (let index = 0; index < lines.length;) {
@@ -1028,15 +1053,15 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
   </div>
 }
 
-function ActivityTimeline({ state }: { state: AgentActivityState | null }): React.JSX.Element {
+function ActivityTimeline({ state, openFile }: { state: AgentActivityState | null; openFile: (path: string) => void }): React.JSX.Element {
   if (!state || state.activities.length === 0) return <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
   return <div className="activity-timeline" aria-label="智能体活动">
-    {state.activities.map((activity) => <ActivityCard activity={activity} key={`${activity.type}:${activity.id}`} />)}
+    {state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
     {state.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
   </div>
 }
 
-function ActivityCard({ activity }: { activity: AgentActivity }): React.JSX.Element {
+function ActivityCard({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
   if (activity.type === 'thread' || activity.type === 'turn') return <></>
   const icon = activity.type === 'userMessage' || activity.type === 'agentMessage' ? <MessageSquare size={15} />
     : activity.type === 'reasoning' ? <Brain size={15} />
@@ -1045,17 +1070,17 @@ function ActivityCard({ activity }: { activity: AgentActivity }): React.JSX.Elem
     <div className="activity-icon">{icon}</div>
     <div className="activity-body">
       <div className="activity-heading"><strong>{activityLabel(activity)}</strong><span>{activity.status}</span></div>
-      <ActivityContent activity={activity} />
+      <ActivityContent activity={activity} openFile={openFile} />
     </div>
   </article>
 }
 
-function ActivityContent({ activity }: { activity: AgentActivity }): React.JSX.Element {
+function ActivityContent({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
   if (activity.type === 'userMessage') return <p>{activity.content.filter(({ type }) => type === 'text').map((item) => item.type === 'text' ? item.text : '').join('\n')}</p>
   if (activity.type === 'agentMessage') return <p>{activity.text}</p>
   if (activity.type === 'reasoning') return <p>{[...activity.summary, ...activity.content].join('\n')}</p>
   if (activity.type === 'command') return <><code>{activity.command}</code>{activity.output && <pre>{activity.output}</pre>}</>
-  if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <code key={`${change.path}:${change.kind}`}>{change.kind} {change.path}</code>)}</>
+  if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <button className="artifact-link" onClick={() => openFile(change.path)} key={`${change.path}:${change.kind}`}><FileCode2 size={12} />{change.kind} {change.path}</button>)}</>
   if (activity.type === 'plan') return <>{activity.steps.map((step) => <p key={step.step}>• {step.step} — {step.status}</p>)}</>
   if (activity.type === 'error') return <p className="danger-text">{activity.message}</p>
   if (activity.type === 'mcpTool') return <p>{activity.server} / {activity.tool}{activity.progress ? ` · ${activity.progress}` : ''}</p>

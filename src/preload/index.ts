@@ -46,6 +46,7 @@ import type {
   SecuritySubscription,
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
+import type { FileOpenInput, FilePathInput } from '../shared/files.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -164,6 +165,9 @@ const api: AsterDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.schedulerChanged, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.schedulerChanged, listener)
   },
+  listProjectDirectory: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesList, input),
+  previewProjectFile: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesPreview, input),
+  openProjectFileExternal: (input: FileOpenInput) => ipcRenderer.invoke(IPC_CHANNELS.filesOpenExternal, input),
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

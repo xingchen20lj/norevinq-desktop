@@ -49,6 +49,7 @@ import type {
   SecuritySubscription,
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
+import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -151,6 +152,12 @@ export type SchedulerController = {
   markRead: (runIds?: string[]) => SchedulerSnapshot
 }
 
+export type FileController = {
+  listDirectory: (input: FilePathInput) => ProjectDirectory
+  readPreview: (input: FilePathInput) => ProjectFilePreview
+  openExternal: (input: FileOpenInput) => Promise<void>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -163,6 +170,7 @@ export function registerIpc(
   integrations: IntegrationController,
   security: SecurityController,
   scheduler: SchedulerController,
+  files: FileController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -429,6 +437,18 @@ export function registerIpc(
     scheduler.cancelRun(runIdSchema.parse(input).runId))
   ipcMain.handle(IPC_CHANNELS.schedulerMarkRead, (_event, input: unknown) =>
     scheduler.markRead(markScheduledReadSchema.parse(input).runIds))
+  ipcMain.handle(IPC_CHANNELS.filesList, (_event, input: unknown) => {
+    const parsed = filePathSchema.parse(input)
+    return files.listDirectory({ projectId: parsed.projectId, path: parsed.path, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
+  })
+  ipcMain.handle(IPC_CHANNELS.filesPreview, (_event, input: unknown) => {
+    const parsed = filePathSchema.parse(input)
+    return files.readPreview({ projectId: parsed.projectId, path: parsed.path, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
+  })
+  ipcMain.handle(IPC_CHANNELS.filesOpenExternal, (_event, input: unknown) => {
+    const parsed = fileOpenSchema.parse(input)
+    return files.openExternal({ projectId: parsed.projectId, path: parsed.path, confirmed: true, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
+  })
 
   return () => {
     unsubscribeRuntime()
@@ -509,6 +529,12 @@ const scheduledTaskPauseSchema = z.object({ taskId: z.uuid(), paused: z.boolean(
 const taskIdSchema = z.object({ taskId: z.uuid() })
 const runIdSchema = z.object({ runId: z.uuid() })
 const markScheduledReadSchema = z.object({ runIds: z.array(z.uuid()).max(500).optional() })
+const filePathSchema = z.object({
+  projectId: z.uuid(),
+  worktreeId: z.uuid().optional(),
+  path: z.string().max(4_096).refine((value) => !value.includes('\0')),
+})
+const fileOpenSchema = filePathSchema.extend({ confirmed: z.literal(true) })
 const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
