@@ -1,12 +1,17 @@
 import { join } from 'node:path'
 import { app, BrowserWindow, shell } from 'electron'
 import { registerIpc } from './ipc.js'
+import { createLogger, type JsonlLogger } from './logging/logger.js'
+import { SizeLimitedRotation } from './logging/sizeRotation.js'
+import { CodexRuntimeSupervisor } from './runtime/codexRuntime.js'
 import { StateDatabase } from './state/database.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
 let database: StateDatabase | null = null
 let unregisterIpc: (() => void) | null = null
+let runtime: CodexRuntimeSupervisor | null = null
+let runtimeLogger: JsonlLogger | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -54,9 +59,17 @@ if (!gotLock) {
   })
 
   void app.whenReady().then(() => {
-    database = new StateDatabase(join(app.getPath('userData'), 'aster-code.sqlite3'))
-    unregisterIpc = registerIpc(database)
+    const userData = app.getPath('userData')
+    database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
+    runtimeLogger = createLogger({
+      component: 'codex-runtime',
+      filePath: join(userData, 'logs', 'runtime.jsonl'),
+      rotation: new SizeLimitedRotation(),
+    })
+    runtime = new CodexRuntimeSupervisor({ logger: runtimeLogger })
+    unregisterIpc = registerIpc(database, runtime)
     mainWindow = createMainWindow()
+    void runtime.start()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) mainWindow = createMainWindow()
@@ -73,4 +86,8 @@ app.on('before-quit', () => {
   unregisterIpc = null
   database?.close()
   database = null
+  void runtime?.stop()
+  runtime = null
+  void runtimeLogger?.close()
+  runtimeLogger = null
 })

@@ -18,11 +18,13 @@ import {
 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
+import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 
 type Theme = 'dark' | 'light'
 
 export function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null)
+  const [runtime, setRuntime] = useState<CodexRuntimeSnapshot | null>(null)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isOpening, setIsOpening] = useState(false)
@@ -42,9 +44,16 @@ export function App(): React.JSX.Element {
       .getBootstrapState()
       .then((state) => {
         setBootstrap(state)
+        setRuntime(state.runtime)
         setSelectedProject(state.projects[0] ?? null)
       })
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onRuntimeStatus(setRuntime)
+    void window.aster.getRuntimeStatus().then(setRuntime).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
   }, [])
 
   const projects = bootstrap?.projects ?? []
@@ -126,6 +135,9 @@ export function App(): React.JSX.Element {
           <div className="topbar-title">
             <span>{selectedProject?.name ?? '欢迎'}</span>
             {selectedProject && <span className="context-pill"><GitBranch size={13} />Local</span>}
+            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? runtime?.binaryPath ?? undefined}>
+              <span className="runtime-dot" /> Codex {runtimeLabel(runtime)}
+            </span>
           </div>
           <div className="topbar-actions">
             <button className="icon-button" aria-label="终端"><TerminalSquare size={17} /></button>
@@ -153,8 +165,12 @@ export function App(): React.JSX.Element {
             <div className="capability-grid">
               <article>
                 <Bot size={20} />
-                <div><h2>Codex 任务</h2><p>流式活动、审批与可中断任务</p></div>
-                <span className="status-chip planned">即将接入</span>
+                <div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div>
+                {runtime?.phase === 'failed' || runtime?.phase === 'unavailable' ? (
+                  <button className="status-chip runtime-retry" onClick={() => void window.aster.restartRuntime()}>重试连接</button>
+                ) : (
+                  <span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span>
+                )}
               </article>
               <article>
                 <GitBranch size={20} />
@@ -193,4 +209,18 @@ export function App(): React.JSX.Element {
 
 function toErrorMessage(reason: unknown): string {
   return reason instanceof Error ? reason.message : '发生未知错误。'
+}
+
+function runtimeLabel(runtime: CodexRuntimeSnapshot | null): string {
+  switch (runtime?.phase) {
+    case 'ready': return '已就绪'
+    case 'discovering': return '查找中'
+    case 'starting': return '启动中'
+    case 'initializing': return '握手中'
+    case 'restarting': return '重启中'
+    case 'unavailable': return '不可用'
+    case 'failed': return '异常'
+    case 'stopped': return '已停止'
+    default: return '连接中'
+  }
 }

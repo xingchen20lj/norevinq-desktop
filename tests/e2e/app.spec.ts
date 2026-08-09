@@ -7,6 +7,17 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window).toHaveTitle('Aster Code')
     await expect(window.getByRole('heading', { name: '把复杂开发工作交给智能体' })).toBeVisible()
     await expect(window.getByRole('button', { name: '打开本地项目', exact: true })).toBeEnabled()
+    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+
+    const runtime = await window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getRuntimeStatus: () => Promise<{ phase: string; version: string | null; models: unknown[] }>
+      }
+      return bridge.getRuntimeStatus()
+    })
+    expect(runtime.phase).toBe('ready')
+    expect(runtime.version).toContain('codex-cli')
+    expect(runtime.models.length).toBeGreaterThan(0)
 
     const securityState = await window.evaluate(() => ({
       hasNodeRequire: typeof Reflect.get(globalThis, 'require') !== 'undefined',

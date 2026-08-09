@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 2：Codex app-server 运行时。
+阶段 3/4：项目、对话与流式智能体活动。
 
 ## 当前任务
 
-- 发现并探测 Codex 二进制版本。
-- 从同一二进制生成 stable TypeScript/JSON Schema 并记录兼容基线。
-- 实现 stdio JSONL supervisor、初始化握手、请求关联、超时、错误与安全日志。
-- 建立 initialize/thread/turn/stream/approval/interrupt 协议契约测试。
+- 用真实项目调用 `thread/start`、`thread/read/list/resume` 并持久化任务关联。
+- 实现 turn/start、结构化 item reducer、流式消息与活动时间线。
+- 建立命令、文件变更、推理、计划和错误事件的领域适配。
+- 为审批、steer 和 interrupt 建立状态机与 IPC 契约。
 
 ## 已完成任务
 
@@ -33,13 +33,20 @@
 - 通过 TypeScript 严格检查、ESLint、单元测试、生产构建和 Playwright Electron 冒烟测试。
 - E2E 确认渲染器没有 `require`/`process`，只暴露最小 `window.aster` IPC 桥。
 - 实际检查 1320×840 浅色界面截图；未发现文本溢出或面板错位。
+- 实现 JSONL 双向 RPC 内核，覆盖 Codex 省略 `jsonrpc` header、请求/通知/反向请求、超时、EOF、最大消息和写背压。
+- 实现 Codex 二进制发现、版本探测与 stable schema 原子同步；真实生成 642 个 TS 类型和 285 个 JSON Schema。
+- 实现 app-server supervisor、自动启动、initialize/initialized、模型目录、异常退出检测和空闲指数退避恢复。
+- 明确禁止活动 turn 崩溃后自动重放，避免重复命令/文件副作用。
+- 实现类型化运行时 IPC、状态订阅、重启入口和 UI 连接状态。
+- 实现递归敏感信息脱敏、0600 JSONL 日志和 2 MiB/3 份轮转。
+- Electron E2E 真实验证 app-server 达到 ready、版本为本机 `0.147.0-alpha.6.5` 且返回 6 个模型。
 
 ## 下一任务
 
-1. 生成并固定当前 Codex app-server stable schema。
-2. 实现 JSONL RPC client 与 app-server supervisor。
-3. 以真实本机 Codex 完成 initialize/model/list/thread/start 探测。
-4. 连接任务 UI 与标准化运行时状态。
+1. 完成 thread start/list/read/resume 和任务持久化。
+2. 完成 turn start、item/delta reducer 和流式活动 UI。
+3. 完成真实 Codex 文本任务的在线闭环。
+4. 接入审批、追加指令、中断与崩溃恢复 UX。
 
 ## 已做技术决策
 
@@ -56,7 +63,7 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：2 个单元测试文件共 3 项通过；1 个 Electron E2E 通过；类型、规范和生产构建通过。
+暂无。最近一次结果：8 个单元测试文件共 30 项通过；1 个 Electron E2E 通过；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
@@ -78,5 +85,5 @@
 ## 待验证问题
 
 - DeepSeek 经 app-server 完整执行文件修改的闭环仍待桌面运行时验证。
-- app-server 异常恢复后，活动 turn 与客户端订阅的恢复语义。
+- app-server 崩溃后 persisted thread 的重新 resume 与订阅恢复语义。
 - Codex Security SDK 当前安装包是否能在 Electron 主进程直接加载，或需要隔离 Node worker。

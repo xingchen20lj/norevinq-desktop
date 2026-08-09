@@ -23,9 +23,9 @@
 | 对话 | 分叉任务 | 尚未开发 | thread/fork |
 | 对话 | 长上下文压缩 | 尚未开发 | thread/compact/start |
 | 对话 | 重启后状态恢复 | 部分实现 | 项目状态恢复已实现；对话待 app-server |
-| 智能体 | Codex app-server stdio 生命周期 | 尚未开发 | 阶段 2 |
-| 智能体 | 协议握手和版本匹配类型 | 尚未开发 | generate-ts/json-schema |
-| 智能体 | app-server 崩溃检测与恢复 | 尚未开发 | 阶段 2 |
+| 智能体 | Codex app-server stdio 生命周期 | 已测试 | Electron E2E 真实自动启动并达到 ready |
+| 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
+| 智能体 | app-server 崩溃检测与恢复 | 部分实现 | 检测/空闲退避重启已实现；崩溃注入测试待补 |
 | 智能体 | 流式文本、推理和活动时间线 | 尚未开发 | item/delta 通知 |
 | 智能体 | 命令、文件修改、工具调用活动 | 尚未开发 | 结构化 item |
 | 智能体 | 追加指令/steer | 尚未开发 | turn/steer |
@@ -40,7 +40,7 @@
 | 沙箱 | 网络与路径权限 | 尚未开发 | permissions/profile API |
 | 模型 | OpenAI API Key 登录 | 尚未开发 | account/login/start |
 | 模型 | ChatGPT 浏览器/设备码登录 | 尚未开发 | app-server auth API |
-| 模型 | 模型列表与推理强度 | 尚未开发 | model/list |
+| 模型 | 模型列表与推理强度 | 部分实现 | 真实 model/list 6 个模型；选择 UI 待接入 |
 | 模型 | 自定义 Responses provider | 尚未开发 | config RPC |
 | DeepSeek | 一级提供商配置 | 尚未开发 | `deepseek-v4-flash` 能力基线已实测 |
 | DeepSeek | 安全保存 API Key | 尚未开发 | OS keychain |
@@ -94,7 +94,7 @@
 | 安全 | 验证、修复、修复验证、误报 | 尚未开发 | 阶段 12 |
 | 安全 | 历史、报告、JSON、SARIF 导出 | 尚未开发 | SDK artifact paths |
 | 安全 | 无权限时可诊断降级 | 尚未开发 | 不伪造扫描结果 |
-| 可观测性 | 结构化日志与敏感信息脱敏 | 尚未开发 | 阶段 2 起 |
+| 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
 | 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 单元和 Electron 冒烟已通过；持续扩展中 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
