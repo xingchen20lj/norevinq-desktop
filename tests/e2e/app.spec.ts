@@ -1,6 +1,7 @@
 import { _electron as electron, expect, test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:http'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
@@ -20,6 +21,19 @@ test('starts with a sandboxed renderer and real project action', async () => {
   writeFileSync(join(projectPath, 'proof.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwWwWQAAAABJRU5ErkJggg==', 'base64'))
   execFileSync('git', ['add', 'README.md', 'AGENTS.md', 'proof.png'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: baseline'], { cwd: projectPath })
+  const previewServer = createServer((request, response) => {
+    response.setHeader('Content-Type', 'text/html; charset=utf-8')
+    response.end(request.url === '/next'
+      ? '<!doctype html><title>Aster Browser Next</title><h1>ASTER_BROWSER_NEXT</h1>'
+      : '<!doctype html><title>Aster Browser Proof</title><h1>ASTER_BROWSER_OK</h1><a href="/next">Next</a><script>console.log("ASTER_BROWSER_LOG")</script>')
+  })
+  await new Promise<void>((resolve, reject) => {
+    previewServer.once('error', reject)
+    previewServer.listen(0, '127.0.0.1', resolve)
+  })
+  const previewAddress = previewServer.address()
+  if (!previewAddress || typeof previewAddress === 'string') throw new Error('Local preview server did not bind a TCP port.')
+  const previewUrl = `http://127.0.0.1:${String(previewAddress.port)}/`
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
     const window = await application.firstWindow()
@@ -252,6 +266,50 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.screenshot({ path: 'test-results/aster-file-image.png' })
     await window.getByRole('button', { name: '关闭文件预览' }).click()
 
+    await window.getByRole('button', { name: '本地网页预览' }).click()
+    const browser = window.getByRole('region', { name: '本地网页预览' })
+    await expect(browser).toBeVisible()
+    await browser.getByLabel('本地预览地址').fill(previewUrl)
+    await browser.getByLabel('本地预览地址').press('Enter')
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getBrowserState: () => Promise<{ title: string | null; loading: boolean; logs: { message: string }[] }>
+      }
+      return bridge.getBrowserState()
+    }), { timeout: 30_000 }).toMatchObject({ title: 'Aster Browser Proof', loading: false })
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getBrowserState: () => Promise<{ logs: { message: string }[] }>
+      }
+      return (await bridge.getBrowserState()).logs.map(({ message }) => message)
+    })).toContain('ASTER_BROWSER_LOG')
+    await expect(browser).toContainText('ASTER_BROWSER_LOG')
+    await window.evaluate(async ({ url }) => {
+      const bridge = Reflect.get(window, 'aster') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
+      await bridge.navigateBrowser({ url: `${url}next` })
+    }, { url: previewUrl })
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ title: string | null }> }
+      return (await bridge.getBrowserState()).title
+    })).toBe('Aster Browser Next')
+    await browser.getByRole('button', { name: '后退' }).click()
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ title: string | null }> }
+      return (await bridge.getBrowserState()).title
+    })).toBe('Aster Browser Proof')
+    const publicNavigation = await window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
+      try { await bridge.navigateBrowser({ url: 'https://example.com/' }); return 'unexpected-success' }
+      catch (error) { return error instanceof Error ? error.message : String(error) }
+    })
+    expect(publicNavigation).toContain('localhost')
+    await window.screenshot({ path: 'test-results/aster-browser.png' })
+    await browser.getByRole('button', { name: '关闭网页预览' }).click()
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ open: boolean }> }
+      return (await bridge.getBrowserState()).open
+    })).toBe(false)
+
     await window.getByRole('button', { name: 'Git 状态' }).click()
     await expect(window.getByLabel('Git 工作区')).toBeVisible()
     await window.getByRole('button', { name: '刷新', exact: true }).click()
@@ -322,6 +380,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.screenshot({ path: 'test-results/aster-shell-compact.png' })
   } finally {
     await application.close()
+    await new Promise<void>((resolve) => previewServer.close(() => resolve()))
     rmSync(profile, { force: true, recursive: true })
   }
 })

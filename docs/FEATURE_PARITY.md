@@ -70,8 +70,8 @@
 | 文件 | 文件树、文本与代码预览 | 已测试 | 项目/worktree 根绑定、500 项目录、2 MiB UTF-8、无扩展名检测；单元及真实文本 E2E |
 | 文件 | 图片、音频、视频、PDF 预览 | 部分实现 | 图片自定义协议真实解码；音视频/PDF UI、MIME、Range/HEAD/206/416 已测试，真实格式矩阵待最终回归 |
 | 文件 | 产物链接和外部打开 | 已测试 | fileChange 直达真实文本产物；确认式系统打开、可执行/脚本拒绝和路径边界单测 |
-| 浏览器 | 本地网页预览 | 尚未开发 | 独立受限 BrowserView/WebContentsView |
-| 浏览器 | 导航、刷新、开发日志 | 尚未开发 | 阶段 15 |
+| 浏览器 | 本地网页预览 | 已测试 | 独立临时 WebContentsView、无 preload/Node、loopback 顶级与子资源策略；真实 HTTP E2E |
+| 浏览器 | 导航、刷新、开发日志 | 已测试 | 地址/前后退/刷新/停止/外部打开、标题/加载/错误、500 条控制台；真实导航/后退/console 回归 |
 | 浏览器 | 通用 Computer Use | 被私有服务阻塞 | 只采用公开可调用能力，不伪造 |
 | MCP | 服务器列表、状态、启停 | 部分实现 | 真实 app-server inventory/reload、工具/资源展示已测试；启停需受控 MCP 配置编辑 |
 | MCP | OAuth 登录和重认证 | 已实现 | OAuth URL 协议校验、外部打开与完成通知；真实账户登录等待外部服务器 |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 23 个测试文件至少 101 项；真实 Electron 覆盖文件产物、计划任务、Security preflight、OpenAI、DeepSeek、AGENTS、MCP、审批、Git/diff/worktree 和 PTY 终端 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 24 个测试文件至少 104 项；真实 Electron 覆盖本地浏览器、文件产物、计划任务、Security preflight、OpenAI、DeepSeek、AGENTS、MCP、审批、Git/diff/worktree 和 PTY 终端 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

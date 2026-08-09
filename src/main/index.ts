@@ -25,6 +25,7 @@ import type { ScheduledTask } from '../shared/scheduler.js'
 import type { ConversationSnapshot } from '../shared/conversation.js'
 import { FileService } from './files/fileService.js'
 import { serveFilePreview } from './files/fileProtocol.js'
+import { BrowserService } from './browser/browserService.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -47,6 +48,7 @@ let integrationService: IntegrationService | null = null
 let securityService: SecurityService | null = null
 let schedulerService: SchedulerService | null = null
 let fileService: FileService | null = null
+let browserService: BrowserService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -132,6 +134,7 @@ if (!gotLock) {
     securityService = new SecurityService(database, join(userData, 'security'))
     schedulerService = new SchedulerService(database, (task, projectId, signal) =>
       executeScheduledTask(createdAgentService, createdWorktreeService, task, projectId, signal))
+    browserService = new BrowserService(() => mainWindow, (url) => shell.openExternal(url))
     unregisterIpc = registerIpc(
       database,
       runtime,
@@ -145,6 +148,7 @@ if (!gotLock) {
       securityService,
       schedulerService,
       createdFileService,
+      browserService,
     )
     mainWindow = createMainWindow()
     void runtime.start().then(() => schedulerService?.start())
@@ -180,6 +184,8 @@ app.on('before-quit', () => {
   runtime = null
   void runtimeLogger?.close()
   runtimeLogger = null
+  browserService?.dispose()
+  browserService = null
   fileService?.clear()
   fileService = null
   database?.close()

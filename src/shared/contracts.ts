@@ -69,6 +69,14 @@ import type {
   SchedulerSubscription,
 } from './scheduler.js'
 import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from './files.js'
+import type {
+  BrowserBounds,
+  BrowserExternalInput,
+  BrowserNavigateInput,
+  BrowserOpenInput,
+  BrowserSnapshot,
+  BrowserSubscription,
+} from './browser.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -143,6 +151,18 @@ export const IPC_CHANNELS = {
   filesList: 'files:list',
   filesPreview: 'files:preview',
   filesOpenExternal: 'files:open-external',
+  browserState: 'browser:state',
+  browserOpen: 'browser:open',
+  browserClose: 'browser:close',
+  browserNavigate: 'browser:navigate',
+  browserReload: 'browser:reload',
+  browserStop: 'browser:stop',
+  browserBack: 'browser:back',
+  browserForward: 'browser:forward',
+  browserBounds: 'browser:bounds',
+  browserClearLogs: 'browser:clear-logs',
+  browserExternal: 'browser:external',
+  browserChanged: 'browser:changed',
 } as const
 
 export type ProjectSummary = {
@@ -241,4 +261,16 @@ export type AsterDesktopApi = {
   listProjectDirectory: (input: FilePathInput) => Promise<ProjectDirectory>
   previewProjectFile: (input: FilePathInput) => Promise<ProjectFilePreview>
   openProjectFileExternal: (input: FileOpenInput) => Promise<void>
+  getBrowserState: () => Promise<BrowserSnapshot>
+  openBrowser: (input: BrowserOpenInput) => Promise<BrowserSnapshot>
+  closeBrowser: () => Promise<BrowserSnapshot>
+  navigateBrowser: (input: BrowserNavigateInput) => Promise<BrowserSnapshot>
+  reloadBrowser: () => Promise<BrowserSnapshot>
+  stopBrowser: () => Promise<BrowserSnapshot>
+  goBackBrowser: () => Promise<BrowserSnapshot>
+  goForwardBrowser: () => Promise<BrowserSnapshot>
+  setBrowserBounds: (input: BrowserBounds) => Promise<void>
+  clearBrowserLogs: () => Promise<BrowserSnapshot>
+  openBrowserExternal: (input: BrowserExternalInput) => Promise<void>
+  onBrowserChanged: (subscription: BrowserSubscription) => () => void
 }

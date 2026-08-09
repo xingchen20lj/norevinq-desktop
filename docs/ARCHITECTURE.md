@@ -18,6 +18,7 @@ flowchart LR
   Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
   Main --> Scheduler["SQLite / RRULE<br/>计划任务队列"]
   Main --> Files["路径沙箱 / 流式协议<br/>文件与产物预览"]
+  Main --> Browser["隔离 WebContentsView<br/>loopback 网页预览"]
   Runtime --> Providers["OpenAI / DeepSeek / 自定义 Responses Provider"]
 ```
 
@@ -40,6 +41,7 @@ flowchart LR
 - `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.8/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
 - `src/main/scheduler`：IANA 时区/RFC 5545 RRULE、SQLite 持久化队列、错过运行、重试、取消和真实 app-server/worktree 执行。
 - `src/main/files`：项目/worktree 根绑定、逐段 symlink 拒绝、有界文本读取、不透明媒体 token、Range 流和外部打开策略。
+- `src/main/browser`：独立临时 session、loopback URL/子资源策略、原生 WebContentsView 生命周期、权限拒绝、控制台与导航状态。
 
 ## 关键不变量
 
@@ -57,6 +59,7 @@ flowchart LR
 12. Security validate/patch/false-positive/export 只通过官方 CLI 参数数组调用；patch 要求 UI 显式二次确认，renderer 不能指定路径或原始命令。
 13. 计划任务只执行已登记项目；同一任务不重叠，崩溃后运行标记失败且不自动重放，避免重复文件或命令副作用。
 14. 文件预览只使用项目相对路径；任何符号链接组件和根目录逃逸都失败关闭，媒体 URL 不包含本地路径且短时过期。
+15. 内嵌浏览器不含 preload/Node/Aster IPC，只允许 loopback 顶级导航与子资源；所有设备权限、下载和弹窗默认拒绝。
 
 ## 上游与公开资料
 

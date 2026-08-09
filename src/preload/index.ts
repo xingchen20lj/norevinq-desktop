@@ -47,6 +47,14 @@ import type {
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 import type { FileOpenInput, FilePathInput } from '../shared/files.js'
+import type {
+  BrowserBounds,
+  BrowserExternalInput,
+  BrowserNavigateInput,
+  BrowserOpenInput,
+  BrowserSnapshot,
+  BrowserSubscription,
+} from '../shared/browser.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -168,6 +176,22 @@ const api: AsterDesktopApi = {
   listProjectDirectory: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesList, input),
   previewProjectFile: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesPreview, input),
   openProjectFileExternal: (input: FileOpenInput) => ipcRenderer.invoke(IPC_CHANNELS.filesOpenExternal, input),
+  getBrowserState: () => ipcRenderer.invoke(IPC_CHANNELS.browserState),
+  openBrowser: (input: BrowserOpenInput) => ipcRenderer.invoke(IPC_CHANNELS.browserOpen, input),
+  closeBrowser: () => ipcRenderer.invoke(IPC_CHANNELS.browserClose),
+  navigateBrowser: (input: BrowserNavigateInput) => ipcRenderer.invoke(IPC_CHANNELS.browserNavigate, input),
+  reloadBrowser: () => ipcRenderer.invoke(IPC_CHANNELS.browserReload),
+  stopBrowser: () => ipcRenderer.invoke(IPC_CHANNELS.browserStop),
+  goBackBrowser: () => ipcRenderer.invoke(IPC_CHANNELS.browserBack),
+  goForwardBrowser: () => ipcRenderer.invoke(IPC_CHANNELS.browserForward),
+  setBrowserBounds: (input: BrowserBounds) => ipcRenderer.invoke(IPC_CHANNELS.browserBounds, input),
+  clearBrowserLogs: () => ipcRenderer.invoke(IPC_CHANNELS.browserClearLogs),
+  openBrowserExternal: (input: BrowserExternalInput) => ipcRenderer.invoke(IPC_CHANNELS.browserExternal, input),
+  onBrowserChanged: (subscription: BrowserSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: BrowserSnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.browserChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.browserChanged, listener)
+  },
 }
 
 contextBridge.exposeInMainWorld('aster', Object.freeze(api))

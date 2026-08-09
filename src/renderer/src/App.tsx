@@ -12,6 +12,7 @@ import {
   FolderOpen,
   GitBranch,
   GitCommitHorizontal,
+  Globe2,
   LoaderCircle,
   MessageSquare,
   Moon,
@@ -47,6 +48,8 @@ import { SecurityWorkbench } from './SecurityWorkbench'
 import type { SchedulerSnapshot } from '../../shared/scheduler'
 import { SchedulerWorkbench } from './SchedulerWorkbench'
 import { FileWorkbench } from './FileWorkbench'
+import type { BrowserSnapshot } from '../../shared/browser'
+import { BrowserWorkbench } from './BrowserWorkbench'
 
 type Theme = 'dark' | 'light'
 
@@ -79,6 +82,8 @@ export function App(): React.JSX.Element {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string | null>(null)
   const [filesOpen, setFilesOpen] = useState(false)
   const [initialFilePath, setInitialFilePath] = useState<string | null>(null)
+  const [browserOpen, setBrowserOpen] = useState(false)
+  const [browser, setBrowser] = useState<BrowserSnapshot | null>(null)
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
@@ -92,6 +97,8 @@ export function App(): React.JSX.Element {
   const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
 
   function openFiles(path: string | null = null): void {
+    if (browserOpen) void window.aster.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
+    setBrowserOpen(false)
     const root = selectedWorktree?.path ?? selectedProject?.path ?? null
     setInitialFilePath(path && root ? projectRelativeArtifactPath(path, root) : path)
     setFilesOpen(true)
@@ -109,6 +116,13 @@ export function App(): React.JSX.Element {
       setProviders(state.providers)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onBrowserChanged(setBrowser)
+    void window.aster.getBrowserState().then(setBrowser)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -283,6 +297,10 @@ export function App(): React.JSX.Element {
 
   async function openTerminal(forceNew = false): Promise<void> {
     if (!selectedProject) return
+    if (browserOpen) {
+      await window.aster.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
+      setBrowserOpen(false)
+    }
     if (runtime?.phase !== 'ready') {
       setError('Codex app-server 尚未就绪，无法启动终端。')
       return
@@ -412,7 +430,7 @@ export function App(): React.JSX.Element {
         <header className="topbar">
           <div className="topbar-title">
             <span>{selectedThread?.name ?? selectedProject?.name ?? '欢迎'}</span>
-            {selectedProject && <button className="context-pill" onClick={() => setGitOpen((value) => !value)} aria-label="Git 状态">
+            {selectedProject && <button className="context-pill" onClick={() => { if (browserOpen) void window.aster.closeBrowser(); setBrowserOpen(false); setGitOpen((value) => !value) }} aria-label="Git 状态">
               <GitBranch size={13} />{gitStatus?.branch ?? (gitStatus?.initialized ? 'Detached' : 'Local')}
               {gitStatus && gitStatus.files.length > 0 && <b>{gitStatus.files.length}</b>}
             </button>}
@@ -422,6 +440,7 @@ export function App(): React.JSX.Element {
           </div>
           <div className="topbar-actions">
             <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
+            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
             <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
             <button className="icon-button" aria-label="帮助"><CircleHelp size={17} /></button>
           </div>
@@ -512,6 +531,7 @@ export function App(): React.JSX.Element {
           close={() => { setFilesOpen(false); setInitialFilePath(null) }}
           onError={setError}
         />}
+        {browserOpen && <BrowserWorkbench snapshot={browser} close={() => setBrowserOpen(false)} onError={setError} />}
       </main>
       {settingsOpen && <SettingsWorkbench
         providers={providers}

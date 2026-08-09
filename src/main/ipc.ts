@@ -50,6 +50,7 @@ import type {
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
+import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -158,6 +159,21 @@ export type FileController = {
   openExternal: (input: FileOpenInput) => Promise<void>
 }
 
+export type BrowserController = {
+  getSnapshot: () => BrowserSnapshot
+  subscribe: (subscription: BrowserSubscription) => () => void
+  open: (url?: string) => Promise<BrowserSnapshot>
+  close: () => BrowserSnapshot
+  navigate: (url: string) => Promise<BrowserSnapshot>
+  reload: () => BrowserSnapshot
+  stop: () => BrowserSnapshot
+  goBack: () => BrowserSnapshot
+  goForward: () => BrowserSnapshot
+  setBounds: (bounds: BrowserBounds) => void
+  clearLogs: () => BrowserSnapshot
+  openInSystemBrowser: (url: string) => Promise<void>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -171,6 +187,7 @@ export function registerIpc(
   security: SecurityController,
   scheduler: SchedulerController,
   files: FileController,
+  browser: BrowserController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -201,6 +218,11 @@ export function registerIpc(
   const unsubscribeScheduler = scheduler.subscribe((snapshot) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.schedulerChanged, snapshot)
+    }
+  })
+  const unsubscribeBrowser = browser.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.browserChanged, snapshot)
     }
   })
 
@@ -449,6 +471,27 @@ export function registerIpc(
     const parsed = fileOpenSchema.parse(input)
     return files.openExternal({ projectId: parsed.projectId, path: parsed.path, confirmed: true, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
   })
+  ipcMain.handle(IPC_CHANNELS.browserState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return browser.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.browserOpen, (_event, input: unknown) => {
+    const parsed = browserOpenSchema.parse(input)
+    return browser.open(parsed.url)
+  })
+  ipcMain.handle(IPC_CHANNELS.browserClose, () => browser.close())
+  ipcMain.handle(IPC_CHANNELS.browserNavigate, (_event, input: unknown) =>
+    browser.navigate(browserNavigateSchema.parse(input).url))
+  ipcMain.handle(IPC_CHANNELS.browserReload, () => browser.reload())
+  ipcMain.handle(IPC_CHANNELS.browserStop, () => browser.stop())
+  ipcMain.handle(IPC_CHANNELS.browserBack, () => browser.goBack())
+  ipcMain.handle(IPC_CHANNELS.browserForward, () => browser.goForward())
+  ipcMain.handle(IPC_CHANNELS.browserBounds, (_event, input: unknown) =>
+    browser.setBounds(browserBoundsSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.browserClearLogs, () => browser.clearLogs())
+  ipcMain.handle(IPC_CHANNELS.browserExternal, (_event, input: unknown) =>
+    browser.openInSystemBrowser(browserExternalSchema.parse(input).url))
 
   return () => {
     unsubscribeRuntime()
@@ -457,6 +500,7 @@ export function registerIpc(
     unsubscribeIntegrations()
     unsubscribeSecurity()
     unsubscribeScheduler()
+    unsubscribeBrowser()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
   }
@@ -535,6 +579,15 @@ const filePathSchema = z.object({
   path: z.string().max(4_096).refine((value) => !value.includes('\0')),
 })
 const fileOpenSchema = filePathSchema.extend({ confirmed: z.literal(true) })
+const browserOpenSchema = z.object({ url: z.string().trim().min(1).max(2_048).optional() })
+const browserNavigateSchema = z.object({ url: z.string().trim().min(1).max(2_048) })
+const browserBoundsSchema = z.object({
+  x: z.number().min(0).max(20_000),
+  y: z.number().min(0).max(20_000),
+  width: z.number().min(100).max(20_000),
+  height: z.number().min(80).max(20_000),
+})
+const browserExternalSchema = z.object({ url: z.string().trim().min(1).max(2_048), confirmed: z.literal(true) })
 const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
