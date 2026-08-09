@@ -1,4 +1,4 @@
-import { createReadStream } from 'node:fs'
+import { closeSync, constants, createReadStream, fstatSync, openSync } from 'node:fs'
 import { Readable } from 'node:stream'
 import type { FileService } from './fileService.js'
 
@@ -12,6 +12,22 @@ export function serveFilePreview(request: Request, files: PreviewResolver): Resp
   const token = url.pathname.slice(1)
   const file = /^[0-9a-f-]{36}$/iu.test(token) ? files.resolvePreviewToken(token) : null
   if (!file) return new Response('Preview expired', { status: 404 })
+  let opened: { descriptor: number; size: number }
+  try {
+    const descriptor = openSync(file.path, constants.O_RDONLY | constants.O_NOFOLLOW)
+    try {
+      const metadata = fstatSync(descriptor)
+      if (!metadata.isFile() || metadata.dev !== file.device || metadata.ino !== file.inode) {
+        throw new Error('Preview file identity changed.')
+      }
+      opened = { descriptor, size: metadata.size }
+    } catch (error) {
+      closeSync(descriptor)
+      throw error
+    }
+  } catch {
+    return new Response('Preview expired', { status: 404 })
+  }
   const headers = new Headers({
     'Accept-Ranges': 'bytes',
     'Cache-Control': 'no-store',
@@ -19,18 +35,27 @@ export function serveFilePreview(request: Request, files: PreviewResolver): Resp
     'X-Content-Type-Options': 'nosniff',
     'Content-Security-Policy': "default-src 'none'; style-src 'unsafe-inline'",
   })
-  const range = parseByteRange(request.headers.get('range'), file.size)
+  const range = parseByteRange(request.headers.get('range'), opened.size)
   if (range === false) {
-    headers.set('Content-Range', `bytes */${String(file.size)}`)
+    closeSync(opened.descriptor)
+    headers.set('Content-Range', `bytes */${String(opened.size)}`)
     return new Response(null, { status: 416, headers })
   }
   const start = range?.start ?? 0
-  const end = range?.end ?? Math.max(0, file.size - 1)
-  const length = file.size === 0 ? 0 : end - start + 1
+  const end = range?.end ?? Math.max(0, opened.size - 1)
+  const length = opened.size === 0 ? 0 : end - start + 1
   headers.set('Content-Length', String(length))
-  if (range) headers.set('Content-Range', `bytes ${String(start)}-${String(end)}/${String(file.size)}`)
-  if (request.method === 'HEAD' || file.size === 0) return new Response(null, { status: range ? 206 : 200, headers })
-  const body = Readable.toWeb(createReadStream(file.path, { start, end })) as ReadableStream
+  if (range) headers.set('Content-Range', `bytes ${String(start)}-${String(end)}/${String(opened.size)}`)
+  if (request.method === 'HEAD' || opened.size === 0) {
+    closeSync(opened.descriptor)
+    return new Response(null, { status: range ? 206 : 200, headers })
+  }
+  const body = Readable.toWeb(createReadStream(file.path, {
+    autoClose: true,
+    fd: opened.descriptor,
+    start,
+    end,
+  })) as ReadableStream
   return new Response(body, { status: range ? 206 : 200, headers })
 }
 

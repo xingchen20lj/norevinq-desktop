@@ -1,4 +1,10 @@
-import { app, dialog, ipcMain, type WebContents } from 'electron'
+import {
+  app,
+  dialog,
+  ipcMain as electronIpcMain,
+  type IpcMainInvokeEvent,
+  type WebContents,
+} from 'electron'
 import { z } from 'zod'
 import { IPC_CHANNELS, type BootstrapState } from '../shared/contracts.js'
 import type {
@@ -51,10 +57,30 @@ import type {
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
 import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
+import {
+  requireAuthorizedIpcSender,
+  type IpcSenderAuthorizer,
+} from './security/ipcAuthorization.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
 })
+
+type AuthorizedIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
+
+let activeSenderAuthorizer: IpcSenderAuthorizer | null = null
+
+const ipcMain = {
+  handle(channel: string, listener: AuthorizedIpcHandler): void {
+    electronIpcMain.handle(channel, (event, ...args: unknown[]) => {
+      requireAuthorizedIpcSender(event, activeSenderAuthorizer)
+      return listener(event, ...args)
+    })
+  },
+  removeHandler(channel: string): void {
+    electronIpcMain.removeHandler(channel)
+  },
+}
 
 export type RuntimeController = {
   getSnapshot: () => CodexRuntimeSnapshot
@@ -188,7 +214,10 @@ export function registerIpc(
   scheduler: SchedulerController,
   files: FileController,
   browser: BrowserController,
+  authorizeSender: IpcSenderAuthorizer,
 ): () => void {
+  if (activeSenderAuthorizer) throw new Error('IPC handlers are already registered.')
+  activeSenderAuthorizer = authorizeSender
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
     for (const contents of webContents) {
@@ -503,6 +532,7 @@ export function registerIpc(
     unsubscribeBrowser()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
+    if (activeSenderAuthorizer === authorizeSender) activeSenderAuthorizer = null
   }
 }
 

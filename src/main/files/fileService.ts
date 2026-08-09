@@ -26,7 +26,14 @@ const MAX_PDF_BYTES = 100 * 1024 * 1024
 const TOKEN_TTL_MS = 15 * 60 * 1_000
 const MAX_TOKENS = 128
 
-type PreviewToken = { path: string; mimeType: string; size: number; expiresAt: number }
+type PreviewToken = {
+  path: string
+  mimeType: string
+  size: number
+  device: number
+  inode: number
+  expiresAt: number
+}
 type FileServiceOptions = { now?: () => number; openPath?: (path: string) => Promise<string> }
 
 export class FileService {
@@ -83,7 +90,7 @@ export class FileService {
     if (detected === 'too-large' || detected === 'binary') {
       return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, null, false)
     }
-    const token = this.#issueToken(absolute, mimeType, metadata.size)
+    const token = this.#issueToken(absolute, mimeType, metadata.size, metadata.dev, metadata.ino)
     return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, `aster-file://preview/${token}`, false)
   }
 
@@ -106,6 +113,7 @@ export class FileService {
     try {
       const metadata = lstatSync(value.path)
       if (!metadata.isFile() || metadata.isSymbolicLink()) return null
+      if (metadata.dev !== value.device || metadata.ino !== value.inode) return null
       return { ...value, size: metadata.size }
     } catch {
       return null
@@ -143,7 +151,7 @@ export class FileService {
     return { absolute: canonical, relativePath: relative(root, canonical).split(sep).join('/') }
   }
 
-  #issueToken(path: string, mimeType: string, size: number): string {
+  #issueToken(path: string, mimeType: string, size: number, device: number, inode: number): string {
     this.#expireTokens()
     while (this.#tokens.size >= MAX_TOKENS) {
       const oldest = this.#tokens.keys().next().value
@@ -151,7 +159,7 @@ export class FileService {
       this.#tokens.delete(oldest)
     }
     const token = randomUUID()
-    this.#tokens.set(token, { path, mimeType, size, expiresAt: this.#now() + TOKEN_TTL_MS })
+    this.#tokens.set(token, { path, mimeType, size, device, inode, expiresAt: this.#now() + TOKEN_TTL_MS })
     return token
   }
 

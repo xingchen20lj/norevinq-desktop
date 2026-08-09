@@ -194,6 +194,13 @@ if (!gotLock) {
       schedulerService,
       createdFileService,
       browserService,
+      (event) => {
+        const window = mainWindow
+        return window !== null
+          && !window.isDestroyed()
+          && event.sender === window.webContents
+          && event.senderFrame === window.webContents.mainFrame
+      },
     )
     mainWindow = createMainWindow()
     void runtime.start().then(() => schedulerService?.start())

@@ -30,6 +30,7 @@ export type CodexRuntimeOptions = {
   initializeTimeoutMs?: number
   configOverrides?: readonly string[]
   childEnvironment?: Readonly<Record<string, string>>
+  baseEnvironment?: NodeJS.ProcessEnv
   extraModels?: readonly CodexModelSummary[]
 }
 
@@ -52,6 +53,7 @@ export class CodexRuntimeSupervisor {
   readonly #maxAutomaticRestarts: number
   readonly #restartBaseDelayMs: number
   readonly #initializeTimeoutMs: number
+  readonly #baseEnvironment: NodeJS.ProcessEnv
   #configOverrides: readonly string[]
   #childEnvironment: Readonly<Record<string, string>>
   #extraModels: readonly CodexModelSummary[]
@@ -76,6 +78,7 @@ export class CodexRuntimeSupervisor {
     this.#maxAutomaticRestarts = options.maxAutomaticRestarts ?? 3
     this.#restartBaseDelayMs = options.restartBaseDelayMs ?? 500
     this.#initializeTimeoutMs = options.initializeTimeoutMs ?? 15_000
+    this.#baseEnvironment = options.baseEnvironment ?? process.env
     this.#configOverrides = options.configOverrides ?? []
     this.#childEnvironment = options.childEnvironment ?? {}
     this.#extraModels = options.extraModels ?? []
@@ -223,10 +226,10 @@ export class CodexRuntimeSupervisor {
     const configArgs = this.#configOverrides.flatMap((override) => ['-c', override])
     const child = this.#spawnProcess(binary.path, ['app-server', ...configArgs, '--listen', 'stdio://'], {
       env: {
-        ...process.env,
+        ...createCodexChildEnvironment(this.#baseEnvironment),
         ...this.#childEnvironment,
         LOG_FORMAT: 'json',
-        RUST_LOG: process.env.RUST_LOG ?? 'warn',
+        RUST_LOG: this.#baseEnvironment.RUST_LOG ?? 'warn',
       },
       windowsHide: true,
     })
@@ -356,6 +359,52 @@ export class CodexRuntimeSupervisor {
       // A diagnostic write must never bring down the agent runtime.
     }
   }
+}
+
+const CODEX_ENVIRONMENT_ALLOWLIST = new Set([
+  'ALL_PROXY',
+  'APPDATA',
+  'CODEX_HOME',
+  'COLORTERM',
+  'ComSpec',
+  'HOME',
+  'HTTPS_PROXY',
+  'HTTP_PROXY',
+  'LANG',
+  'LANGUAGE',
+  'LOCALAPPDATA',
+  'LOGNAME',
+  'NODE_EXTRA_CA_CERTS',
+  'NO_PROXY',
+  'OPENAI_API_KEY',
+  'OPENAI_BASE_URL',
+  'PATH',
+  'PATHEXT',
+  'PROGRAMDATA',
+  'RUST_BACKTRACE',
+  'RUST_LOG',
+  'SHELL',
+  'SSL_CERT_DIR',
+  'SSL_CERT_FILE',
+  'SystemRoot',
+  'TEMP',
+  'TERM',
+  'TMP',
+  'TMPDIR',
+  'TZ',
+  'USER',
+  'USERNAME',
+  'USERPROFILE',
+  'all_proxy',
+  'https_proxy',
+  'http_proxy',
+  'no_proxy',
+])
+
+export function createCodexChildEnvironment(environment: NodeJS.ProcessEnv): NodeJS.ProcessEnv {
+  return Object.fromEntries(Object.entries(environment).filter(([name, value]) =>
+    value !== undefined && (CODEX_ENVIRONMENT_ALLOWLIST.has(name) || name.startsWith('LC_')),
+  ))
 }
 
 function attachNotification(peer: JsonlRpcPeer | null, registration: NotificationRegistration): () => void {

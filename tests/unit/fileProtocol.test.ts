@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { lstatSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -27,10 +27,18 @@ describe('file preview protocol', () => {
     temporaryPaths.push(root)
     const path = join(root, 'media.bin')
     writeFileSync(path, '0123456789')
+    const metadata = lstatSync(path)
     const response = serveFilePreview(new Request(`aster-file://preview/${token}`, {
       headers: { Range: 'bytes=2-5' },
     }), {
-      resolvePreviewToken: () => ({ path, mimeType: 'video/mp4', size: 10, expiresAt: Date.now() + 1_000 }),
+      resolvePreviewToken: () => ({
+        path,
+        mimeType: 'video/mp4',
+        size: 10,
+        device: metadata.dev,
+        inode: metadata.ino,
+        expiresAt: Date.now() + 1_000,
+      }),
     })
     expect(response.status).toBe(206)
     expect(response.headers.get('content-range')).toBe('bytes 2-5/10')
@@ -44,7 +52,21 @@ describe('file preview protocol', () => {
     const missing = { resolvePreviewToken: () => null }
     expect(serveFilePreview(new Request(`aster-file://preview/${token}`), missing).status).toBe(404)
     expect(serveFilePreview(new Request(`aster-file://preview/${token}`, { method: 'POST' }), missing).status).toBe(404)
-    const resolver = { resolvePreviewToken: () => ({ path: '/unused', mimeType: 'audio/mpeg', size: 5, expiresAt: Date.now() + 1_000 }) }
+    const root = mkdtempSync(join(tmpdir(), 'aster-file-protocol-'))
+    temporaryPaths.push(root)
+    const path = join(root, 'audio.bin')
+    writeFileSync(path, '12345')
+    const metadata = lstatSync(path)
+    const resolver = {
+      resolvePreviewToken: () => ({
+        path,
+        mimeType: 'audio/mpeg',
+        size: 5,
+        device: metadata.dev,
+        inode: metadata.ino,
+        expiresAt: Date.now() + 1_000,
+      }),
+    }
     const response = serveFilePreview(new Request(`aster-file://preview/${token}`, { headers: { Range: 'bytes=9-10' } }), resolver)
     expect(response.status).toBe(416)
     expect(response.headers.get('content-range')).toBe('bytes */5')

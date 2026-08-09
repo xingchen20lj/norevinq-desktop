@@ -3,3 +3,5 @@ allowBuilds:
   esbuild: true
 minimumReleaseAgeExclude:
   - lucide-react@1.31.0
+overrides:
+  pdfjs-dist: 6.2.108

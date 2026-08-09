@@ -94,8 +94,9 @@
 | 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
 | 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、固定产物路径、2 MiB 预览、CLI JSON/CSV 与 SDK SARIF；自动测试通过 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
+| 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 25 个测试文件 107 项及 V8 全局门槛；既有真实 Electron 覆盖主要闭环，本轮在线复验被账户使用量外部限制中止；Windows CI 尚待远端执行 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 26 个测试文件 111 项及 V8 全局门槛；离线 Electron IPC 对抗通过，既有在线 E2E 覆盖主要闭环；Windows CI 尚待远端执行 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

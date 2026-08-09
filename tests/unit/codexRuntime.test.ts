@@ -1,6 +1,9 @@
 import { spawn } from 'node:child_process'
 import { describe, expect, it, vi } from 'vitest'
-import { CodexRuntimeSupervisor } from '../../src/main/runtime/codexRuntime.js'
+import {
+  CodexRuntimeSupervisor,
+  createCodexChildEnvironment,
+} from '../../src/main/runtime/codexRuntime.js'
 
 const FAKE_APP_SERVER = String.raw`
 import readline from 'node:readline'
@@ -58,6 +61,22 @@ function createSupervisor(options: { restartBaseDelayMs?: number } = {}) {
 }
 
 describe('CodexRuntimeSupervisor recovery', () => {
+  it('passes only required runtime variables into the app-server process', () => {
+    expect(createCodexChildEnvironment({
+      PATH: '/usr/bin',
+      HOME: '/home/tester',
+      OPENAI_API_KEY: 'explicit-provider-key',
+      LC_ALL: 'C',
+      ASTER_UNRELATED_SECRET: 'must-not-leak',
+      GITHUB_TOKEN: 'must-not-leak',
+    })).toEqual({
+      PATH: '/usr/bin',
+      HOME: '/home/tester',
+      OPENAI_API_KEY: 'explicit-provider-key',
+      LC_ALL: 'C',
+    })
+  })
+
   it('restarts an idle crashed app-server without replaying the failed request', async () => {
     const { runtime, getSpawnCount } = createSupervisor()
     try {

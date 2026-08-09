@@ -1,4 +1,13 @@
-import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
+import {
+  mkdirSync,
+  mkdtempSync,
+  realpathSync,
+  renameSync,
+  rmSync,
+  symlinkSync,
+  truncateSync,
+  writeFileSync,
+} from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -69,6 +78,20 @@ describe('FileService', () => {
     expect(() => service.readPreview({ projectId: fixture.projectId, path: '../secret.txt' })).toThrow(/escapes/u)
     expect(() => service.readPreview({ projectId: fixture.projectId, path: join(outside, 'secret.txt') })).toThrow(/relative/u)
     expect(() => service.readPreview({ projectId: fixture.projectId, path: 'escape/secret.txt' })).toThrow(/Symbolic links/u)
+    fixture.database.close()
+  })
+
+  it('invalidates a preview token when the file identity is replaced', () => {
+    const fixture = createFixture()
+    const path = join(fixture.root, 'proof.png')
+    writeFileSync(path, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    const service = new FileService(fixture.database)
+    const preview = service.readPreview({ projectId: fixture.projectId, path: 'proof.png' })
+    const token = preview.url?.split('/').at(-1) ?? ''
+    renameSync(path, join(fixture.root, 'original.png'))
+    writeFileSync(path, 'replacement')
+
+    expect(service.resolvePreviewToken(token)).toBeNull()
     fixture.database.close()
   })
 

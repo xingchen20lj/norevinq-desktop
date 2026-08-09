@@ -41,8 +41,14 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Audit production dependencies
+        run: pnpm audit:dependencies
+
       - name: Typecheck, lint, test with coverage, and build
         run: pnpm verify:ci
+
+      - name: Run offline Electron security smoke
+        run: pnpm test:e2e:offline
 
       - name: Upload coverage report
         if: matrix.os == 'macos-15'
