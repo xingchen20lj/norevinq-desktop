@@ -178,6 +178,14 @@ function reduceTurnRecord(
     const record = asRecord(item)
     if (record) next = upsertItemRecord(next, threadId, turnId, record, lifecycle, emittedAtMs, makeCurrent)
   }
+  if (lifecycle === 'completed') {
+    next = {
+      ...next,
+      activities: next.activities.map((candidate) => candidate.turnId === turnId && candidate.status === 'inProgress'
+        ? { ...candidate, status, completedAtMs: candidate.completedAtMs ?? completedAtMs }
+        : candidate),
+    }
+  }
   if (error && makeCurrent) next = appendTurnError(next, threadId, turnId, error, completedAtMs)
   return next
 }

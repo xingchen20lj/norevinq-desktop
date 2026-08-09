@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 5：审批、停止、追加指令和副作用闭环加固。
+阶段 6：DeepSeek Responses API 一级提供商。
 
 ## 当前任务
 
-- 在临时 Git 项目中真实验证命令、文件修改与 diff 活动。
-- 真实触发命令和文件审批，验证允许、拒绝、会话允许及恢复行为。
-- 对在线长任务验证 steer 和 interrupt，并补充崩溃注入回归。
-- 完成阶段 5 后进入 DeepSeek provider 配置与 app-server 闭环。
+- 实现 DeepSeek provider 配置、能力说明、密钥保险库和安全运行时注入。
+- 通过 app-server 使用 `deepseek-v4-flash` 创建真实任务并完成工具/文件修改闭环。
+- 对不支持的模型、参数、图片和 stateful Responses 显式拒绝或解释，不静默降级。
+- 完成 DeepSeek 错误、取消、限流和能力探测测试。
 
 ## 已完成任务
 
@@ -47,13 +47,16 @@
 - 完成真实任务列表、流式活动时间线、模型/推理选择、发送/追加/停止和审批 UI。
 - 使用临时真实项目与已配置 ChatGPT 登录完成在线 Codex 流式 E2E，最终消息为 `ASTER_RUNTIME_OK` 且未调用工具。
 - 实际检查 1320×840 浅色和 960×640 深色任务界面，消息、侧栏、输入区无明显溢出。
+- 在 read-only 沙箱真实触发 fileChange 审批，UI 允许后 apply_patch 创建文件并精确验证内容。
+- 真实执行 `sleep 8` 命令并在运行中 steer，最终收到 `ASTER_STEER_OK`。
+- 真实中断 `sleep 20` turn，确认未产生 `INTERRUPT_FAILED` 最终消息；修复了中断时上游省略 item/completed 导致活动卡滞留 inProgress 的问题。
 
 ## 下一任务
 
-1. 对临时仓库运行真实文件修改任务并核对磁盘与结构化活动。
-2. 真实验证审批、steer、interrupt 和运行时崩溃错误状态。
-3. 补齐对话重命名/归档与重启恢复 E2E。
-4. 进入 DeepSeek Responses 一级提供商阶段。
+1. 创建 provider 配置和 OS 凭据适配层，禁止密钥写入数据库/日志。
+2. 用本机已有安全 DeepSeek 凭据写入临时 Codex provider 配置并执行真实 app-server 任务。
+3. 验证 DeepSeek custom apply_patch、推理事件、取消和错误呈现。
+4. 完成 provider 设置 UI 与能力限制说明。
 
 ## 已做技术决策
 
@@ -70,7 +73,7 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：10 个单元测试文件共 60 项通过；1 个 Electron + 真实 app-server + 在线模型 E2E 通过；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：10 个单元测试文件共 61 项通过；1 个 Electron + 真实 app-server E2E 内含文本、文件审批、命令、steer、interrupt 四类在线闭环；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 

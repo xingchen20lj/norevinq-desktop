@@ -99,6 +99,29 @@ describe('agent activity reducer', () => {
     expect(findActivity(completed, 'turn:turn-1', 'turn')).toMatchObject({ startedAtMs: 10000, completedAtMs: 11000, durationMs: 1000 })
   })
 
+  it('finalizes in-progress items when an interrupted turn omits item completion', () => {
+    const state = reduceAll(
+      event('turn/started', {
+        threadId: 'thread-1',
+        turn: { id: 'turn-1', status: 'inProgress', startedAt: 10, completedAt: null, durationMs: null, error: null, items: [] },
+      }),
+      event('item/started', {
+        ...ids,
+        item: { type: 'commandExecution', id: 'cmd-interrupted', command: 'sleep 20', status: 'inProgress' },
+      }),
+      event('turn/completed', {
+        threadId: 'thread-1',
+        turn: { id: 'turn-1', status: 'interrupted', startedAt: 10, completedAt: 11, durationMs: 1000, error: null, items: [] },
+      }),
+    )
+
+    expect(state.turnStatus).toBe('interrupted')
+    expect(findActivity(state, 'cmd-interrupted', 'command')).toMatchObject({
+      status: 'interrupted',
+      completedAtMs: 11000,
+    })
+  })
+
   it('normalizes all supported user input variants', () => {
     const state = reduceAll(event('item/completed', {
       ...ids,

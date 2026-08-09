@@ -1,14 +1,15 @@
 import { _electron as electron, expect, test } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
 
 test('starts with a sandboxed renderer and real project action', async () => {
+  test.setTimeout(240_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-e2e-'))
   const projectPath = mkdtempSync(join(profile, 'project-'))
   const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
-  database.upsertProject(projectPath)
+  const project = database.upsertProject(projectPath)
   database.close()
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
@@ -38,6 +39,40 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByRole('button', { name: '发送任务' }).click()
     await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_RUNTIME_OK', { timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+
+    await window.evaluate(async ({ projectId }) => {
+      const bridge = Reflect.get(window, 'aster') as {
+        startConversation: (input: unknown) => Promise<unknown>
+      }
+      await bridge.startConversation({
+        projectId,
+        sandbox: 'read-only',
+        text: 'Create a file named aster-approval-proof.txt in the project root containing exactly ASTER_APPROVAL_OK followed by a newline. Use apply_patch only and do not run shell commands.',
+      })
+    }, { projectId: project.id })
+    await expect(window.getByLabel('待审批操作')).toBeVisible({ timeout: 90_000 })
+    await expect(window.getByLabel('待审批操作')).toContainText('允许修改文件？')
+    await window.getByRole('button', { name: '允许', exact: true }).click()
+    await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 90_000 })
+    expect(existsSync(join(projectPath, 'aster-approval-proof.txt'))).toBe(true)
+    expect(readFileSync(join(projectPath, 'aster-approval-proof.txt'), 'utf8')).toBe('ASTER_APPROVAL_OK\n')
+
+    await window.getByRole('button', { name: /新任务/ }).click()
+    await window.getByLabel('任务输入').fill('Run the shell command sleep 8, then reply with FIRST. Do not perform any other action.')
+    await window.getByRole('button', { name: '发送任务' }).click()
+    await expect(window.locator('.activity-card.command')).toBeVisible({ timeout: 90_000 })
+    await window.getByLabel('任务输入').fill('After the sleep, reply with exactly ASTER_STEER_OK instead.')
+    await window.getByLabel('任务输入').press('Enter')
+    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_STEER_OK' })).toBeVisible({ timeout: 90_000 })
+    await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+
+    await window.getByRole('button', { name: /新任务/ }).click()
+    await window.getByLabel('任务输入').fill('Run the shell command sleep 20, then reply INTERRUPT_FAILED.')
+    await window.getByRole('button', { name: '发送任务' }).click()
+    await expect(window.locator('.activity-card.command')).toBeVisible({ timeout: 90_000 })
+    await window.getByRole('button', { name: '停止任务' }).click()
+    await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
+    await expect(window.locator('.activity-card.agentMessage')).not.toContainText('INTERRUPT_FAILED')
     await window.screenshot({ path: 'test-results/aster-shell.png' })
 
     const originalTheme = await window.locator('html').getAttribute('data-theme')

@@ -56,4 +56,5 @@ stderr 与生命周期事件写入用户数据目录的 `logs/runtime.jsonl`。�
 - 二进制发现单元测试覆盖优先级、去重和失败路径。
 - 2026-08-10 Playwright Electron E2E 真实启动 app-server，断言 phase 为 `ready`、版本包含 `codex-cli` 且模型目录非空（实际 6 个模型）。
 - 2026-08-10 Playwright Electron E2E 在临时真实项目中创建 thread/turn，使用现有 ChatGPT 登录完成在线 SSE 活动，并验证最终消息 `ASTER_RUNTIME_OK`、完成状态、深浅主题和 960×640 布局。
-- agent service 协议替身测试覆盖 start/list/resume/steer/interrupt、项目关联持久化和显式反向审批；activity reducer 有 27 个场景、79 条断言。
+- 同一隔离 E2E 以 read-only 沙箱真实触发 fileChange 反向审批；用户允许后 `apply_patch` 创建文件并精确断言 `ASTER_APPROVAL_OK\n`。随后真实执行 `sleep 8`、在运行中 steer 至 `ASTER_STEER_OK`，并中断另一条 `sleep 20`，确认不产生被禁止的最终回复。
+- agent service 协议替身测试覆盖 start/list/resume/steer/interrupt、项目关联持久化和显式反向审批；activity reducer 有 28 个场景并覆盖中断时缺失 item/completed 的归一化。
