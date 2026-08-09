@@ -25,6 +25,7 @@ import type {
   RemoveWorktreeInput,
   WorktreeActionInput,
 } from './worktree.js'
+import type { DiffSnapshot, GetDiffInput } from './diff.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -54,6 +55,7 @@ export const IPC_CHANNELS = {
   worktreeLock: 'worktree:lock',
   worktreeUnlock: 'worktree:unlock',
   worktreeRemove: 'worktree:remove',
+  diffGet: 'diff:get',
 } as const
 
 export type ProjectSummary = {
@@ -107,4 +109,5 @@ export type AsterDesktopApi = {
   lockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
   unlockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
   removeWorktree: (input: RemoveWorktreeInput) => Promise<ManagedWorktree[]>
+  getDiff: (input: GetDiffInput) => Promise<DiffSnapshot>
 }

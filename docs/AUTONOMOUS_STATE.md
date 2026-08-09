@@ -12,6 +12,7 @@
 - 接入 unified/split 代码差异面板和大型 diff 边界。
 - 实现按区块 stage/unstage、显式 revert 与行内评论上下文。
 - 将评论/选中 diff 安全追加给当前智能体任务。
+- 已完成 working/staged unified diff 基础；当前聚焦区块操作、split view 和评论。
 
 ## 已完成任务
 
@@ -60,13 +61,15 @@
 - 完成仓库外 managed root、detached 默认、显式分支、SQLite 恢复、missing、lock/unlock/remove。
 - 完成 `.worktreeinclude` ignored 候选、glob/排除、普通文件、路径和 10/100 MiB 边界。
 - Electron E2E 创建、锁定/解锁、选择 worktree 作为真实 Codex cwd，任务完成后移除并恢复 Local。
+- 完成 working/staged diff、tracked/untracked/binary 归一、增删统计和 200 文件/2 MiB/16 MiB 预算。
+- Electron E2E 实际审阅智能体生成文件的 unified patch 后再暂存提交。
 
 ## 下一任务
 
-1. 建立安全 diff runner 与结构化文件/区块模型。
-2. 实现工作区/已暂存 diff 读取和真实仓库测试。
-3. 接入 diff panel 与行内评论。
-4. 实现区块操作和回归测试。
+1. 在结构化 patch 上实现安全区块 stage/unstage 与反向 apply 检查。
+2. 增加 split view 和大型 patch 虚拟渲染。
+3. 实现行内评论并追加到当前智能体任务。
+4. 完成 diff 回归后进入集成终端。
 
 ## 已做技术决策
 
@@ -83,13 +86,13 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：16 个单元/集成测试文件共 75 项通过；Electron E2E 另覆盖真实 managed worktree 生命周期与 Codex 上下文；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：17 个单元/集成测试文件共 76 项通过；Electron E2E 另覆盖真实 unified diff 审阅；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
-- 当前渲染器生产主包约 608 kB，后续按工作台路由做代码分割。
+- 当前渲染器生产主包约 611 kB，后续按工作台路由做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞

@@ -99,6 +99,10 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.getByLabel('Git 工作区')).toBeVisible()
     await window.getByRole('button', { name: '刷新', exact: true }).click()
     await expect(window.getByRole('button', { name: '暂存 aster-approval-proof.txt' })).toBeVisible()
+    await window.getByRole('button', { name: '审阅未暂存' }).click()
+    await expect(window.getByLabel('代码差异')).toContainText('aster-approval-proof.txt')
+    await expect(window.getByLabel('代码差异')).toContainText('ASTER_APPROVAL_OK')
+    await window.getByRole('button', { name: '← 返回状态' }).click()
     await window.getByRole('button', { name: '暂存 aster-approval-proof.txt' }).click()
     if (deepSeekConfigured) {
       await window.getByRole('button', { name: '暂存 aster-deepseek-proof.txt' }).click()

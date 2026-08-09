@@ -35,6 +35,7 @@ import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitRepositorySnapshot } from '../../shared/git'
 import type { ManagedWorktree } from '../../shared/worktree'
+import type { DiffSnapshot } from '../../shared/diff'
 
 type Theme = 'dark' | 'light'
 
@@ -420,6 +421,7 @@ function GitPanel({ project, snapshot, close, update, onError }: {
 }): React.JSX.Element {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
+  const [diff, setDiff] = useState<DiffSnapshot | null>(null)
   const staged = snapshot?.files.filter(({ indexStatus }) => indexStatus !== '.' && indexStatus !== '?') ?? []
   const unstaged = snapshot?.files.filter(({ worktreeStatus, kind }) => worktreeStatus !== '.' || kind === 'untracked') ?? []
 
@@ -431,10 +433,19 @@ function GitPanel({ project, snapshot, close, update, onError }: {
     finally { setBusy(false) }
   }
 
+  async function review(mode: 'working' | 'staged'): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try { setDiff(await window.aster.getDiff({ projectId: project.id, mode })) }
+    catch (reason) { onError(toErrorMessage(reason)) }
+    finally { setBusy(false) }
+  }
+
   return <aside className="git-panel" aria-label="Git 工作区">
     <header><div><p className="eyebrow">SOURCE CONTROL</p><h2>{snapshot?.branch ?? (snapshot?.initialized ? 'Detached HEAD' : '尚未初始化')}</h2></div><button className="icon-button" onClick={close} aria-label="关闭 Git"><X size={16} /></button></header>
-    {!snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
+    {diff ? <DiffReview snapshot={diff} close={() => setDiff(null)} /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
       <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.aster.getGitStatus({ projectId: project.id }))}>刷新</button></div>
+      <div className="diff-actions"><button disabled={busy || unstaged.length === 0} onClick={() => void review('working')}>审阅未暂存</button><button disabled={busy || staged.length === 0} onClick={() => void review('staged')}>审阅已暂存</button></div>
       <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} />
       <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.aster.stageGitPaths({ projectId: project.id, paths: [path] }))} />
       {snapshot.files.length === 0 && <div className="git-clean"><Check size={16} />工作区干净</div>}
@@ -456,6 +467,18 @@ function GitPanel({ project, snapshot, close, update, onError }: {
       }}><Upload size={14} />推送当前分支</button>
     </>}
   </aside>
+}
+
+function DiffReview({ snapshot, close }: { snapshot: DiffSnapshot; close: () => void }): React.JSX.Element {
+  return <section className="diff-review" aria-label="代码差异">
+    <div className="diff-review-heading"><button onClick={close}>← 返回状态</button><span>+{snapshot.totalAdditions} −{snapshot.totalDeletions}</span></div>
+    {snapshot.files.map((file) => <article className="diff-file" key={file.path}>
+      <header><strong>{file.path}</strong><span>+{file.additions} −{file.deletions}</span></header>
+      {file.binary ? <p>二进制文件已更改</p> : <pre>{file.patch || '无文本差异'}</pre>}
+      {file.truncated && <p className="danger-text">此文件差异已达到 2 MiB 展示上限。</p>}
+    </article>)}
+    {snapshot.truncated && <p className="danger-text">差异达到全局展示上限；剩余内容未载入。</p>}
+  </section>
 }
 
 function GitFileGroup({ title, files, actionLabel, action }: {

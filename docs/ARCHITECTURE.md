@@ -30,6 +30,7 @@ flowchart LR
 - `src/main/providers`：provider 生命周期、能力目录和仅进程级 Codex 配置；不写用户全局 Codex 配置。
 - `src/main/security/credentialStore.ts`：操作系统加密适配、仓库外 0600 原子凭据文件；不提供读取密钥的 IPC。
 - `src/main/git`：项目根绑定的无 shell Git runner、porcelain v2 NUL parser、超时/输出边界和变更操作。
+- `src/main/git/diffService.ts`：working/staged patch、untracked/二进制归一和 2/16 MiB 展示预算。
 - `src/main/worktree`：仓库外托管 worktree、数据库恢复、ownership 校验、锁定/删除和受限 include 复制。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。

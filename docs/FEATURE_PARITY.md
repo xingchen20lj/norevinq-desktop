@@ -59,10 +59,10 @@
 | 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
 | 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |
 | 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、安全 remove 已实现；未提交快照/Handoff 待补 |
-| 差异 | 文件树和 unified/split diff | 尚未开发 | 阶段 9 |
-| 差异 | 大 diff 虚拟化 | 尚未开发 | 阶段 9/19 |
+| 差异 | 文件树和 unified/split diff | 部分实现 | working/staged 文件与 unified viewer 已真实测试；split view 待开发 |
+| 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量边界已实现；虚拟滚动待性能阶段 |
 | 差异 | 行内评论并发送给智能体 | 尚未开发 | 阶段 9 |
-| 差异 | 区块 stage/revert | 尚未开发 | 阶段 9 |
+| 差异 | 区块 stage/revert | 尚未开发 | 安全 patch 选择与反向应用仍在阶段 9 |
 | 终端 | 每任务 PTY 终端 | 尚未开发 | 阶段 10 |
 | 终端 | 输入、调整尺寸、中断、退出 | 尚未开发 | node-pty |
 | 终端 | 输出环形缓冲和脱敏 | 尚未开发 | 防止无限内存增长 |

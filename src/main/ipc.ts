@@ -15,6 +15,7 @@ import type { StateDatabase } from './state/database.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type { GitRepositorySnapshot } from '../shared/git.js'
 import type { ManagedWorktree } from '../shared/worktree.js'
+import type { DiffMode, DiffSnapshot } from '../shared/diff.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -60,6 +61,10 @@ export type WorktreeController = {
   remove: (input: { worktreeId: string; force?: boolean }) => Promise<ManagedWorktree[]>
 }
 
+export type DiffController = {
+  getDiff: (projectId: string, mode: DiffMode) => Promise<DiffSnapshot>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -67,6 +72,7 @@ export function registerIpc(
   providers: ProviderController,
   git: GitController,
   worktrees: WorktreeController,
+  diffs: DiffController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -161,6 +167,10 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.worktreeUnlock, (_event, input: unknown) => worktrees.unlock(worktreeActionSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.worktreeRemove, (_event, input: unknown) =>
     worktrees.remove(worktreeRemoveSchema.parse(input) as { worktreeId: string; force?: boolean }))
+  ipcMain.handle(IPC_CHANNELS.diffGet, (_event, input: unknown) => {
+    const parsed = diffGetSchema.parse(input)
+    return diffs.getDiff(parsed.projectId, parsed.mode)
+  })
 
   return () => {
     unsubscribeRuntime()
@@ -221,3 +231,4 @@ const worktreeCreateSchema = z.object({
 })
 const worktreeActionSchema = z.object({ worktreeId: z.uuid() })
 const worktreeRemoveSchema = z.object({ worktreeId: z.uuid(), force: z.boolean().optional() })
+const diffGetSchema = z.object({ projectId: z.uuid(), mode: z.enum(['working', 'staged']) })

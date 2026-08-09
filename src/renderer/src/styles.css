@@ -170,6 +170,16 @@ button { color: inherit; }
 .git-summary { display: flex; align-items: center; gap: 8px; min-height: 31px; padding: 0 7px; border-radius: 7px; color: var(--muted); background: var(--surface-2); font-size: 9.5px; }
 .git-summary span:first-child { overflow: hidden; flex: 1; text-overflow: ellipsis; white-space: nowrap; }
 .git-summary button { border: 0; color: var(--accent-strong); background: transparent; font-size: 9.5px; cursor: pointer; }
+.diff-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 7px; }
+.diff-actions button { height: 29px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: transparent; font-size: 9.5px; cursor: pointer; }
+.diff-actions button:disabled { opacity: .35; cursor: default; }
+.diff-review-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; color: var(--muted); font-size: 9.5px; }
+.diff-review-heading button { border: 0; color: var(--accent-strong); background: transparent; font-size: 10px; cursor: pointer; }
+.diff-file { margin-bottom: 12px; overflow: hidden; border: 1px solid var(--border); border-radius: 8px; }
+.diff-file header { display: flex; align-items: center; justify-content: space-between; min-height: 31px; padding: 0 9px; color: var(--muted); background: var(--surface-2); font-size: 9px; }
+.diff-file header strong { overflow: hidden; color: var(--text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.diff-file pre { max-height: 420px; overflow: auto; margin: 0; padding: 9px; color: var(--muted); background: var(--bg); font: 9px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; white-space: pre; }
+.diff-file p { margin: 0; padding: 10px; color: var(--muted); font-size: 9.5px; }
 .git-file-group { margin-top: 17px; }
 .git-file-group h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
 .git-file-group h3 span { padding: 1px 5px; border-radius: 999px; background: var(--surface-2); font-size: 8px; }
