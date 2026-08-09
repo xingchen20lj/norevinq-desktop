@@ -40,7 +40,9 @@ import type { ManagedWorktree } from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 import type { TerminalEvent, TerminalSession, TerminalState } from '../../shared/terminal'
 import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } from '../../shared/integrations'
+import type { SecuritySnapshot } from '../../shared/security'
 import { SettingsWorkbench } from './SettingsWorkbench'
+import { SecurityWorkbench } from './SecurityWorkbench'
 
 type Theme = 'dark' | 'light'
 
@@ -58,6 +60,8 @@ export function App(): React.JSX.Element {
   const [isOpening, setIsOpening] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [securityOpen, setSecurityOpen] = useState(false)
+  const [security, setSecurity] = useState<SecuritySnapshot | null>(null)
   const [deepSeekKey, setDeepSeekKey] = useState('')
   const [gitStatus, setGitStatus] = useState<GitRepositorySnapshot | null>(null)
   const [gitOpen, setGitOpen] = useState(false)
@@ -92,6 +96,19 @@ export function App(): React.JSX.Element {
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onSecurityChanged(setSecurity)
+    void window.aster.getSecurityState().then(setSecurity)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    if (!securityOpen) return
+    void window.aster.refreshSecurityRuntime().then(setSecurity)
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [securityOpen])
 
   useEffect(() => {
     const unsubscribe = window.aster.onIntegrationChanged(setIntegrations)
@@ -359,7 +376,7 @@ export function App(): React.JSX.Element {
 
         <div className="sidebar-bottom">
           <button className="secondary-nav"><Clock3 size={16} />计划任务</button>
-          <button className="secondary-nav"><ShieldCheck size={16} />安全</button>
+          <button className="secondary-nav" onClick={() => setSecurityOpen(true)}><ShieldCheck size={16} />安全{security?.activeScanId && <span className="active-indicator" />}</button>
           <button className="secondary-nav" onClick={() => setSettingsOpen(true)}><Settings size={16} />设置</button>
           <div className="sidebar-footer">
             <span>v{bootstrap?.appVersion ?? '0.1.0'}</span>
@@ -476,6 +493,12 @@ export function App(): React.JSX.Element {
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
+      />}
+      {securityOpen && <SecurityWorkbench
+        snapshot={security}
+        project={selectedProject}
+        close={() => setSecurityOpen(false)}
+        onError={setError}
       />}
     </div>
   )
@@ -982,7 +1005,7 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
     <div className="capability-grid">
       <article><Bot size={20} /><div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
       <article><GitBranch size={20} /><div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div><span className="status-chip connected">已接入</span></article>
-      <article><ShieldCheck size={20} /><div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip planned">即将接入</span></article>
+      <article><ShieldCheck size={20} /><div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
     </div>
   </div>
 }

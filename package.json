@@ -26,6 +26,7 @@
     "package:win": "pnpm build && electron-builder --win"
   },
   "dependencies": {
+    "@openai/codex-security": "0.1.8",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-search": "0.16.0",
     "@xterm/xterm": "6.0.0",

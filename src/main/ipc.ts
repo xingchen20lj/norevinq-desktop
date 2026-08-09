@@ -36,6 +36,18 @@ import type {
   ResolveIntegrationRequestInput,
   WriteSafeConfigInput,
 } from '../shared/integrations.js'
+import type {
+  SecurityArtifact,
+  SecurityArtifactInput,
+  SecurityExportInput,
+  SecurityExportResult,
+  SecurityFindingActionInput,
+  SecurityFindingActionResult,
+  SecurityPreflight,
+  SecurityScanRequest,
+  SecuritySnapshot,
+  SecuritySubscription,
+} from '../shared/security.js'
 
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
@@ -115,6 +127,18 @@ export type IntegrationController = {
   resolveRequest: (input: ResolveIntegrationRequestInput) => IntegrationSnapshot
 }
 
+export type SecurityController = {
+  getSnapshot: () => SecuritySnapshot
+  subscribe: (subscription: SecuritySubscription) => () => void
+  refreshRuntime: () => Promise<SecuritySnapshot>
+  preflight: (request: SecurityScanRequest) => Promise<SecurityPreflight>
+  startScan: (request: SecurityScanRequest) => SecuritySnapshot
+  cancelScan: (scanId: string) => SecuritySnapshot
+  readArtifact: (input: SecurityArtifactInput) => SecurityArtifact
+  runFindingAction: (input: SecurityFindingActionInput) => Promise<SecurityFindingActionResult>
+  exportFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -125,6 +149,7 @@ export function registerIpc(
   diffs: DiffController,
   terminals: TerminalController,
   integrations: IntegrationController,
+  security: SecurityController,
 ): () => void {
   const webContents = new Set<WebContents>()
   const unsubscribeRuntime = runtime.subscribe((snapshot) => {
@@ -145,6 +170,11 @@ export function registerIpc(
   const unsubscribeIntegrations = integrations.subscribe((snapshot) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.integrationChanged, snapshot)
+    }
+  })
+  const unsubscribeSecurity = security.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.securityChanged, snapshot)
     }
   })
 
@@ -319,18 +349,91 @@ export function registerIpc(
       ...(parsed.answers === undefined ? {} : { answers: parsed.answers }),
     })
   })
+  ipcMain.handle(IPC_CHANNELS.securityState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return security.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.securityRefreshRuntime, () => security.refreshRuntime())
+  ipcMain.handle(IPC_CHANNELS.securityPreflight, (_event, input: unknown) =>
+    security.preflight(securityScanSchema.parse(input) as SecurityScanRequest))
+  ipcMain.handle(IPC_CHANNELS.securityScanStart, (_event, input: unknown) =>
+    security.startScan(securityScanSchema.parse(input) as SecurityScanRequest))
+  ipcMain.handle(IPC_CHANNELS.securityScanCancel, (_event, input: unknown) =>
+    security.cancelScan(scanIdSchema.parse(input).scanId))
+  ipcMain.handle(IPC_CHANNELS.securityArtifactRead, (_event, input: unknown) =>
+    security.readArtifact(securityArtifactSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.securityFindingAction, (_event, input: unknown) => {
+    const parsed = securityFindingActionSchema.parse(input)
+    return security.runFindingAction({
+      scanId: parsed.scanId,
+      occurrenceId: parsed.occurrenceId,
+      action: parsed.action,
+      confirmed: parsed.confirmed,
+      ...(parsed.reason === undefined ? {} : { reason: parsed.reason }),
+    })
+  })
+  ipcMain.handle(IPC_CHANNELS.securityExport, (_event, input: unknown) =>
+    security.exportFindings(securityExportSchema.parse(input)))
 
   return () => {
     unsubscribeRuntime()
     unsubscribeAgent()
     unsubscribeTerminal()
     unsubscribeIntegrations()
+    unsubscribeSecurity()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
   }
 }
 
 const projectInputSchema = z.object({ projectId: z.uuid() })
+const securityTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('repository') }),
+  z.object({
+    kind: z.literal('paths'),
+    paths: z.array(z.string().min(1).max(4_096).refine((value) => !value.includes('\0'))).min(1).max(100),
+  }),
+  z.object({ kind: z.literal('working_tree'), base: z.string().min(1).max(255).optional() }),
+  z.object({
+    kind: z.literal('refs'),
+    base: z.string().min(1).max(255),
+    head: z.string().min(1).max(255).optional(),
+  }),
+])
+const securityScanSchema = z.object({
+  projectId: z.uuid(),
+  mode: z.enum(['standard', 'deep']),
+  target: securityTargetSchema,
+  auth: z.enum(['auto', 'chatgpt', 'api-key']),
+  maxCostUsd: z.number().positive().max(10_000).optional(),
+  deep: z.object({
+    workers: z.number().int().min(1).max(16),
+    subagents: z.number().int().min(0).max(16),
+    stopAfterNoNew: z.number().int().min(1).max(20),
+    maxDiscoveryRuns: z.number().int().min(1).max(100),
+  }).optional(),
+}).superRefine((value, context) => {
+  if (value.mode === 'deep' && (value.target.kind === 'refs' || value.target.kind === 'working_tree')) {
+    context.addIssue({ code: 'custom', message: '深度扫描仅支持仓库或路径目标。', path: ['target'] })
+  }
+})
+const scanIdSchema = z.object({ scanId: z.uuid() })
+const securityArtifactSchema = z.object({
+  scanId: z.uuid(),
+  kind: z.enum(['report', 'sarif', 'findings', 'coverage', 'manifest']),
+})
+const securityFindingActionSchema = z.object({
+  scanId: z.uuid(),
+  occurrenceId: z.string().min(1).max(300),
+  action: z.enum(['validate', 'patch', 'false_positive']),
+  confirmed: z.literal(true),
+  reason: z.string().trim().min(1).max(2_000).optional(),
+})
+const securityExportSchema = z.object({
+  scanId: z.uuid(),
+  format: z.enum(['json', 'csv', 'sarif']),
+})
 const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({

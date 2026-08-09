@@ -37,6 +37,14 @@ import type {
   SetSkillEnabledInput,
   WriteSafeConfigInput,
 } from '../shared/integrations.js'
+import type {
+  SecurityArtifactInput,
+  SecurityExportInput,
+  SecurityFindingActionInput,
+  SecurityScanRequest,
+  SecuritySnapshot,
+  SecuritySubscription,
+} from '../shared/security.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -122,6 +130,25 @@ const api: AsterDesktopApi = {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: IntegrationSnapshot): void => subscription(snapshot)
     ipcRenderer.on(IPC_CHANNELS.integrationChanged, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.integrationChanged, listener)
+  },
+  getSecurityState: () => ipcRenderer.invoke(IPC_CHANNELS.securityState),
+  refreshSecurityRuntime: () => ipcRenderer.invoke(IPC_CHANNELS.securityRefreshRuntime),
+  preflightSecurityScan: (input: SecurityScanRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityPreflight, input),
+  startSecurityScan: (input: SecurityScanRequest) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityScanStart, input),
+  cancelSecurityScan: (input: { scanId: string }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityScanCancel, input),
+  readSecurityArtifact: (input: SecurityArtifactInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityArtifactRead, input),
+  runSecurityFindingAction: (input: SecurityFindingActionInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityFindingAction, input),
+  exportSecurityFindings: (input: SecurityExportInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityExport, input),
+  onSecurityChanged: (subscription: SecuritySubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: SecuritySnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.securityChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.securityChanged, listener)
   },
 }
 

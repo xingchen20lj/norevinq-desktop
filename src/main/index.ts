@@ -19,6 +19,7 @@ import { WorktreeService } from './worktree/worktreeService.js'
 import { DiffService } from './git/diffService.js'
 import { TerminalService } from './terminal/terminalService.js'
 import { IntegrationService } from './integrations/integrationService.js'
+import { SecurityService } from './security/securityService.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -33,6 +34,7 @@ let worktreeService: WorktreeService | null = null
 let diffService: DiffService | null = null
 let terminalService: TerminalService | null = null
 let integrationService: IntegrationService | null = null
+let securityService: SecurityService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -110,6 +112,7 @@ if (!gotLock) {
     terminalService = new TerminalService(runtime, database)
     agentService = new AgentService(runtime, database)
     integrationService = new IntegrationService(runtime, database)
+    securityService = new SecurityService(database, join(userData, 'security'))
     unregisterIpc = registerIpc(
       database,
       runtime,
@@ -120,6 +123,7 @@ if (!gotLock) {
       diffService,
       terminalService,
       integrationService,
+      securityService,
     )
     mainWindow = createMainWindow()
     void runtime.start()
@@ -149,6 +153,8 @@ app.on('before-quit', () => {
   terminalService = null
   integrationService?.dispose()
   integrationService = null
+  void securityService?.dispose()
+  securityService = null
   void runtime?.stop()
   runtime = null
   void runtimeLogger?.close()

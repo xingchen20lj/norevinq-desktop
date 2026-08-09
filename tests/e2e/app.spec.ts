@@ -78,6 +78,26 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.screenshot({ path: 'test-results/aster-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
 
+    await window.getByRole('button', { name: '安全', exact: true }).click()
+    const security = window.getByRole('dialog', { name: '安全工作台' })
+    await expect(security).toBeVisible()
+    await expect.poll(async () => window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getSecurityState: () => Promise<{
+          runtime: { python: { status: string }; account: { status: string }; sdkVersion: string }
+        }>
+      }
+      return bridge.getSecurityState()
+    }), { timeout: 30_000 }).toMatchObject({
+      runtime: { python: { status: 'ready' }, account: { status: 'authenticated' }, sdkVersion: '0.1.8' },
+    })
+    await security.getByRole('button', { name: '扫描', exact: true }).click()
+    await security.getByRole('button', { name: '本地预检', exact: true }).click()
+    await expect(security).toContainText('预检通过', { timeout: 30_000 })
+    await expect(security).toContainText('产物目录已隔离')
+    await window.screenshot({ path: 'test-results/aster-security.png' })
+    await window.getByRole('button', { name: '关闭安全工作台' }).click()
+
     await window.getByLabel('任务输入').fill('instruction proof')
     await window.getByRole('button', { name: '发送任务' }).click()
     await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_INSTRUCTIONS_OK', { timeout: 90_000 })

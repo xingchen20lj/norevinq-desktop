@@ -15,7 +15,7 @@ flowchart LR
   Main --> Git["Git 服务"]
   Main --> DB["SQLite 状态库"]
   Main --> Keys["系统凭据保险库"]
-  Main --> Security["隔离 Node worker<br/>Codex Security SDK"]
+  Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
   Runtime --> Providers["OpenAI / DeepSeek / 自定义 Responses Provider"]
 ```
 
@@ -35,7 +35,7 @@ flowchart LR
 - `src/main/worktree`：仓库外托管 worktree、数据库恢复、ownership 校验、锁定/删除和受限 include 复制。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。
-- `src/main/security`：SDK worker、扫描状态、artifact 导入与导出。
+- `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.8/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
 - `src/main/scheduler`：RRULE、持久化队列、错过运行和隔离工作树。
 
 ## 关键不变量
@@ -50,6 +50,8 @@ flowchart LR
 8. 命令与文件审批默认保持 pending，只有明确用户决策才向 app-server 回应；关闭时统一 cancel。
 9. provider key 只从环境或 OS 加密保险库进入 app-server 子进程；配置、SQLite、日志、snapshot 和 renderer 均不含明文。
 10. worktree 路径由主进程创建和登记；renderer/agent 只能传 worktree UUID，不能直接注入 cwd。
+11. Security 输出固定在 userData 私有目录且不位于任何被扫工作树内；只有 completed + sealed contract 的扫描可导入 finding、报告或执行验证/修复。
+12. Security validate/patch/false-positive/export 只通过官方 CLI 参数数组调用；patch 要求 UI 显式二次确认，renderer 不能指定路径或原始命令。
 
 ## 上游与公开资料
 

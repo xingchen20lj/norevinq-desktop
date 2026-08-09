@@ -65,6 +65,8 @@
 - 0.1.8 的隔离运行时锁定 `@openai/codex`/SDK 0.144.6，必须与桌面主 app-server 0.147.0 分离。
 - 历史、误报、部分导出、validate 和 patch 仍主要由 CLI 提供；不能直接绑定私有 workbench SQLite schema。
 - SDK 公开可安装不代表账户拥有扫描权限；认证缺失、Security access 缺失和 Trusted Access 未授予是不同状态。
+- 本机 SDK 真实诊断：Node 24、隔离 Python 3.12、ChatGPT 存储登录均可用；preflight 返回 `gpt-5.6-sol`/`xhigh` 且产物目录位于仓库外。
+- 真实路径扫描已进入 discovery，说明认证、插件和模型链路可工作；以 `maxCostUsd=2` 运行时 SDK 在估算 $2.010621 后抛出 `ScanCostLimitExceededError`。该输出未 sealed，产品必须保留失败状态且不得导入其中的部分 finding。
 
 来源：
 

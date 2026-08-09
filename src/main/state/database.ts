@@ -3,6 +3,7 @@ import { realpathSync, statSync } from 'node:fs'
 import { basename } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import type { ProjectSummary } from '../../shared/contracts.js'
+import type { SecurityScanRecord } from '../../shared/security.js'
 import type { ManagedWorktree } from '../../shared/worktree.js'
 
 type ProjectRow = {
@@ -21,6 +22,20 @@ type WorktreeRow = {
   branch: string | null
   created_at: string
   copied_include_files: number
+}
+
+type SecurityScanRow = {
+  id: string
+  project_id: string
+  project_name: string
+  project_path: string
+  created_at: string
+  updated_at: string
+  status: SecurityScanRecord['status']
+  request_json: string
+  progress_json: string | null
+  result_json: string | null
+  error_json: string | null
 }
 
 export class StateDatabase {
@@ -149,6 +164,52 @@ export class StateDatabase {
     this.#database.prepare('DELETE FROM managed_worktrees WHERE id = ?').run(worktreeId)
   }
 
+  upsertSecurityScan(scan: SecurityScanRecord): void {
+    this.#database.prepare(`
+      INSERT INTO security_scans
+        (id, project_id, project_name, project_path, created_at, updated_at, status,
+         request_json, progress_json, result_json, error_json)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        updated_at = excluded.updated_at,
+        status = excluded.status,
+        progress_json = excluded.progress_json,
+        result_json = excluded.result_json,
+        error_json = excluded.error_json
+    `).run(
+      scan.id,
+      scan.projectId,
+      scan.projectName,
+      scan.projectPath,
+      scan.createdAt,
+      scan.updatedAt,
+      scan.status,
+      JSON.stringify(scan.request),
+      scan.progress ? JSON.stringify(scan.progress) : null,
+      scan.result ? JSON.stringify(scan.result) : null,
+      scan.error ? JSON.stringify(scan.error) : null,
+    )
+  }
+
+  listSecurityScans(limit = 100): SecurityScanRecord[] {
+    const boundedLimit = Math.max(1, Math.min(500, Math.trunc(limit)))
+    const rows = this.#database.prepare(`
+      SELECT id, project_id, project_name, project_path, created_at, updated_at, status,
+             request_json, progress_json, result_json, error_json
+      FROM security_scans ORDER BY created_at DESC LIMIT ?
+    `).all(boundedLimit) as SecurityScanRow[]
+    return rows.map(toSecurityScanRecord)
+  }
+
+  getSecurityScan(scanId: string): SecurityScanRecord | null {
+    const row = this.#database.prepare(`
+      SELECT id, project_id, project_name, project_path, created_at, updated_at, status,
+             request_json, progress_json, result_json, error_json
+      FROM security_scans WHERE id = ?
+    `).get(scanId) as SecurityScanRow | undefined
+    return row ? toSecurityScanRecord(row) : null
+  }
+
   #migrate(): void {
     const version = this.#database.prepare('PRAGMA user_version').get() as { user_version: number }
     if (version.user_version < 1) {
@@ -197,6 +258,46 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 4) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS security_scans (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL,
+          project_name TEXT NOT NULL,
+          project_path TEXT NOT NULL,
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled')),
+          request_json TEXT NOT NULL,
+          progress_json TEXT,
+          result_json TEXT,
+          error_json TEXT
+        );
+        CREATE INDEX IF NOT EXISTS security_scans_created_idx
+          ON security_scans(created_at DESC);
+        CREATE INDEX IF NOT EXISTS security_scans_project_idx
+          ON security_scans(project_id, created_at DESC);
+        PRAGMA user_version = 4;
+        COMMIT;
+      `)
+    }
+  }
+}
+
+function toSecurityScanRecord(row: SecurityScanRow): SecurityScanRecord {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    projectName: row.project_name,
+    projectPath: row.project_path,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    status: row.status,
+    request: JSON.parse(row.request_json) as SecurityScanRecord['request'],
+    progress: row.progress_json ? JSON.parse(row.progress_json) as SecurityScanRecord['progress'] : null,
+    result: row.result_json ? JSON.parse(row.result_json) as SecurityScanRecord['result'] : null,
+    error: row.error_json ? JSON.parse(row.error_json) as SecurityScanRecord['error'] : null,
   }
 }
 

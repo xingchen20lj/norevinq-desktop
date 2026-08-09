@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 12：Codex Security。
+阶段 13：计划任务。
 
 ## 当前任务
 
-- 集成 `@openai/codex-security` 0.1.8 并隔离其 0.144.6 Codex runtime 依赖。
-- 建立安全总览、扫描、漏洞、仓库和设置工作台。
-- 完成 preflight、standard/deep/working-tree/commit 扫描、进度、取消、历史与 SARIF。
-- 区分缺少认证、Security access 和 Trusted Access，不伪造扫描结果。
+- 设计本地计划任务 schema、时区/RRULE 或间隔调度和错过运行策略。
+- 实现创建、编辑、暂停、删除、立即运行和持久化恢复。
+- 使用项目或隔离工作树启动真实 Codex turn，记录运行历史、未读与错误。
+- 建立计划任务工作台、自动测试和桌面回归。
 
 ## 已完成任务
 
@@ -81,13 +81,22 @@
 - 完成提供商、MCP、技能、配置四页设置工作台及空状态、错误、loading、OAuth 和结果预览。
 - Electron E2E 真实读取 app-server MCP/技能/配置，持久化项目信任，并通过项目指令返回 `ASTER_INSTRUCTIONS_OK`。
 - 当前环境 `node_repl` MCP 通过 app-server 直接工具调用执行无副作用表达式；elicitation 与用户输入由自动替身闭环覆盖。
+- 集成公开 `@openai/codex-security` 0.1.8，并隔离其 Codex SDK/可执行文件 0.144.6 与 plugin 0.1.15。
+- 完成 SDK/Python/账户诊断、repository/path/refs/working-tree/deep 参数、preflight、费用、进度、Trusted Access、取消和错误分类。
+- 扫描输出固定在仓库外 `userData/security` 私有目录；只有 completed + sealed contract 的结果可导入。
+- 完成安全总览、扫描、漏洞、仓库和设置五页工作台，支持报告、finding、coverage、JSON/CSV/SARIF 与 2 MiB 有界预览。
+- 完成官方 CLI validate/patch/false-positive/export 适配；全部使用参数数组，patch 二次确认，误报必须填写原因。
+- SQLite 持久化安全历史；错误或取消扫描不会产生完成结果，密钥形状错误文本会脱敏。
+- 真实 SDK preflight 验证 Node 24、Python 3.12、ChatGPT 登录和仓库外输出；真实路径扫描进入 discovery。
+- 真实扫描在估算 $2.010621 时按设定的 $2 上限抛出 `ScanCostLimitExceededError`；未 sealed 的部分产物未导入或伪装成漏洞。
+- Electron E2E 再次通过 1 项约 1.5 分钟全回归，安全页 1320×840 浅色截图无溢出。
 
 ## 下一任务
 
-1. 安装并验证 Codex Security SDK 的 Node/Python preflight 与权限诊断。
-2. 实现隔离扫描服务、进度/取消、artifact 安全目录与持久化历史。
-3. 建立五页安全工作台和 finding/coverage/report/SARIF 展示。
-4. 完成可用账户真实扫描或准确记录外部访问阻塞后进入计划任务。
+1. 调查 Codex 计划任务公开行为并选定本地调度与时区语义。
+2. 实现计划任务数据库、调度器、错过运行、重试和单实例并发控制。
+3. 将调度执行连接到真实项目/工作树 Codex 任务并记录运行历史。
+4. 建立计划任务 UI、回归、文档与阶段提交。
 
 ## 已做技术决策
 
@@ -101,10 +110,12 @@
 - DeepSeek：优先通过 Codex 自定义 Responses provider 形成完整智能体闭环；同时保留独立能力探测与直接连接诊断层，不静默假设模型能力。
 - Git：所有命令使用参数数组且限制 cwd；工作树使用 detached HEAD 起步，并保存可恢复快照元数据。
 - 安全扫描输出必须位于被扫描工作树之外，并使用私有权限目录。
+- Codex Security 只接受 completed + sealed SDK 结果；cost limit、中断和 contract 失败保留失败状态，不展示部分 finding。
+- Security validate/patch/false-positive/export 使用官方 CLI 参数数组；patch 必须显式确认，renderer 不能提交路径或命令。
 
 ## 当前失败测试
 
-暂无。最近一次结果：19 个单元/集成测试文件共 85 项通过；Electron E2E 真实覆盖 AGENTS.md、MCP/技能/配置、app-server PTY、终端输出→Codex，以及既有全功能回归；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：20 个单元/集成测试文件共 88 项通过；Electron E2E 1 项约 1.5 分钟通过，真实覆盖 Security SDK preflight、AGENTS.md、MCP/技能/配置、app-server PTY、终端输出→Codex，以及既有全功能回归；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
@@ -112,6 +123,7 @@
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
 - 当前渲染器生产主包约 1.07 MiB（含 xterm），后续按工作台路由和终端动态导入做代码分割。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
+- Codex Security standard 扫描即使仅 2 个目标文件也超过本次 $2 在线验证上限；提高预算前不能宣称真实 sealed 扫描完成。
 
 ## 当前阻塞
 
@@ -121,10 +133,10 @@
 
 - OpenAI/ChatGPT 凭据：在线 Codex 实测需要；缺失时使用协议测试替身。
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
-- Codex Security 权限：真实扫描需要 Trusted Access/账户授权；SDK 集成与错误路径不依赖权限。
+- Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
 
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的重新 resume 与订阅恢复语义。
-- Codex Security SDK 当前安装包是否能在 Electron 主进程直接加载，或需要隔离 Node worker。
+- 计划任务在应用完全退出时采用“下次启动补跑”还是安装平台后台服务；阶段 13 先实现应用运行期间调度与可配置错过运行。

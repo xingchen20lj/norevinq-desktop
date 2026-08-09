@@ -51,6 +51,18 @@ import type {
   SetSkillEnabledInput,
   WriteSafeConfigInput,
 } from './integrations.js'
+import type {
+  SecurityArtifact,
+  SecurityArtifactInput,
+  SecurityExportInput,
+  SecurityExportResult,
+  SecurityFindingActionInput,
+  SecurityFindingActionResult,
+  SecurityPreflight,
+  SecurityScanRequest,
+  SecuritySnapshot,
+  SecuritySubscription,
+} from './security.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -105,6 +117,15 @@ export const IPC_CHANNELS = {
   integrationConfigWrite: 'integration:config-write',
   integrationRequestResolve: 'integration:request-resolve',
   integrationChanged: 'integration:changed',
+  securityState: 'security:state',
+  securityRefreshRuntime: 'security:refresh-runtime',
+  securityPreflight: 'security:preflight',
+  securityScanStart: 'security:scan-start',
+  securityScanCancel: 'security:scan-cancel',
+  securityArtifactRead: 'security:artifact-read',
+  securityFindingAction: 'security:finding-action',
+  securityExport: 'security:export',
+  securityChanged: 'security:changed',
 } as const
 
 export type ProjectSummary = {
@@ -183,4 +204,13 @@ export type AsterDesktopApi = {
   writeSafeConfig: (input: WriteSafeConfigInput) => Promise<IntegrationSnapshot>
   resolveIntegrationRequest: (input: ResolveIntegrationRequestInput) => Promise<IntegrationSnapshot>
   onIntegrationChanged: (subscription: IntegrationSubscription) => () => void
+  getSecurityState: () => Promise<SecuritySnapshot>
+  refreshSecurityRuntime: () => Promise<SecuritySnapshot>
+  preflightSecurityScan: (input: SecurityScanRequest) => Promise<SecurityPreflight>
+  startSecurityScan: (input: SecurityScanRequest) => Promise<SecuritySnapshot>
+  cancelSecurityScan: (input: { scanId: string }) => Promise<SecuritySnapshot>
+  readSecurityArtifact: (input: SecurityArtifactInput) => Promise<SecurityArtifact>
+  runSecurityFindingAction: (input: SecurityFindingActionInput) => Promise<SecurityFindingActionResult>
+  exportSecurityFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
+  onSecurityChanged: (subscription: SecuritySubscription) => () => void
 }
