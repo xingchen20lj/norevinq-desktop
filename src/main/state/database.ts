@@ -33,6 +33,13 @@ export class StateDatabase {
     return rows.map(toProjectSummary)
   }
 
+  getProject(projectId: string): ProjectSummary | null {
+    const row = this.#database
+      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects WHERE id = ?')
+      .get(projectId) as ProjectRow | undefined
+    return row ? toProjectSummary(row) : null
+  }
+
   upsertProject(path: string): ProjectSummary {
     const canonicalPath = realpathSync(path)
     if (!statSync(canonicalPath).isDirectory()) {
@@ -66,6 +73,25 @@ export class StateDatabase {
     this.#database.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
   }
 
+  associateThread(projectId: string, threadId: string): void {
+    this.#database
+      .prepare(`
+        INSERT INTO project_threads (project_id, thread_id, last_opened_at)
+        VALUES (?, ?, ?)
+        ON CONFLICT(thread_id) DO UPDATE SET
+          project_id = excluded.project_id,
+          last_opened_at = excluded.last_opened_at
+      `)
+      .run(projectId, threadId, new Date().toISOString())
+  }
+
+  listProjectThreadIds(projectId: string): string[] {
+    const rows = this.#database
+      .prepare('SELECT thread_id FROM project_threads WHERE project_id = ? ORDER BY last_opened_at DESC')
+      .all(projectId) as { thread_id: string }[]
+    return rows.map(({ thread_id }) => thread_id)
+  }
+
   #migrate(): void {
     const version = this.#database.prepare('PRAGMA user_version').get() as { user_version: number }
     if (version.user_version < 1) {
@@ -79,6 +105,20 @@ export class StateDatabase {
           last_opened_at TEXT NOT NULL
         );
         PRAGMA user_version = 1;
+        COMMIT;
+      `)
+    }
+    if (version.user_version < 2) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS project_threads (
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          thread_id TEXT PRIMARY KEY,
+          last_opened_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS project_threads_project_id_idx
+          ON project_threads(project_id, last_opened_at DESC);
+        PRAGMA user_version = 2;
         COMMIT;
       `)
     }

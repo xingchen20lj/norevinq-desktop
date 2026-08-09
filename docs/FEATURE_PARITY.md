@@ -17,30 +17,30 @@
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 尚未开发 | 配置/MCP/技能加载前置 |
 | 项目 | 项目指令 AGENTS.md | 尚未开发 | app-server 原生支持 |
-| 对话 | 新建、读取、继续、重命名、固定、归档 | 尚未开发 | app-server thread API |
+| 对话 | 新建、读取、继续、重命名、固定、归档 | 部分实现 | 新建/list/resume/read/继续已接真实 app-server；重命名、固定、归档待开发 |
 | 对话 | 删除任务 | 尚未开发 | 永久操作需明确确认 |
-| 对话 | 对话搜索和分页 | 尚未开发 | thread/list |
+| 对话 | 对话搜索和分页 | 部分实现 | cwd 过滤与首 100 条列表已实现；搜索和游标 UI 待开发 |
 | 对话 | 分叉任务 | 尚未开发 | thread/fork |
 | 对话 | 长上下文压缩 | 尚未开发 | thread/compact/start |
-| 对话 | 重启后状态恢复 | 部分实现 | 项目状态恢复已实现；对话待 app-server |
+| 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 和历史 hydration 已实现；重启 E2E 待补 |
 | 智能体 | Codex app-server stdio 生命周期 | 已测试 | Electron E2E 真实自动启动并达到 ready |
 | 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
 | 智能体 | app-server 崩溃检测与恢复 | 部分实现 | 检测/空闲退避重启已实现；崩溃注入测试待补 |
-| 智能体 | 流式文本、推理和活动时间线 | 尚未开发 | item/delta 通知 |
-| 智能体 | 命令、文件修改、工具调用活动 | 尚未开发 | 结构化 item |
-| 智能体 | 追加指令/steer | 尚未开发 | turn/steer |
-| 智能体 | 停止/中断 | 尚未开发 | turn/interrupt |
+| 智能体 | 流式文本、推理和活动时间线 | 已测试 | 真实在线 Codex 文本流 E2E；reducer 27 项测试覆盖乱序 delta 与 1 MiB 截断 |
+| 智能体 | 命令、文件修改、工具调用活动 | 部分实现 | 结构化 reducer 与 UI 已测试；真实副作用 E2E 待阶段 5 |
+| 智能体 | 追加指令/steer | 已测试 | 类型化 IPC 与协议替身测试通过；长任务在线回归待补 |
+| 智能体 | 停止/中断 | 已测试 | 类型化 IPC 与协议替身测试通过；长任务在线回归待补 |
 | 智能体 | 目标与长期任务状态 | 尚未开发 | thread/goal API |
-| 智能体 | 多智能体/子任务显示 | 尚未开发 | 依上游公开事件 |
-| 审批 | 命令执行审批 | 尚未开发 | 双向 server request |
-| 审批 | 文件修改审批 | 尚未开发 | 双向 server request |
+| 智能体 | 多智能体/子任务显示 | 部分实现 | 领域事件与活动卡已实现；真实协作回归待补 |
+| 审批 | 命令执行审批 | 部分实现 | 双向 request 挂起、IPC 决策与拒绝/一次/会话 UI 已测试；真实命令待验证 |
+| 审批 | 文件修改审批 | 部分实现 | 双向 request 挂起、IPC 决策与 UI 已测试；真实 apply_patch 待验证 |
 | 审批 | MCP/应用工具审批 | 尚未开发 | app-server MCP 审批 |
 | 审批 | 用户输入请求 | 尚未开发 | tool/requestUserInput |
-| 沙箱 | 只读/工作区写入/完整访问 | 尚未开发 | app-server sandbox policy |
+| 沙箱 | 只读/工作区写入/完整访问 | 部分实现 | thread/start 真实传递，默认 workspace-write；设置 UI 与策略说明待补 |
 | 沙箱 | 网络与路径权限 | 尚未开发 | permissions/profile API |
 | 模型 | OpenAI API Key 登录 | 尚未开发 | account/login/start |
 | 模型 | ChatGPT 浏览器/设备码登录 | 尚未开发 | app-server auth API |
-| 模型 | 模型列表与推理强度 | 部分实现 | 真实 model/list 6 个模型；选择 UI 待接入 |
+| 模型 | 模型列表与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过 |
 | 模型 | 自定义 Responses provider | 尚未开发 | config RPC |
 | DeepSeek | 一级提供商配置 | 尚未开发 | `deepseek-v4-flash` 能力基线已实测 |
 | DeepSeek | 安全保存 API Key | 尚未开发 | OS keychain |
@@ -96,6 +96,6 @@
 | 安全 | 无权限时可诊断降级 | 尚未开发 | 不伪造扫描结果 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 尚未开发 | 本地优先、需用户明确导出 |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 单元和 Electron 冒烟已通过；持续扩展中 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 10 个单测文件 60 项、真实 Electron/app-server/在线流式 E2E 通过；持续扩展中 |
 | 发布 | macOS 打包/签名/公证流程 | 尚未开发 | 证书为外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 尚未开发 | 真机和证书为外部阻塞 |

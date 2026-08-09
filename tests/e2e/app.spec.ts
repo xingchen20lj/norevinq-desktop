@@ -1,12 +1,20 @@
 import { _electron as electron, expect, test } from '@playwright/test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { StateDatabase } from '../../src/main/state/database.js'
 
 test('starts with a sandboxed renderer and real project action', async () => {
-  const application = await electron.launch({ args: ['.'] })
+  const profile = mkdtempSync(join(tmpdir(), 'aster-e2e-'))
+  const projectPath = mkdtempSync(join(profile, 'project-'))
+  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  database.upsertProject(projectPath)
+  database.close()
+  const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
     const window = await application.firstWindow()
     await expect(window).toHaveTitle('Aster Code')
-    await expect(window.getByRole('heading', { name: '把复杂开发工作交给智能体' })).toBeVisible()
-    await expect(window.getByRole('button', { name: '打开本地项目', exact: true })).toBeEnabled()
+    await expect(window.getByRole('heading', { name: /开始处理 project-/ })).toBeVisible()
     await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
 
     const runtime = await window.evaluate(async () => {
@@ -25,6 +33,11 @@ test('starts with a sandboxed renderer and real project action', async () => {
       hasAsterBridge: typeof Reflect.get(window, 'aster') === 'object',
     }))
     expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasAsterBridge: true })
+
+    await window.getByLabel('任务输入').fill('Reply with exactly ASTER_RUNTIME_OK and do not use tools.')
+    await window.getByRole('button', { name: '发送任务' }).click()
+    await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_RUNTIME_OK', { timeout: 90_000 })
+    await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
     await window.screenshot({ path: 'test-results/aster-shell.png' })
 
     const originalTheme = await window.locator('html').getAttribute('data-theme')
@@ -33,9 +46,10 @@ test('starts with a sandboxed renderer and real project action', async () => {
 
     await window.setViewportSize({ width: 960, height: 640 })
     await expect(window.getByLabel('任务输入')).toBeVisible()
-    await expect(window.getByRole('button', { name: '打开本地项目', exact: true })).toBeVisible()
+    await expect(window.locator('.activity-timeline')).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-shell-compact.png' })
   } finally {
     await application.close()
+    rmSync(profile, { force: true, recursive: true })
   }
 })

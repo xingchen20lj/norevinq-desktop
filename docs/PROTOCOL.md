@@ -40,8 +40,20 @@ pnpm schema:sync
 
 stderr 与生命周期事件写入用户数据目录的 `logs/runtime.jsonl`。日志在序列化前递归脱敏 Authorization、Bearer、API key、JWT、Cookie、私钥、URL query secret 和敏感字段；单文件 2 MiB，保留三个轮转文件，权限为 `0600`。
 
+## Thread、turn 与审批
+
+- 项目打开后按规范化 `cwd` 调用 `thread/list`；选择历史任务使用 `thread/resume` 并从返回 turns 重建活动状态。
+- 新任务依次执行 `thread/start` 和 `turn/start`。默认 `approvalPolicy=on-request`、`sandbox=workspace-write`，模型与推理强度来自真实 `model/list`。
+- 所有 notification 进入不可变领域 reducer；渲染器不导入生成协议类型。文本、推理、命令、文件、MCP、动态工具、搜索、计划、协作和错误均有判别联合类型。
+- 单活动文本上限 1 MiB，超限记录截断字符数；未知 item/event 保留以便诊断协议漂移。
+- `turn/steer` 使用 `expectedTurnId` 防止追加到错误轮次；`turn/interrupt` 必须同时携带 threadId/turnId。
+- 命令/文件审批按 request id 与 thread/turn/item 四级标识路由。server request Promise 保持挂起，直到用户选择允许一次、会话允许、拒绝或取消；没有默认批准路径。
+- app-server 在活动 turn 中崩溃时不重放，以避免重复命令和文件副作用。
+
 ## 验证证据
 
 - JSONL/RPC 单元测试覆盖分帧、超时、反向请求、错误、EOF、最大行、写背压和 Codex 省略 header 方言。
 - 二进制发现单元测试覆盖优先级、去重和失败路径。
 - 2026-08-10 Playwright Electron E2E 真实启动 app-server，断言 phase 为 `ready`、版本包含 `codex-cli` 且模型目录非空（实际 6 个模型）。
+- 2026-08-10 Playwright Electron E2E 在临时真实项目中创建 thread/turn，使用现有 ChatGPT 登录完成在线 SSE 活动，并验证最终消息 `ASTER_RUNTIME_OK`、完成状态、深浅主题和 960×640 布局。
+- agent service 协议替身测试覆盖 start/list/resume/steer/interrupt、项目关联持久化和显式反向审批；activity reducer 有 27 个场景、79 条断言。

@@ -1,4 +1,15 @@
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from './runtime.js'
+import type {
+  ConversationSnapshot,
+  ConversationSubscription,
+  InterruptTurnInput,
+  LoadProjectConversationsInput,
+  ResolveApprovalInput,
+  SelectConversationInput,
+  StartConversationInput,
+  StartTurnInput,
+  SteerTurnInput,
+} from './conversation.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -7,6 +18,14 @@ export const IPC_CHANNELS = {
   runtimeStatus: 'runtime:status',
   runtimeRestart: 'runtime:restart',
   runtimeStatusChanged: 'runtime:status-changed',
+  conversationsLoad: 'conversations:load',
+  conversationSelect: 'conversation:select',
+  conversationStart: 'conversation:start',
+  conversationTurnStart: 'conversation:turn-start',
+  conversationSteer: 'conversation:steer',
+  conversationInterrupt: 'conversation:interrupt',
+  conversationApprovalResolve: 'conversation:approval-resolve',
+  conversationChanged: 'conversation:changed',
 } as const
 
 export type ProjectSummary = {
@@ -35,4 +54,12 @@ export type AsterDesktopApi = {
   getRuntimeStatus: () => Promise<CodexRuntimeSnapshot>
   restartRuntime: () => Promise<CodexRuntimeSnapshot>
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void
+  loadProjectConversations: (input: LoadProjectConversationsInput) => Promise<ConversationSnapshot>
+  selectConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
+  startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
+  steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>
+  interruptTurn: (input: InterruptTurnInput) => Promise<ConversationSnapshot>
+  resolveApproval: (input: ResolveApprovalInput) => Promise<ConversationSnapshot>
+  onConversationChanged: (subscription: ConversationSubscription) => () => void
 }

@@ -5,6 +5,7 @@ import { createLogger, type JsonlLogger } from './logging/logger.js'
 import { SizeLimitedRotation } from './logging/sizeRotation.js'
 import { CodexRuntimeSupervisor } from './runtime/codexRuntime.js'
 import { StateDatabase } from './state/database.js'
+import { AgentService } from './agent/agentService.js'
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -12,6 +13,7 @@ let database: StateDatabase | null = null
 let unregisterIpc: (() => void) | null = null
 let runtime: CodexRuntimeSupervisor | null = null
 let runtimeLogger: JsonlLogger | null = null
+let agentService: AgentService | null = null
 
 function createMainWindow(): BrowserWindow {
   const window = new BrowserWindow({
@@ -67,7 +69,8 @@ if (!gotLock) {
       rotation: new SizeLimitedRotation(),
     })
     runtime = new CodexRuntimeSupervisor({ logger: runtimeLogger })
-    unregisterIpc = registerIpc(database, runtime)
+    agentService = new AgentService(runtime, database)
+    unregisterIpc = registerIpc(database, runtime, agentService)
     mainWindow = createMainWindow()
     void runtime.start()
 
@@ -86,6 +89,8 @@ app.on('before-quit', () => {
   unregisterIpc = null
   database?.close()
   database = null
+  agentService?.dispose()
+  agentService = null
   void runtime?.stop()
   runtime = null
   void runtimeLogger?.close()

@@ -4,14 +4,14 @@
 
 ## 当前阶段
 
-阶段 3/4：项目、对话与流式智能体活动。
+阶段 5：审批、停止、追加指令和副作用闭环加固。
 
 ## 当前任务
 
-- 用真实项目调用 `thread/start`、`thread/read/list/resume` 并持久化任务关联。
-- 实现 turn/start、结构化 item reducer、流式消息与活动时间线。
-- 建立命令、文件变更、推理、计划和错误事件的领域适配。
-- 为审批、steer 和 interrupt 建立状态机与 IPC 契约。
+- 在临时 Git 项目中真实验证命令、文件修改与 diff 活动。
+- 真实触发命令和文件审批，验证允许、拒绝、会话允许及恢复行为。
+- 对在线长任务验证 steer 和 interrupt，并补充崩溃注入回归。
+- 完成阶段 5 后进入 DeepSeek provider 配置与 app-server 闭环。
 
 ## 已完成任务
 
@@ -40,13 +40,20 @@
 - 实现类型化运行时 IPC、状态订阅、重启入口和 UI 连接状态。
 - 实现递归敏感信息脱敏、0600 JSONL 日志和 2 MiB/3 份轮转。
 - Electron E2E 真实验证 app-server 达到 ready、版本为本机 `0.147.0-alpha.6.5` 且返回 6 个模型。
+- 完成 thread/start/list/read/resume 与项目→thread SQLite 关联，任务在应用重启后可由 app-server 历史恢复。
+- 完成 turn/start、turn/steer、turn/interrupt 的类型化主进程服务与最小 IPC 桥。
+- 完成稳定活动领域模型与不可变 reducer，覆盖消息、推理、命令、文件、MCP、动态工具、搜索、协作、计划、错误和未知协议项。
+- 完成 server→client 命令/文件审批挂起状态机，只有明确 UI 决策才响应，关闭时统一 cancel。
+- 完成真实任务列表、流式活动时间线、模型/推理选择、发送/追加/停止和审批 UI。
+- 使用临时真实项目与已配置 ChatGPT 登录完成在线 Codex 流式 E2E，最终消息为 `ASTER_RUNTIME_OK` 且未调用工具。
+- 实际检查 1320×840 浅色和 960×640 深色任务界面，消息、侧栏、输入区无明显溢出。
 
 ## 下一任务
 
-1. 完成 thread start/list/read/resume 和任务持久化。
-2. 完成 turn start、item/delta reducer 和流式活动 UI。
-3. 完成真实 Codex 文本任务的在线闭环。
-4. 接入审批、追加指令、中断与崩溃恢复 UX。
+1. 对临时仓库运行真实文件修改任务并核对磁盘与结构化活动。
+2. 真实验证审批、steer、interrupt 和运行时崩溃错误状态。
+3. 补齐对话重命名/归档与重启恢复 E2E。
+4. 进入 DeepSeek Responses 一级提供商阶段。
 
 ## 已做技术决策
 
@@ -63,13 +70,14 @@
 
 ## 当前失败测试
 
-暂无。最近一次结果：8 个单元测试文件共 30 项通过；1 个 Electron E2E 通过；类型、规范、脚本语法和生产构建通过。
+暂无。最近一次结果：10 个单元测试文件共 60 项通过；1 个 Electron + 真实 app-server + 在线模型 E2E 通过；类型、规范、脚本语法和生产构建通过。
 
 ## 已知问题
 
 - 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
 - 当前渲染器生产主包约 574 kB，后续按工作台路由做代码分割。
+- 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 
 ## 当前阻塞
 

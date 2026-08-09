@@ -1,23 +1,33 @@
 import {
   Bot,
+  Brain,
+  Check,
   ChevronRight,
   CircleHelp,
   Clock3,
   Code2,
+  FileCode2,
   FolderCode,
   FolderOpen,
   GitBranch,
+  LoaderCircle,
+  MessageSquare,
   Moon,
   Plus,
   Search,
   Settings,
   ShieldCheck,
   Sparkles,
+  Square,
   Sun,
   TerminalSquare,
+  Wrench,
+  X,
 } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+import type { AgentActivity, AgentActivityState } from '../../shared/agent'
 import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
+import type { ConversationSnapshot, PendingApproval } from '../../shared/conversation'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 
 type Theme = 'dark' | 'light'
@@ -25,9 +35,15 @@ type Theme = 'dark' | 'light'
 export function App(): React.JSX.Element {
   const [bootstrap, setBootstrap] = useState<BootstrapState | null>(null)
   const [runtime, setRuntime] = useState<CodexRuntimeSnapshot | null>(null)
+  const [conversations, setConversations] = useState<ConversationSnapshot | null>(null)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
+  const [composer, setComposer] = useState('')
+  const [model, setModel] = useState('')
+  const [effort, setEffort] = useState('')
+  const [newTask, setNewTask] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isOpening, setIsOpening] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const [theme, setTheme] = useState<Theme>(() => {
     const saved = window.localStorage.getItem('aster-theme')
     if (saved === 'dark' || saved === 'light') return saved
@@ -40,27 +56,47 @@ export function App(): React.JSX.Element {
   }, [theme])
 
   useEffect(() => {
-    void window.aster
-      .getBootstrapState()
-      .then((state) => {
-        setBootstrap(state)
-        setRuntime(state.runtime)
-        setSelectedProject(state.projects[0] ?? null)
-      })
-      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+    void window.aster.getBootstrapState().then((state) => {
+      setBootstrap(state)
+      setRuntime(state.runtime)
+      setSelectedProject(state.projects[0] ?? null)
+    }).catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onRuntimeStatus(setRuntime)
+    const unsubscribeRuntime = window.aster.onRuntimeStatus(setRuntime)
+    const unsubscribeConversations = window.aster.onConversationChanged(setConversations)
     void window.aster.getRuntimeStatus().then(setRuntime).catch((reason: unknown) => setError(toErrorMessage(reason)))
-    return unsubscribe
+    return () => {
+      unsubscribeRuntime()
+      unsubscribeConversations()
+    }
   }, [])
 
+  useEffect(() => {
+    if (!selectedProject || runtime?.phase !== 'ready') return
+    setError(null)
+    void window.aster.loadProjectConversations({ projectId: selectedProject.id })
+      .then((snapshot) => {
+        setConversations(snapshot)
+        setNewTask(snapshot.selectedThreadId === null)
+      })
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [selectedProject, runtime?.phase])
+
+  useEffect(() => {
+    const defaultModel = runtime?.models.find(({ isDefault }) => isDefault) ?? runtime?.models[0]
+    if (defaultModel && !model) {
+      setModel(defaultModel.id)
+      setEffort(defaultModel.defaultReasoningEffort ?? defaultModel.supportedReasoningEfforts[0] ?? '')
+    }
+  }, [model, runtime?.models])
+
   const projects = bootstrap?.projects ?? []
-  const subtitle = useMemo(() => {
-    if (selectedProject) return selectedProject.path
-    return '由 Codex app-server 驱动的本地智能编程工作台'
-  }, [selectedProject])
+  const selectedThread = conversations?.threads.find(({ id }) => id === conversations.selectedThreadId) ?? null
+  const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
+  const activeTurn = activityState?.turnStatus === 'inProgress'
+  const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
 
   async function openProject(): Promise<void> {
     setIsOpening(true)
@@ -69,14 +105,68 @@ export function App(): React.JSX.Element {
       const project = await window.aster.selectProject()
       if (!project) return
       setSelectedProject(project)
-      setBootstrap((current) => {
-        if (!current) return current
-        return { ...current, projects: [project, ...current.projects.filter(({ id }) => id !== project.id)] }
-      })
+      setNewTask(true)
+      setBootstrap((current) => current && ({
+        ...current,
+        projects: [project, ...current.projects.filter(({ id }) => id !== project.id)],
+      }))
     } catch (reason) {
       setError(toErrorMessage(reason))
     } finally {
       setIsOpening(false)
+    }
+  }
+
+  async function selectThread(threadId: string): Promise<void> {
+    setError(null)
+    setNewTask(false)
+    try {
+      setConversations(await window.aster.selectConversation({ threadId }))
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+    }
+  }
+
+  async function submit(): Promise<void> {
+    if (!selectedProject || !composer.trim() || isSubmitting || runtime?.phase !== 'ready') return
+    const text = composer
+    setComposer('')
+    setError(null)
+    setIsSubmitting(true)
+    try {
+      let snapshot: ConversationSnapshot
+      if (newTask || !selectedThread) {
+        snapshot = await window.aster.startConversation({
+          projectId: selectedProject.id,
+          text,
+          ...(model ? { model } : {}),
+          ...(effort ? { reasoningEffort: effort } : {}),
+        })
+        setNewTask(false)
+      } else if (activeTurn && activityState.turnId) {
+        snapshot = await window.aster.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
+      } else {
+        snapshot = await window.aster.startTurn({
+          threadId: selectedThread.id,
+          text,
+          ...(effort ? { reasoningEffort: effort } : {}),
+        })
+      }
+      setConversations(snapshot)
+    } catch (reason) {
+      setComposer(text)
+      setError(toErrorMessage(reason))
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  async function interrupt(): Promise<void> {
+    if (!selectedThread || !activityState?.turnId) return
+    try {
+      await window.aster.interruptTurn({ threadId: selectedThread.id, turnId: activityState.turnId })
+    } catch (reason) {
+      setError(toErrorMessage(reason))
     }
   }
 
@@ -90,11 +180,11 @@ export function App(): React.JSX.Element {
           <button className="icon-button sidebar-search" aria-label="搜索"><Search size={16} /></button>
         </div>
 
-        <button className="new-task-button" disabled={!selectedProject}>
+        <button className="new-task-button" disabled={!selectedProject} onClick={() => setNewTask(true)}>
           <Plus size={16} /> 新任务 <span className="shortcut">⌘N</span>
         </button>
 
-        <nav className="sidebar-nav" aria-label="项目导航">
+        <nav className="sidebar-nav" aria-label="项目与任务导航">
           <div className="nav-heading">
             <span>项目</span>
             <button className="icon-button" onClick={() => void openProject()} aria-label="打开项目"><Plus size={14} /></button>
@@ -104,16 +194,30 @@ export function App(): React.JSX.Element {
               <FolderOpen size={15} /> 打开第一个项目
             </button>
           ) : projects.map((project) => (
-            <button
-              className={`project-row ${selectedProject?.id === project.id ? 'selected' : ''}`}
-              key={project.id}
-              onClick={() => setSelectedProject(project)}
-              title={project.path}
-            >
-              <FolderCode size={15} />
-              <span>{project.name}</span>
-              <ChevronRight size={13} className="project-chevron" />
-            </button>
+            <div key={project.id}>
+              <button
+                className={`project-row ${selectedProject?.id === project.id ? 'selected' : ''}`}
+                onClick={() => { setSelectedProject(project); setNewTask(true) }}
+                title={project.path}
+              >
+                <FolderCode size={15} /><span>{project.name}</span><ChevronRight size={13} className="project-chevron" />
+              </button>
+              {selectedProject?.id === project.id && conversations?.projectId === project.id && (
+                <div className="thread-list" aria-label={`${project.name} 任务`}>
+                  {conversations.threads.map((thread) => (
+                    <button
+                      className={`thread-row ${!newTask && conversations.selectedThreadId === thread.id ? 'selected' : ''}`}
+                      key={thread.id}
+                      onClick={() => void selectThread(thread.id)}
+                      title={thread.preview}
+                    >
+                      <MessageSquare size={12} /><span>{(thread.name ?? thread.preview) || '未命名任务'}</span>
+                      {thread.status === 'active' && <span className="active-indicator" />}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           ))}
         </nav>
 
@@ -133,7 +237,7 @@ export function App(): React.JSX.Element {
       <main className="main-area">
         <header className="topbar">
           <div className="topbar-title">
-            <span>{selectedProject?.name ?? '欢迎'}</span>
+            <span>{selectedThread?.name ?? selectedProject?.name ?? '欢迎'}</span>
             {selectedProject && <span className="context-pill"><GitBranch size={13} />Local</span>}
             <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? runtime?.binaryPath ?? undefined}>
               <span className="runtime-dot" /> Codex {runtimeLabel(runtime)}
@@ -145,60 +249,45 @@ export function App(): React.JSX.Element {
           </div>
         </header>
 
-        <section className="workspace">
-          <div className="hero">
-            <div className="hero-orbit" aria-hidden="true">
-              <div className="hero-core"><Sparkles size={27} /></div>
-            </div>
-            <p className="eyebrow">LOCAL-FIRST CODING AGENT</p>
-            <h1>{selectedProject ? `开始处理 ${selectedProject.name}` : '把复杂开发工作交给智能体'}</h1>
-            <p className="hero-subtitle">{subtitle}</p>
-
-            {!selectedProject && (
-              <button className="primary-button" onClick={() => void openProject()} disabled={isOpening}>
-                <FolderOpen size={17} /> {isOpening ? '正在打开…' : '打开本地项目'}
-              </button>
-            )}
-
-            {error && <div className="error-banner" role="alert">{error}</div>}
-
-            <div className="capability-grid">
-              <article>
-                <Bot size={20} />
-                <div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div>
-                {runtime?.phase === 'failed' || runtime?.phase === 'unavailable' ? (
-                  <button className="status-chip runtime-retry" onClick={() => void window.aster.restartRuntime()}>重试连接</button>
-                ) : (
-                  <span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span>
-                )}
-              </article>
-              <article>
-                <GitBranch size={20} />
-                <div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div>
-                <span className="status-chip planned">即将接入</span>
-              </article>
-              <article>
-                <ShieldCheck size={20} />
-                <div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div>
-                <span className="status-chip planned">即将接入</span>
-              </article>
-            </div>
-          </div>
-
+        <section className={`workspace ${selectedThread && !newTask ? 'conversation-workspace' : ''}`}>
+          {selectedThread && !newTask ? (
+            <ActivityTimeline state={activityState} />
+          ) : (
+            <Welcome selectedProject={selectedProject} runtime={runtime} isOpening={isOpening} openProject={openProject} />
+          )}
+          {error && <div className="error-banner workspace-error" role="alert">{error}</div>}
+          {conversations?.approvals.map((approval) => (
+            <ApprovalPanel approval={approval} key={approval.requestId} onError={setError} />
+          ))}
           <div className="composer-shell">
             <textarea
               aria-label="任务输入"
-              placeholder={selectedProject ? '描述你希望 Aster Code 完成的任务…' : '请先打开一个本地项目'}
-              disabled={!selectedProject}
+              placeholder={selectedProject ? (activeTurn ? '追加指令到正在运行的任务…' : '描述你希望 Aster Code 完成的任务…') : '请先打开一个本地项目'}
+              disabled={!selectedProject || runtime?.phase !== 'ready'}
+              value={composer}
+              onChange={(event) => setComposer(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); void submit() }
+              }}
               rows={2}
             />
             <div className="composer-footer">
               <div className="composer-options">
-                <button disabled><Bot size={14} />Codex</button>
-                <button disabled>Medium</button>
-                <button disabled><GitBranch size={14} />Local</button>
+                <select aria-label="模型" value={model} onChange={(event) => setModel(event.target.value)}>
+                  {runtime?.models.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}
+                </select>
+                <select aria-label="推理强度" value={effort} onChange={(event) => setEffort(event.target.value)}>
+                  {(selectedModel?.supportedReasoningEfforts ?? []).map((item) => <option value={item} key={item}>{item}</option>)}
+                </select>
+                <span><GitBranch size={13} />Local</span>
               </div>
-              <button className="send-button" disabled title="Codex runtime 将在阶段 2 接入"><ChevronRight size={17} /></button>
+              {activeTurn ? (
+                <button className="send-button stop-button" onClick={() => void interrupt()} aria-label="停止任务"><Square size={12} fill="currentColor" /></button>
+              ) : (
+                <button className="send-button" onClick={() => void submit()} disabled={!composer.trim() || isSubmitting || runtime?.phase !== 'ready'} aria-label="发送任务">
+                  {isSubmitting ? <LoaderCircle size={16} className="spin" /> : <ChevronRight size={17} />}
+                </button>
+              )}
             </div>
           </div>
         </section>
@@ -207,8 +296,99 @@ export function App(): React.JSX.Element {
   )
 }
 
+function Welcome({ selectedProject, runtime, isOpening, openProject }: {
+  selectedProject: ProjectSummary | null
+  runtime: CodexRuntimeSnapshot | null
+  isOpening: boolean
+  openProject: () => Promise<void>
+}): React.JSX.Element {
+  return <div className="hero">
+    <div className="hero-orbit" aria-hidden="true"><div className="hero-core"><Sparkles size={27} /></div></div>
+    <p className="eyebrow">LOCAL-FIRST CODING AGENT</p>
+    <h1>{selectedProject ? `开始处理 ${selectedProject.name}` : '把复杂开发工作交给智能体'}</h1>
+    <p className="hero-subtitle">{selectedProject?.path ?? '由 Codex app-server 驱动的本地智能编程工作台'}</p>
+    {!selectedProject && <button className="primary-button" onClick={() => void openProject()} disabled={isOpening}>
+      <FolderOpen size={17} /> {isOpening ? '正在打开…' : '打开本地项目'}
+    </button>}
+    <div className="capability-grid">
+      <article><Bot size={20} /><div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
+      <article><GitBranch size={20} /><div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div><span className="status-chip planned">即将接入</span></article>
+      <article><ShieldCheck size={20} /><div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip planned">即将接入</span></article>
+    </div>
+  </div>
+}
+
+function ActivityTimeline({ state }: { state: AgentActivityState | null }): React.JSX.Element {
+  if (!state || state.activities.length === 0) return <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
+  return <div className="activity-timeline" aria-label="智能体活动">
+    {state.activities.map((activity) => <ActivityCard activity={activity} key={`${activity.type}:${activity.id}`} />)}
+    {state.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
+  </div>
+}
+
+function ActivityCard({ activity }: { activity: AgentActivity }): React.JSX.Element {
+  if (activity.type === 'thread' || activity.type === 'turn') return <></>
+  const icon = activity.type === 'userMessage' || activity.type === 'agentMessage' ? <MessageSquare size={15} />
+    : activity.type === 'reasoning' ? <Brain size={15} />
+      : activity.type === 'fileChange' ? <FileCode2 size={15} /> : <Wrench size={15} />
+  return <article className={`activity-card ${activity.type}`}>
+    <div className="activity-icon">{icon}</div>
+    <div className="activity-body">
+      <div className="activity-heading"><strong>{activityLabel(activity)}</strong><span>{activity.status}</span></div>
+      <ActivityContent activity={activity} />
+    </div>
+  </article>
+}
+
+function ActivityContent({ activity }: { activity: AgentActivity }): React.JSX.Element {
+  if (activity.type === 'userMessage') return <p>{activity.content.filter(({ type }) => type === 'text').map((item) => item.type === 'text' ? item.text : '').join('\n')}</p>
+  if (activity.type === 'agentMessage') return <p>{activity.text}</p>
+  if (activity.type === 'reasoning') return <p>{[...activity.summary, ...activity.content].join('\n')}</p>
+  if (activity.type === 'command') return <><code>{activity.command}</code>{activity.output && <pre>{activity.output}</pre>}</>
+  if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <code key={`${change.path}:${change.kind}`}>{change.kind} {change.path}</code>)}</>
+  if (activity.type === 'plan') return <>{activity.steps.map((step) => <p key={step.step}>• {step.step} — {step.status}</p>)}</>
+  if (activity.type === 'error') return <p className="danger-text">{activity.message}</p>
+  if (activity.type === 'mcpTool') return <p>{activity.server} / {activity.tool}{activity.progress ? ` · ${activity.progress}` : ''}</p>
+  if (activity.type === 'webSearch') return <p>{activity.query}</p>
+  if (activity.type === 'dynamicTool') return <p>{activity.namespace ? `${activity.namespace} / ` : ''}{activity.tool}</p>
+  return <p>{activity.type}</p>
+}
+
+function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onError: (message: string) => void }): React.JSX.Element {
+  async function decide(decision: 'accept' | 'acceptForSession' | 'decline'): Promise<void> {
+    try { await window.aster.resolveApproval({ requestId: approval.requestId, decision }) }
+    catch (reason) { onError(toErrorMessage(reason)) }
+  }
+  return <section className="approval-panel" aria-label="待审批操作">
+    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : '允许修改文件？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Codex 请求继续执行受保护操作。'}</p></div>
+    <button onClick={() => void decide('decline')}><X size={14} />拒绝</button>
+    <button onClick={() => void decide('acceptForSession')}>本次会话允许</button>
+    <button className="approve" onClick={() => void decide('accept')}><Check size={14} />允许</button>
+  </section>
+}
+
+function activityLabel(activity: AgentActivity): string {
+  switch (activity.type) {
+    case 'userMessage': return '你的指令'
+    case 'agentMessage': return 'Codex'
+    case 'reasoning': return '推理'
+    case 'command': return '命令'
+    case 'fileChange': return '文件变更'
+    case 'plan': return '计划'
+    case 'error': return '错误'
+    case 'mcpTool': return 'MCP 工具'
+    case 'dynamicTool': return '工具'
+    case 'webSearch': return '网络搜索'
+    case 'collab': return '协作'
+    case 'subagent': return '子智能体'
+    default: return '活动'
+  }
+}
+
 function toErrorMessage(reason: unknown): string {
-  return reason instanceof Error ? reason.message : '发生未知错误。'
+  if (reason instanceof Error) return reason.message
+  if (typeof reason === 'string' && reason) return reason
+  return '发生未知错误。'
 }
 
 function runtimeLabel(runtime: CodexRuntimeSnapshot | null): string {
