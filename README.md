@@ -9,7 +9,9 @@ Aster Code 是一款面向 macOS 和 Windows 的开源桌面智能编程客户�
 - [UI 一致性](docs/UI_PARITY.md)
 - [架构](docs/ARCHITECTURE.md)
 - [性能基线](docs/PERFORMANCE.md)
+- [桌面构建与发布](docs/RELEASING.md)
+- [第三方许可证清单](THIRD_PARTY_NOTICES.md)
 
 > 当前已完成完整自动测试、安全加固和性能优化阶段，正在执行桌面打包、发布准备与最终功能一致性审计。功能状态只以自动测试、真实运行证据和功能一致性表为准。
 
-开发验证命令与在线测试边界见 [测试策略](docs/TESTING.md)。
+开发验证命令与在线测试边界见 [测试策略](docs/TESTING.md)。当前 Intel macOS 的无签名 DMG/ZIP 已完成真实构建、校验和挂载启动；签名、公证和 Windows 真机安装仍必须在持有相应凭据/系统的发布环境完成。

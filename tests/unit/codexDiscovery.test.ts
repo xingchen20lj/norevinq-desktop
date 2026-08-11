@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   discoverCodexBinary,
+  getBundledCodexPath,
   getCodexBinaryCandidates,
   probeCodexVersion,
 } from '../../src/main/runtime/codexDiscovery.js'
@@ -24,21 +25,34 @@ async function executable(name: string, body = '#!/bin/sh\necho codex-cli-test 1
 }
 
 describe('Codex binary discovery', () => {
-  it('orders explicit, environment, PATH, then known macOS bundle candidates', () => {
+  it('orders explicit, environment, bundled runtime, PATH, then known macOS bundle candidates', () => {
     const candidates = getCodexBinaryCandidates({
       explicitBinary: '/configured/codex',
       env: { CODEX_BINARY: '/environment/codex', PATH: '/first:/second' },
       platform: 'darwin',
+      arch: 'x64',
+      resourcesPath: '/Aster Code.app/Contents/Resources',
       knownBundlePaths: ['/Applications/ChatGPT.app/Contents/Resources/codex'],
     })
 
     expect(candidates).toEqual([
       { path: '/configured/codex', source: 'explicit' },
       { path: '/environment/codex', source: 'environment' },
+      { path: '/Aster Code.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/bin/codex', source: 'bundled' },
       { path: '/first/codex', source: 'path' },
       { path: '/second/codex', source: 'path' },
       { path: '/Applications/ChatGPT.app/Contents/Resources/codex', source: 'chatgpt-bundle' },
     ])
+  })
+
+  it('maps supported packaged targets without guessing unsupported platforms', () => {
+    expect(getBundledCodexPath('C:\\resources', 'win32', 'x64')).toBe(
+      'C:\\resources/app.asar.unpacked/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe',
+    )
+    expect(getBundledCodexPath('/resources', 'darwin', 'arm64')).toBe(
+      '/resources/app.asar.unpacked/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex',
+    )
+    expect(getBundledCodexPath('/resources', 'linux', 'x64')).toBeNull()
   })
 
   it('probes candidates in order and falls back when a candidate is not Codex', async () => {

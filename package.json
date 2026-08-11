@@ -2,6 +2,7 @@
   "name": "aster-code",
   "version": "0.1.0",
   "private": true,
+  "author": "Aster Code contributors",
   "description": "A local-first desktop coding agent client powered by Codex app-server.",
   "type": "module",
   "main": "./out/main/index.js",
@@ -15,10 +16,14 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs",
+    "check:workflows": "node scripts/check-workflows.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
+    "check:package": "node scripts/check-packaged-runtime.mjs",
     "audit:dependencies": "pnpm audit --prod --audit-level high",
     "audit:licenses": "pnpm licenses list --prod",
+    "notices:generate": "node scripts/generate-third-party-notices.mjs",
+    "notices:check": "node scripts/generate-third-party-notices.mjs --check",
     "schema:sync": "node scripts/sync-codex-schema.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
@@ -27,13 +32,15 @@
     "test:e2e": "pnpm build && playwright test",
     "test:e2e:offline": "pnpm build && playwright test tests/e2e/ipc-security.spec.ts",
     "test:e2e:performance": "pnpm build && playwright test tests/e2e/performance.spec.ts",
-    "verify": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm test && pnpm build && pnpm check:bundle",
-    "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
-    "package:dir": "pnpm build && electron-builder --dir",
-    "package:mac": "pnpm build && electron-builder --mac",
-    "package:win": "pnpm build && electron-builder --win"
+    "test:e2e:packaged": "pnpm package:dir && pnpm check:package && playwright test tests/e2e/packaged.spec.ts",
+    "verify": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm test && pnpm build && pnpm check:bundle",
+    "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm notices:check && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
+    "package:dir": "pnpm build && electron-builder --dir --publish never",
+    "package:mac": "pnpm build && electron-builder --mac --publish never",
+    "package:win": "pnpm build && electron-builder --win --publish never"
   },
   "dependencies": {
+    "@openai/codex": "0.147.0",
     "@openai/codex-security": "0.1.8",
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-search": "0.16.0",
@@ -43,6 +50,12 @@
     "react-dom": "19.2.8",
     "rrule": "2.8.1",
     "zod": "4.4.3"
+  },
+  "optionalDependencies": {
+    "@openai/codex-darwin-arm64": "npm:@openai/codex@0.147.0-darwin-arm64",
+    "@openai/codex-darwin-x64": "npm:@openai/codex@0.147.0-darwin-x64",
+    "@openai/codex-win32-arm64": "npm:@openai/codex@0.147.0-win32-arm64",
+    "@openai/codex-win32-x64": "npm:@openai/codex@0.147.0-win32-x64"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
@@ -65,24 +78,43 @@
     "appId": "dev.astercode.desktop",
     "productName": "Aster Code",
     "asar": true,
+    "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
     "files": [
       "out/**/*",
-      "package.json"
+      "package.json",
+      "!node_modules/@openai/codex-security/node_modules/@openai/codex-*/**",
+      "!node_modules/@openai/codex-sdk/node_modules/@openai/codex-*/**"
     ],
     "mac": {
       "category": "public.app-category.developer-tools",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "notarize": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.plist",
       "target": [
         "dmg",
         "zip"
       ]
     },
     "win": {
+      "icon": "build/icon.ico",
       "target": [
         "nsis"
       ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": "always",
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false
     }
   }
 }

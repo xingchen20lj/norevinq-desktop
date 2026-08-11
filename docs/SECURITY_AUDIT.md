@@ -1,15 +1,28 @@
 # 安全审计与加固记录
 
-审计日期：2026-08-10。范围为当前仓库生产源码、Electron 配置、IPC、文件/浏览器边界、子进程、凭据与生产依赖。
+审计日期：2026-08-11。范围为当前仓库生产源码、Electron 配置、IPC、文件/浏览器边界、子进程、凭据、生产依赖和发布流水线。
 
 ## 方法与限制
 
 - 执行 `pnpm audit --prod --audit-level low`，并在修复后复扫。
 - 逐项追踪 Renderer → preload → IPC → 主进程敏感操作，以及仓库/模型/MCP/app-server → 文件、进程、网络和持久化的路径。
 - 运行定向单元/集成测试和一个不调用模型的 Electron 对抗测试。
-- Codex Security 标准扫描技能要求的桌面 direct-start/finalize 工具在当前工具面不可用；独立子代理也受当前协作规则禁止。在线 SDK 又因账户使用量耗尽无法完成 sealed 扫描。因此本文件不是伪造的 Codex Security sealed 报告，完整在线扫描仍列为外部待验证。
+- 使用 Codex Security plugin 0.1.18 对 Stage 20 working-tree diff 完成七个安全相关文件的 discovery、候选验证和攻击路径校准；两个 release workflow 问题 survives validation，修复见下文。
+- 扫描的 unsealed `scan-manifest.json`、`findings.json`、`coverage.json` 和全部逐文件收据已生成，但 finalizer 拒绝 macOS `/var` 符号链接形式的扫描目录（要求 canonical non-symlink directory）。按扫描流程的单次 finalization 规则未重试，因此本文件不把该次扫描称为 sealed。在线 SDK sealed 扫描仍受账户使用量/费用限制。
 
 ## 已验证并修复
+
+### 中：任意 dispatch ref 可使用发布签名凭据
+
+手动发布 workflow 原先没有 ref 守门或 protected environment，`workflow_dispatch` 可让具有仓库写权限的账号选择未审阅 ref，并让该 ref 的 `package:*` 脚本继承 macOS/Windows 签名凭据。攻击路径把普通写权限提升为发行者签名/公证身份使用权，校准为中危/P2。
+
+现在 package job 只允许 `refs/heads/main`，checkout 明确绑定触发时的 `github.sha` 并关闭凭据持久化；job 使用 `release` environment，发布文档要求独立 reviewer、禁止 self-review 和仅允许受保护 main。`require_signing=false` 时签名变量显式为空，Windows signed build 还会逐 installer 验证 Authenticode。
+
+### 低：GitHub Actions 使用可变 major 标签
+
+发布与 CI 原先使用 `actions/checkout@v7` 等可移动标签。若上游 publisher/tag 被控制，前置 Action 可持久化修改 runner 后在签名步骤取密，上传 Action 也可控制本地校验后的 artifact；需上游控制和合法 manual dispatch，因此校准为低危/P3，不声称任何当前上游已被攻破。
+
+所有 checkout、pnpm setup、Node setup 和 artifact upload callsite 现固定到经上游 tag 解析的完整 40 位提交 SHA。`scripts/check-workflows.mjs` 进入本地与 CI 质量门，自动拒绝浮动 Action ref，并守护 main/ref/environment/签名验证配置。
 
 ### 高：Codex Security 的 PDF.js 传递依赖漏洞
 
@@ -27,6 +40,10 @@
 
 app-server 过去继承 Electron 的整个 `process.env`，可能无意携带 CI、Git 或其他服务密钥。现在只传递跨平台系统运行、区域、代理/证书、Codex/OpenAI 认证变量和显式 provider 环境。定向测试证明未授权的 `GITHUB_TOKEN`/任意秘密不会进入子进程；真实 app-server 仍完成 initialize/model-list 并达到 ready。
 
+### 防御性：notice 生成器信任 PATH 和最终符号链接
+
+该脚本只在受信任的 Aster 源码构建中使用，因此独立攻击路径被判定为非报告项；仍完成前瞻加固：子进程通过当前 pinned pnpm 暴露的绝对 `npm_execpath` 运行，不再二次搜索项目 `PATH`；生成目标必须是普通文件并通过同目录临时文件替换，拒绝符号链接；homepage 只允许 HTTP(S)。自动测试确认外部 symlink victim 内容保持不变。
+
 ## 未发现可报告问题的已审计控制
 
 - 主 Renderer CSP、sandbox/contextIsolation、无 Node，且阻止非当前 URL 导航。
@@ -35,6 +52,7 @@ app-server 过去继承 Electron 的整个 `process.env`，可能无意携带 CI
 - OS safeStorage 密文、0600 原子文件、日志递归脱敏和有界轮转。
 - Security 产物在仓库外、realpath 约束、只有 completed sealed 结果可读取或执行 finding 操作。
 - app-server JSONL 大小/超时/背压、活动 turn 崩溃不重放、终端输出与共享上下文有界。
+- 发布 workflow 只从 main 的不可变触发 SHA 进入受保护 environment；第三方 Actions 全部固定提交 SHA，未签名构建不接收签名变量。
 
 ## 许可证
 

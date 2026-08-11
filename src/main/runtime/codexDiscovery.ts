@@ -6,7 +6,7 @@ import { promisify } from 'node:util'
 
 const execFile = promisify(nodeExecFile)
 
-export type CodexBinarySource = 'explicit' | 'environment' | 'path' | 'chatgpt-bundle'
+export type CodexBinarySource = 'explicit' | 'environment' | 'bundled' | 'path' | 'chatgpt-bundle'
 
 export type CodexBinaryCandidate = {
   path: string
@@ -21,6 +21,8 @@ export type CodexDiscoveryOptions = {
   explicitBinary?: string
   env?: NodeJS.ProcessEnv
   platform?: NodeJS.Platform
+  arch?: NodeJS.Architecture
+  resourcesPath?: string
   knownBundlePaths?: readonly string[]
   probe?: (binaryPath: string) => Promise<string>
 }
@@ -29,6 +31,41 @@ export const KNOWN_CHATGPT_MACOS_CODEX_PATHS = [
   '/Applications/ChatGPT.app/Contents/Resources/codex',
   '/Applications/ChatGPT.app/Contents/MacOS/codex',
 ] as const
+
+const BUNDLED_CODEX_TARGETS: Partial<Record<NodeJS.Platform, Partial<Record<NodeJS.Architecture, {
+  packageName: string
+  triple: string
+  executable: string
+}>>>> = {
+  darwin: {
+    x64: { packageName: 'codex-darwin-x64', triple: 'x86_64-apple-darwin', executable: 'codex' },
+    arm64: { packageName: 'codex-darwin-arm64', triple: 'aarch64-apple-darwin', executable: 'codex' },
+  },
+  win32: {
+    x64: { packageName: 'codex-win32-x64', triple: 'x86_64-pc-windows-msvc', executable: 'codex.exe' },
+    arm64: { packageName: 'codex-win32-arm64', triple: 'aarch64-pc-windows-msvc', executable: 'codex.exe' },
+  },
+}
+
+export function getBundledCodexPath(
+  resourcesPath: string,
+  platform: NodeJS.Platform,
+  arch: NodeJS.Architecture,
+): string | null {
+  const target = BUNDLED_CODEX_TARGETS[platform]?.[arch]
+  if (!target) return null
+  return join(
+    resourcesPath,
+    'app.asar.unpacked',
+    'node_modules',
+    '@openai',
+    target.packageName,
+    'vendor',
+    target.triple,
+    'bin',
+    target.executable,
+  )
+}
 
 function commandNames(platform: NodeJS.Platform): readonly string[] {
   return platform === 'win32' ? ['codex.exe', 'codex.cmd', 'codex.bat', 'codex'] : ['codex']
@@ -61,6 +98,8 @@ function configuredCandidate(
 export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): CodexBinaryCandidate[] {
   const env = options.env ?? process.env
   const platform = options.platform ?? process.platform
+  const arch = options.arch ?? process.arch
+  const resourcesPath = options.resourcesPath ?? runtimeResourcesPath()
   const pathValue = env.PATH ?? ''
   const candidates: CodexBinaryCandidate[] = []
 
@@ -69,6 +108,10 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
   }
   if (env.CODEX_BINARY) {
     candidates.push(...configuredCandidate(env.CODEX_BINARY, 'environment', platform, pathValue))
+  }
+  if (resourcesPath) {
+    const bundledPath = getBundledCodexPath(resourcesPath, platform, arch)
+    if (bundledPath) candidates.push({ path: bundledPath, source: 'bundled' })
   }
   for (const entry of pathValue.split(platform === 'win32' ? ';' : delimiter).filter(Boolean)) {
     for (const name of commandNames(platform)) candidates.push({ path: join(entry, name), source: 'path' })
@@ -86,6 +129,11 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
     seen.add(key)
     return true
   })
+}
+
+function runtimeResourcesPath(): string | undefined {
+  const value = Reflect.get(process, 'resourcesPath') as unknown
+  return typeof value === 'string' && value.length > 0 ? value : undefined
 }
 
 export async function probeCodexVersion(binaryPath: string): Promise<string> {
@@ -129,6 +177,6 @@ export async function discoverCodexBinary(
 
   const detail = failures.length > 0 ? ` Probe failures: ${failures.join('; ')}` : ''
   throw new Error(
-    `Unable to find a working Codex binary. Configure one explicitly, set CODEX_BINARY, or add codex to PATH.${detail}`,
+    `Unable to find a working Codex binary. Configure one explicitly, set CODEX_BINARY, reinstall the bundled runtime, or add codex to PATH.${detail}`,
   )
 }

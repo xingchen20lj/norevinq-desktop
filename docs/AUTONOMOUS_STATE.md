@@ -4,12 +4,12 @@
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备。
+阶段 20：桌面打包和发布准备（完成）；正在执行最终功能一致性逐项审计。
 
 ## 当前任务
 
-- 验证 macOS 未签名目录包、DMG/ZIP 产物与安装启动。
-- 完成 Windows NSIS 构建配置、跨平台 CI 产物、签名/公证脚本和发布文档。
+- 从 `docs/FEATURE_PARITY.md` 首行开始逐项审计尚未研究、尚未开发和部分实现项。
+- 优先完成无需在线账户的公开功能，并把外部权限/证书/目标平台限制收敛为准确阻塞说明。
 
 ## 已完成任务
 
@@ -137,13 +137,24 @@
 - 真实 Electron 全新 profile 冷启动基线：首屏可见 2.15 s、DOMContentLoaded 345 ms、4 个进程工作集总计 307.1 MiB。
 - 离线 Electron 回归真实打开全部 lazy 工作台并再次验证恶意 Renderer IPC 拒绝；性能测试不调用在线模型。
 - 阶段 19 最终质量门：26 个单元/集成测试文件 111 项、2 项性能基准、类型、规范、脚本、覆盖率、生产构建和 bundle 预算通过；覆盖率 80.14/68.32/84.24/87.09。
+- 将公开 `@openai/codex` 0.147.0 固定为随应用发布的主 runtime；发现优先级为显式配置、`CODEX_BINARY`、包内版本、PATH、ChatGPT bundle，不复制或依赖本机 ChatGPT 私有安装。
+- 为 macOS/Windows x64/arm64 显式声明官方平台 optional package，避免 pnpm 11 在目标 runner 漏装传递型原生依赖。
+- 完成独立 Aster Code SVG/PNG/ICNS/ICO 图标、macOS hardened runtime/entitlements、公证配置和 Windows 交互式 per-user NSIS 配置。
+- 生产包明确去除 Codex Security pnpm 嵌套图中的重复原生二进制；主包只保留一份 0.147.0。Security 0.1.8 声明的 0.144.6 打包兼容性保留为 sealed 扫描复验项，不伪称完成。
+- 完成包内 runtime 审计脚本和 packaged E2E；真实目录包与只读挂载 DMG 均启动，包内 app-server 0.147.0 达到 ready、模型目录非空。
+- Intel macOS 无签名产物实测：App 697 MiB、DMG 259 MiB、ZIP 273 MiB；DMG CRC、ZIP 全文件测试通过，最终 SHA-256 为 DMG `1d88ba25...e653`、ZIP `c5bd6b35...417e`。
+- 建立 macOS 15/Windows 2025 手动发布 workflow：默认缺签名/公证凭据即失败，完成质量门、许可证、平台打包、packaged E2E、签名验证、校验和与 artifact 上传。
+- 从锁定生产依赖图生成 90 包 `THIRD_PARTY_NOTICES.md`，并加入 CI 漂移守门。
+- 使用 Codex Security plugin 0.1.18 完成 Stage 20 working-tree diff 的七文件 discovery、两项候选独立验证和攻击路径校准；finalizer 因 macOS `/var` 非 canonical 路径硬约束未 sealed，未伪称完成。
+- 修复 release workflow 任意 ref 使用签名凭据（中危/P2）与 GitHub Actions 可变标签（低危/P3）：main-only、immutable checkout SHA、protected `release` environment、无签名模式空凭据、完整 Action SHA 和 Windows Authenticode 验证。
+- 建立 `check:workflows` 回归守门；notice 生成器改为绝对 pinned pnpm 入口、普通文件替换和 HTTP(S) 链接，并用 symlink victim 测试验证不越界写入。
+- 阶段 20 最终质量门：27 个测试文件 114 项、2 项性能基准、覆盖率门槛、类型、规范、workflow 守门、许可证、构建、bundle、生产漏洞审计和 packaged E2E 全部通过。
 
 ## 下一任务
 
-1. 提交阶段 19 性能检查点。
-2. 生成并验证 macOS 未签名目录包、DMG/ZIP，检查 asar、生产依赖、应用启动和卸载边界。
-3. 完善 Windows NSIS、macOS 签名/公证、Windows 签名和 CI 发布产物流程。
-4. 开始最终功能一致性审计；账户使用量恢复后补在线 E2E。
+1. 从 `docs/FEATURE_PARITY.md` 首行开始逐项审计尚未研究/尚未开发/部分实现项目。
+2. 优先完成无需在线账户的公开功能；账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
+3. 对剩余外部凭据、目标平台和私有服务差异给出可验证的发布前清单。
 
 ## 已做技术决策
 
@@ -167,16 +178,17 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 26 个测试文件 111 项、2 项性能基准、覆盖率门槛、类型、规范、构建和 bundle 预算均通过；离线 Electron IPC/lazy 工作台与独立性能 E2E 通过。在线 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 27 个测试文件 114 项、2 项性能基准、覆盖率门槛、类型、规范、workflow 守门、许可证、构建和 bundle 预算均通过；生产漏洞审计、目录包 packaged E2E 与挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
-- 本机 Codex 是预发布构建 `0.147.0-alpha.6.5`，会与稳定 0.147.0 schema 做兼容测试。
+- 开发环境仍可发现 ChatGPT 预发布 `0.147.0-alpha.6.5`，但发布包已固定并实际启动稳定 0.147.0；schema 继续按固定版本同步。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
 - 当前 bundle 预算基于 Intel macOS 构建；不同平台 chunk 哈希可不同，但 `check:bundle` 以生产 HTML 的真实入口资产计量。
-- pnpm `licenses list` 读取本机全局 store 索引需要提升的只读权限；CI 使用自身可读 store，不影响构建。
+- Codex Security 0.1.8 元数据固定 Codex SDK/runtime 0.144.6；发布包为避免额外约 270 MiB 原生副本统一使用 0.147.0，需在使用量/权限恢复后执行 packaged sealed 扫描确认兼容。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 - Codex Security standard 扫描即使仅 2 个目标文件也超过本次 $2 在线验证上限；提高预算前不能宣称真实 sealed 扫描完成。
+- Stage 20 本地安全 diff 扫描完成源码、验证与攻击路径阶段，但 finalizer 拒绝 `/var` 符号链接形式扫描目录；按单次 finalization 规则保留为 unsealed 证据，不导入产品扫描历史。
 
 ## 当前阻塞
 
