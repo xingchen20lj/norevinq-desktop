@@ -4,7 +4,7 @@
 
 ## 发布基线
 
-- Node.js 24.14.0、pnpm 11.16.0、Electron 43.3.0、electron-builder 26.15.3；
+- Node.js 24.14.0、pnpm 11.16.0、Electron 43.3.0、electron-builder 26.15.3、electron-updater 6.8.9；
 - 主 Codex runtime 固定为公开 `@openai/codex` 0.147.0，并随平台包内置；
 - Codex Security SDK 固定 0.1.8，其 SDK 元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，因此 Security 的打包兼容性必须通过目标账户 sealed 扫描复验；
 - macOS 目标为 DMG + ZIP，Windows 目标为交互式 per-user NSIS；
@@ -37,6 +37,27 @@ pnpm package:win
 `test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready。
 
 应用注册 `aster-code` 自定义协议，只接受 `aster-code://project/<project-uuid>` 与 `aster-code://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
+
+## 自动更新渠道
+
+普通 `package:mac`/`package:win` 和无签名 CI 只生成内部安装包，不内置更新渠道。正式签名发布必须提供真实 HTTPS base URL：
+
+```bash
+ASTER_UPDATE_URL='https://downloads.example.org/aster-code/' pnpm package:update
+pnpm check:package
+```
+
+`package:update` 不上传文件；它以 `--publish never` 生成平台安装包、blockmap、`app-update.yml` 和 `latest-mac.yml`/`latest.yml`。脚本拒绝 HTTP、localhost、凭据、query 和 fragment。`check:package` 会验证包内 URL 仍为安全 HTTPS generic provider。示例域名必须替换为发布者实际控制的服务，不能把示例构建当作公开更新渠道。
+
+发布顺序：
+
+1. 使用与旧版本相同的 Developer ID/Windows publisher 身份签名并完成平台验证。
+2. 上传 DMG+ZIP（macOS）或 NSIS EXE（Windows）及全部 blockmap。
+3. 验证远端文件大小和 SHA-512 与本地产物一致。
+4. 最后原子发布 `latest-mac.yml`/`latest.yml`，避免客户端看到尚未完整上传的版本。
+5. 用已安装的上一版本执行检查→下载进度→重启安装→用户数据保留回归。
+
+正式包启动 30 秒后检查，之后每 6 小时检查。发现版本不会静默下载；用户确认下载后，electron-updater 执行 SHA-512 与平台签名验证，下载完成可立即重启或在正常退出时安装。macOS 没有签名时官方 updater 会拒绝工作。
 
 2026-08-11 本机 Intel macOS 无签名实测：目录包 697 MiB，DMG 259 MiB，ZIP 273 MiB；DMG CRC、ZIP 全文件校验、目录包启动和只读挂载 DMG 启动均通过。体积主要由 Electron、Codex 0.147.0 原生运行时和 Codex Security 依赖组成。files 规则明确去除 pnpm 嵌套图中重复的平台二进制，但保留根平台 runtime。完整生产依赖许可证元数据见根目录 `THIRD_PARTY_NOTICES.md`。
 
@@ -72,7 +93,7 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 
 ## GitHub Actions
 
-“Desktop release artifacts” 是手动 workflow，只允许从 `main` 执行，并把 checkout 绑定到触发时的不可变 `github.sha`。默认 `require_signing=true`，缺任一平台凭据会失败，不会静默发布未签名包。仅用于内部验证时可显式选择 false，此时签名变量被显式置空，产物仍只保留为 Actions artifact，不创建 GitHub Release。
+“Desktop release artifacts” 是手动 workflow，只允许从 `main` 执行，并把 checkout 绑定到触发时的不可变 `github.sha`。默认 `require_signing=true`，此时还必须填写实际 `update_url`，缺平台凭据或安全 HTTPS 地址会失败。仅用于内部验证时可显式选择 false，此时签名变量被显式置空、使用普通 package 命令且不生成更新元数据；产物仍只保留为 Actions artifact，不创建 GitHub Release。
 
 首次启用前必须在 GitHub 创建受保护的 `release` environment：
 
@@ -88,7 +109,7 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 - macOS：`MAC_CSC_LINK`、`MAC_CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`；
 - Windows：`WIN_CSC_LINK`、`WIN_CSC_KEY_PASSWORD`。
 
-每个平台依次执行生产依赖审计、完整质量门、平台打包、包内 Codex 启动冒烟、签名/公证验证（要求签名时）、SHA-256 和 artifact 上传。将 artifact 发布到公开渠道仍需发布者审阅版本、third-party notices、功能一致性和已知限制。
+每个平台依次执行生产依赖审计、完整质量门、平台打包、包内 Codex/更新配置冒烟、签名/公证验证（要求签名时）、SHA-256 和 artifact 上传。签名构建同时保留 latest metadata；Actions 不会向 `update_url` 上传，发布者必须按上述顺序部署。将 artifact 发布到公开渠道仍需审阅版本、third-party notices、功能一致性和已知限制。
 
 ## 发布清单
 
@@ -96,5 +117,5 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 2. 同步并审阅 Codex schema；确认 package runtime 与 schema 版本。
 3. 运行 `pnpm verify:ci`、`pnpm audit:dependencies` 和平台 packaged E2E。
 4. 在目标系统安装产物，验证项目、任务、终端、Git、文件预览、DeepSeek 和安全诊断。
-5. 验证签名、公证/SmartScreen、安装、`aster-code` 外部唤起、升级、卸载和用户数据保留。
+5. 从上一签名版本验证签名、公证/SmartScreen、安装、`aster-code` 外部唤起、自动更新下载/重启升级、卸载和用户数据保留。
 6. 记录产物 SHA-256；人工批准后再发布。

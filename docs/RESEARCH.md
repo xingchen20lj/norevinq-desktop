@@ -1,6 +1,6 @@
 # 官方上游研究基线
 
-调查日期：2026-08-10。所有动态能力必须在运行时再次探测；本文只作为首个实现和回归基线。
+调查日期：2026-08-11。所有动态能力必须在运行时再次探测；本文只作为首个实现和回归基线。
 
 ## OpenAI Codex
 
@@ -85,6 +85,20 @@
 来源：
 
 - [Codex Scheduled Tasks](https://learn.chatgpt.com/docs/automations)
+
+## Electron 自动更新
+
+- 当前稳定 `electron-updater` 为 6.8.9；Aster Code 使用 electron-builder 26.15.3 生成同一套 `app-update.yml`、`latest-mac.yml`/`latest.yml`、SHA-512 和 blockmap。
+- macOS 自动更新要求应用已签名，并需要 DMG 与 ZIP；Windows 使用现有 NSIS 目标。未签名内部包不生成更新渠道，避免把不可验证产物发布为升级版本。
+- 运行时不接受 Renderer 或用户输入更新 URL，只读取签名包内的 `app-update.yml`。发布构建只接受无凭据、无 query/fragment 的 HTTPS base URL。
+- 正式包在启动 30 秒后检查，并每 6 小时检查；发现新版本后由用户确认下载，下载完成可立即安装或在正常退出时安装。禁用预发布、降级和 NSIS web installer。
+- electron-updater 校验 update metadata 的 SHA-512，并在 macOS/Windows 执行平台代码签名校验；真实跨版本更新仍必须用同一发布身份的两个签名版本在目标系统验证。
+
+来源：
+
+- [electron-builder Auto Update](https://www.electron.build/docs/features/auto-update/)
+- [electron-updater API](https://www.electron.build/docs/api/electron-updater/)
+- [Electron autoUpdater 平台要求](https://www.electronjs.org/docs/latest/api/auto-updater)
 
 ## 本机开发环境
 

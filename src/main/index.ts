@@ -28,6 +28,9 @@ import { serveFilePreview } from './files/fileProtocol.js'
 import { BrowserService } from './browser/browserService.js'
 import { extractAsterDeepLinks, parseAsterDeepLink } from './app/deepLinks.js'
 import { IPC_CHANNELS } from '../shared/contracts.js'
+import { UpdateService } from './update/updateService.js'
+import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
+import { lstatSync } from 'node:fs'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -51,6 +54,7 @@ let securityService: SecurityService | null = null
 let schedulerService: SchedulerService | null = null
 let fileService: FileService | null = null
 let browserService: BrowserService | null = null
+let updateService: UpdateService | null = null
 let rendererReady = false
 const pendingDeepLinks = extractAsterDeepLinks(process.argv)
 
@@ -192,6 +196,14 @@ if (!gotLock) {
     schedulerService = new SchedulerService(database, (task, projectId, signal) =>
       executeScheduledTask(createdAgentService, createdWorktreeService, task, projectId, signal))
     browserService = new BrowserService(() => mainWindow, (url) => shell.openExternal(url))
+    const updateConfigured = app.isPackaged && hasPackagedUpdateConfiguration(process.resourcesPath)
+    updateService = new UpdateService({
+      configured: updateConfigured,
+      currentVersion: app.getVersion(),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      ...(updateConfigured ? { driver: createElectronUpdateDriver() } : {}),
+    })
     unregisterIpc = registerIpc(
       database,
       runtime,
@@ -206,6 +218,7 @@ if (!gotLock) {
       schedulerService,
       createdFileService,
       browserService,
+      updateService,
       (event) => {
         const window = mainWindow
         return window !== null
@@ -215,6 +228,7 @@ if (!gotLock) {
       },
     )
     mainWindow = createMainWindow()
+    updateService.startAutomaticChecks()
     void runtime.start().then(() => schedulerService?.start())
 
     app.on('activate', () => {
@@ -255,6 +269,8 @@ app.on('before-quit', () => {
   runtimeLogger = null
   browserService?.dispose()
   browserService = null
+  updateService?.dispose()
+  updateService = null
   fileService?.clear()
   fileService = null
 })
@@ -263,6 +279,15 @@ app.on('will-quit', () => {
   database?.close()
   database = null
 })
+
+function hasPackagedUpdateConfiguration(resourcesPath: string): boolean {
+  try {
+    const metadata = lstatSync(join(resourcesPath, 'app-update.yml'))
+    return metadata.isFile() && !metadata.isSymbolicLink() && metadata.size > 0 && metadata.size <= 64 * 1024
+  } catch {
+    return false
+  }
+}
 
 function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
   try {

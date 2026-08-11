@@ -16,7 +16,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs",
     "check:workflows": "node scripts/check-workflows.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:package": "node scripts/check-packaged-runtime.mjs",
@@ -37,7 +37,8 @@
     "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm notices:check && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
     "package:dir": "pnpm build && electron-builder --dir --publish never",
     "package:mac": "pnpm build && electron-builder --mac --publish never",
-    "package:win": "pnpm build && electron-builder --win --publish never"
+    "package:win": "pnpm build && electron-builder --win --publish never",
+    "package:update": "pnpm build && node scripts/package-update-release.mjs"
   },
   "dependencies": {
     "@openai/codex": "0.147.0",
@@ -45,6 +46,7 @@
     "@xterm/addon-fit": "0.11.0",
     "@xterm/addon-search": "0.16.0",
     "@xterm/xterm": "6.0.0",
+    "electron-updater": "6.8.9",
     "lucide-react": "1.31.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
@@ -80,7 +82,9 @@
     "protocols": [
       {
         "name": "Aster Code",
-        "schemes": ["aster-code"]
+        "schemes": [
+          "aster-code"
+        ]
       }
     ],
     "asar": true,

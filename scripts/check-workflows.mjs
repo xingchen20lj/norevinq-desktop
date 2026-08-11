@@ -30,6 +30,12 @@ const requiredReleaseControls = [
   "CSC_LINK: ${{ inputs.require_signing && secrets.WIN_CSC_LINK || '' }}",
   'Get-AuthenticodeSignature',
   'codesign --verify --deep --strict',
+  'ASTER_UPDATE_URL: ${{ inputs.update_url }}',
+  'release/latest*.yml',
+  "if: runner.os == 'macOS' && inputs.require_signing",
+  "if: runner.os == 'macOS' && !inputs.require_signing",
+  "if: runner.os == 'Windows' && inputs.require_signing",
+  "if: runner.os == 'Windows' && !inputs.require_signing",
 ]
 
 for (const control of requiredReleaseControls) {

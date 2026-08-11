@@ -62,6 +62,7 @@ import type {
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
 import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
 import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
+import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 import {
   requireAuthorizedIpcSender,
   type IpcSenderAuthorizer,
@@ -220,6 +221,14 @@ export type BrowserController = {
   openInSystemBrowser: (url: string) => Promise<void>
 }
 
+export type UpdateController = {
+  getSnapshot: () => UpdateSnapshot
+  subscribe: (subscription: UpdateSubscription) => () => void
+  checkForUpdates: () => Promise<UpdateSnapshot>
+  downloadUpdate: () => Promise<UpdateSnapshot>
+  installUpdate: () => void
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -234,6 +243,7 @@ export function registerIpc(
   scheduler: SchedulerController,
   files: FileController,
   browser: BrowserController,
+  updates: UpdateController,
   authorizeSender: IpcSenderAuthorizer,
 ): () => void {
   if (activeSenderAuthorizer) throw new Error('IPC handlers are already registered.')
@@ -274,6 +284,11 @@ export function registerIpc(
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.browserChanged, snapshot)
     }
   })
+  const unsubscribeUpdates = updates.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.updateChanged, snapshot)
+    }
+  })
 
   ipcMain.handle(IPC_CHANNELS.bootstrap, (): BootstrapState => ({
     appVersion: app.getVersion(),
@@ -281,6 +296,7 @@ export function registerIpc(
     projects: database.listProjects(),
     runtime: runtime.getSnapshot(),
     providers: providers.getStatus(),
+    updates: updates.getSnapshot(),
   }))
 
   ipcMain.handle(IPC_CHANNELS.selectProject, async () => {
@@ -310,6 +326,14 @@ export function registerIpc(
       ? agent.openLinkedThread(target.projectId, target.threadId)
       : null
   })
+  ipcMain.handle(IPC_CHANNELS.updateState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return updates.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.updateCheck, () => updates.checkForUpdates())
+  ipcMain.handle(IPC_CHANNELS.updateDownload, () => updates.downloadUpdate())
+  ipcMain.handle(IPC_CHANNELS.updateInstall, () => updates.installUpdate())
 
   ipcMain.handle(IPC_CHANNELS.runtimeStatus, (event) => {
     webContents.add(event.sender)
@@ -580,6 +604,7 @@ export function registerIpc(
     unsubscribeSecurity()
     unsubscribeScheduler()
     unsubscribeBrowser()
+    unsubscribeUpdates()
     webContents.clear()
     for (const channel of Object.values(IPC_CHANNELS)) ipcMain.removeHandler(channel)
     if (activeSenderAuthorizer === authorizeSender) activeSenderAuthorizer = null

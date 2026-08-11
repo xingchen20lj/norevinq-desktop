@@ -1,5 +1,6 @@
 import {
   Check,
+  Download,
   ExternalLink,
   FileText,
   KeyRound,
@@ -25,8 +26,9 @@ import type {
 } from '../../shared/integrations'
 import type { ProviderStatus } from '../../shared/providers'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
+import type { UpdateSnapshot } from '../../shared/update'
 
-type SettingsTab = 'providers' | 'mcp' | 'skills' | 'config'
+type SettingsTab = 'providers' | 'mcp' | 'skills' | 'config' | 'app'
 
 export function SettingsWorkbench({
   providers,
@@ -35,9 +37,11 @@ export function SettingsWorkbench({
   project,
   threadId,
   integrations,
+  updates,
   close,
   onError,
   onUpdated,
+  onUpdate,
 }: {
   providers: ProviderStatus | null
   apiKey: string
@@ -45,9 +49,11 @@ export function SettingsWorkbench({
   project: ProjectSummary | null
   threadId: string | null
   integrations: IntegrationSnapshot | null
+  updates: UpdateSnapshot | null
   close: () => void
   onError: (message: string | null) => void
   onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
+  onUpdate: (snapshot: UpdateSnapshot) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<SettingsTab>('providers')
   const [busy, setBusy] = useState(false)
@@ -69,6 +75,7 @@ export function SettingsWorkbench({
         <button className={tab === 'mcp' ? 'selected' : ''} onClick={() => setTab('mcp')}><Network size={14} />MCP</button>
         <button className={tab === 'skills' ? 'selected' : ''} onClick={() => setTab('skills')}><PackageOpen size={14} />技能</button>
         <button className={tab === 'config' ? 'selected' : ''} onClick={() => setTab('config')}><Layers3 size={14} />配置</button>
+        <button className={tab === 'app' ? 'selected' : ''} onClick={() => setTab('app')}><Download size={14} />应用</button>
       </nav>
       <div className="settings-workbench-body">
         {tab === 'providers' && <ProviderTab
@@ -88,9 +95,58 @@ export function SettingsWorkbench({
         />}
         {tab === 'skills' && <SkillsTab project={project} snapshot={integrations} busy={busy} run={run} />}
         {tab === 'config' && <ConfigTab project={project} snapshot={integrations} busy={busy} run={run} />}
+        {tab === 'app' && <ApplicationTab snapshot={updates} busy={busy} run={run} onUpdate={onUpdate} />}
       </div>
     </section>
   </div>
+}
+
+function ApplicationTab({ snapshot, busy, run, onUpdate }: {
+  snapshot: UpdateSnapshot | null
+  busy: boolean
+  run: (action: () => Promise<unknown>) => Promise<void>
+  onUpdate: (snapshot: UpdateSnapshot) => void
+}): React.JSX.Element {
+  const phaseLabel = snapshot ? updatePhaseLabel(snapshot.phase) : '正在读取'
+  const canCheck = snapshot?.phase === 'idle' || snapshot?.phase === 'upToDate' || snapshot?.phase === 'error'
+  return <div className="settings-section">
+    <div className="section-heading"><div><h3>应用更新</h3><p>由签名发布包中的 electron-builder 更新元数据驱动。</p></div>{canCheck && <button disabled={busy} onClick={() => void run(async () => onUpdate(await window.aster.checkForUpdates()))}><RefreshCw size={13} />检查更新</button>}</div>
+    <div className="provider-state">
+      <div className="provider-icon"><Download size={17} /></div>
+      <div><strong>{phaseLabel}</strong><p>当前版本 {snapshot?.currentVersion ?? '—'}{snapshot?.availableVersion ? ` · 可用 ${snapshot.availableVersion}` : ''}</p></div>
+      <span className={snapshot?.phase === 'downloaded' || snapshot?.phase === 'upToDate' ? 'connected' : ''}>{snapshot?.configured ? '已配置渠道' : '无发布渠道'}</span>
+    </div>
+    {snapshot?.disabledReason && <div className="provider-warning"><strong>自动更新未启用</strong><span>{snapshot.disabledReason}</span></div>}
+    {snapshot?.error && <div className="provider-warning"><strong>更新失败</strong><span>{snapshot.error}</span></div>}
+    {snapshot?.phase === 'downloading' && <div className="update-progress"><progress max={100} value={snapshot.progress?.percent ?? 0} /><span>{(snapshot.progress?.percent ?? 0).toFixed(1)}%{snapshot.progress ? ` · ${formatBytes(snapshot.progress.transferred)} / ${formatBytes(snapshot.progress.total)}` : ''}</span></div>}
+    {snapshot?.releaseNotes && <details className="result-preview" open><summary>版本说明</summary><pre>{snapshot.releaseNotes}</pre></details>}
+    <p className="settings-note">已配置的正式包会在启动 30 秒后检查，并每 6 小时重试。发现版本后由你确认下载；SHA-512 与平台代码签名由 electron-updater 验证。下载完成后可立即重启安装，也会在正常退出时自动安装。</p>
+    <div className="settings-actions">
+      {snapshot?.phase === 'available' && <button className="primary-button" disabled={busy} onClick={() => void run(async () => onUpdate(await window.aster.downloadUpdate()))}><Download size={13} />下载 {snapshot.availableVersion}</button>}
+      {snapshot?.phase === 'downloaded' && <button className="primary-button" disabled={busy} onClick={() => void run(() => window.aster.installUpdate())}><RefreshCw size={13} />重启并安装</button>}
+    </div>
+  </div>
+}
+
+function updatePhaseLabel(phase: UpdateSnapshot['phase']): string {
+  const labels: Record<UpdateSnapshot['phase'], string> = {
+    disabled: '更新不可用',
+    idle: '等待检查',
+    checking: '正在检查更新',
+    available: '发现新版本',
+    downloading: '正在下载更新',
+    downloaded: '更新已就绪',
+    upToDate: '已是最新版本',
+    error: '检查失败',
+  }
+  return labels[phase]
+}
+
+function formatBytes(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '0 B'
+  if (value < 1024) return `${String(Math.round(value))} B`
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KiB`
+  return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
 function ProviderTab({ providers, apiKey, setApiKey, busy, run, onUpdated }: {

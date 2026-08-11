@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 完成安全深链接阶段质量门与提交。
-- 研究并实现不依赖虚构发布服务的自动更新闭环；缺少真实发布渠道和签名时必须准确诊断而非伪装可用。
+- 完成自动更新阶段质量门、普通无渠道包复验与提交。
+- 继续逐项审计功能一致性表，优先处理本地可实现的尚未开发项。
 
 ## 已完成任务
 
@@ -167,11 +167,18 @@
 - 完成 macOS `open-url`、Windows/Linux `second-instance`、冷启动 argv 队列和最多 8 项去重边界；离线 Electron 真实发出单实例事件并恢复关联任务。
 - electron-builder 注册 `aster-code`，目录包 `Info.plist` 实际含 URL scheme；`check:package` 将协议元数据与官方 Codex 0.147.0 runtime 一并作为发布守门。
 - 深链接阶段 `verify:ci`：29 个测试文件 126 项、覆盖率 80.65/68.87/85.50/87.70、2 项性能基准、类型、规范、脚本、workflow、许可证、构建和 bundle 预算全部通过；任务生命周期 Electron E2E 与重新打包后的官方 Codex 0.147.0 packaged E2E 通过。
+- 集成 electron-updater 6.8.9；仅签名且包含 `app-update.yml` 的 macOS/Windows 包启用，开发构建与普通内部包给出明确禁用原因。
+- 完成更新检查/可用/下载进度/已下载/最新/取消/错误状态机、30 秒首检、6 小时间隔、用户确认下载、正常退出或立即重启安装；预发布、降级与 NSIS web installer 默认禁用。
+- 设置增加应用更新页；开发 Electron E2E 与配置渠道 packaged E2E 分别验证禁用/启用状态，1320×840 浅色截图未见溢出。
+- 完成只接受安全 HTTPS base URL 的 `package:update`；真实生成 macOS DMG、ZIP、blockmap、`app-update.yml` 与含 SHA-512 的 `latest-mac.yml`，测试 URL 使用保留 `.invalid` 域且未发布。
+- 发布 workflow 只为要求签名的构建生成更新元数据；无签名内部构建保持无渠道，避免不可验证的升级产物。生产依赖审计为 0 已知漏洞，third-party notices 更新为 104 包。
+- 自动更新阶段 `verify:ci`：31 个测试文件 137 项、覆盖率 80.81/69.35/85.41/87.77、2 项性能基准、类型、规范、脚本、workflow、notices、构建和 bundle 预算全部通过；配置渠道与普通无渠道两种目录包均通过 packaged E2E。
+- 复核 Codex Security 发布链报告：报告来自旧提交 `685dc51` 的扫描快照；当前基线已用 40 位 SHA 固定所有远程 Action，并由 main-only、不可变 `github.sha`、禁用 checkout credential 与受保护 `release` environment 关闭手工发布越权路径；`check:workflows` 对这些不变量持续守门，当前无需追加修复。
 
 ## 下一任务
 
-1. 完成自动更新发布渠道、状态机、更新包完整性和用户可控安装策略研究与实现。
-2. 从 `docs/FEATURE_PARITY.md` 继续逐项审计尚未研究/尚未开发/部分实现项目。
+1. 从 `docs/FEATURE_PARITY.md` 继续逐项审计尚未研究/尚未开发/部分实现项目。
+2. 优先实现无需外部账户的崩溃诊断包或网络/路径权限控制。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -194,10 +201,11 @@
 - 本地网页使用独立临时 WebContentsView；只允许 loopback 导航/资源，权限、下载和弹窗失败关闭。
 - 窗口状态只由主进程内部写入，恢复前必须验证显示器交集；Renderer 不能任意读写 app_settings。
 - 深链接只承载数据库 UUID，不承载文件路径、命令或凭据；项目–任务关联在接收 URL 和执行打开动作时分别校验。
+- 更新 URL 只在受保护发布构建时注入并固化进签名包；Renderer 无权读写 feed URL，未签名内部包不生成更新渠道。
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 29 个测试文件 126 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接生命周期、固定恢复 Electron E2E、生产漏洞审计、目录包 packaged E2E 与既有挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 31 个测试文件 137 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新生命周期、固定恢复 Electron E2E、生产漏洞审计、配置渠道与普通无渠道目录包 packaged E2E、既有挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
@@ -208,6 +216,7 @@
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
 - Codex Security standard 扫描即使仅 2 个目标文件也超过本次 $2 在线验证上限；提高预算前不能宣称真实 sealed 扫描完成。
 - Stage 20 本地安全 diff 扫描完成源码、验证与攻击路径阶段，但 finalizer 拒绝 `/var` 符号链接形式扫描目录；按单次 finalization 规则保留为 unsealed 证据，不导入产品扫描历史。
+- 自动更新尚无发布者实际控制的 HTTPS 源和平台签名证书；本机只验证元数据/状态机/包内启停，不能宣称真实跨版本升级完成。
 
 ## 当前阻塞
 
@@ -220,6 +229,7 @@
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
 - Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
+- 自动更新发布域名/对象存储：当前仓库没有远端或实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
 
 ## 待验证问题
 

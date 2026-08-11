@@ -56,6 +56,7 @@ import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } 
 import type { SecuritySnapshot } from '../../shared/security'
 import type { SchedulerSnapshot } from '../../shared/scheduler'
 import type { BrowserSnapshot } from '../../shared/browser'
+import type { UpdateSnapshot } from '../../shared/update'
 import type { CommandAction } from './CommandPalette'
 
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
@@ -111,6 +112,7 @@ export function App(): React.JSX.Element {
   const [initialFilePath, setInitialFilePath] = useState<string | null>(null)
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browser, setBrowser] = useState<BrowserSnapshot | null>(null)
+  const [updates, setUpdates] = useState<UpdateSnapshot | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aster-sidebar-collapsed') === 'true')
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
@@ -154,8 +156,15 @@ export function App(): React.JSX.Element {
       setBootstrap(state)
       setRuntime(state.runtime)
       setProviders(state.providers)
+      setUpdates(state.updates)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onUpdateChanged(setUpdates)
+    void window.aster.getUpdateState().then(setUpdates).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
   }, [])
 
   useEffect(() => window.aster.onDeepLink(setPendingDeepLink), [])
@@ -816,9 +825,11 @@ export function App(): React.JSX.Element {
         project={selectedProject}
         threadId={selectedThread?.id ?? null}
         integrations={integrations}
+        updates={updates}
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
+        onUpdate={setUpdates}
       /></Suspense>}
       {securityOpen && <Suspense fallback={<WorkbenchLoading label="正在加载安全工作台…" overlay />}><SecurityWorkbench
         snapshot={security}

@@ -81,6 +81,7 @@ import type {
   BrowserSnapshot,
   BrowserSubscription,
 } from './browser.js'
+import type { UpdateSnapshot, UpdateSubscription } from './update.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -89,6 +90,11 @@ export const IPC_CHANNELS = {
   projectPinnedSet: 'project:pinned-set',
   deepLinkOpened: 'app:deep-link-opened',
   deepLinkOpen: 'app:deep-link-open',
+  updateState: 'app:update-state',
+  updateCheck: 'app:update-check',
+  updateDownload: 'app:update-download',
+  updateInstall: 'app:update-install',
+  updateChanged: 'app:update-changed',
   runtimeStatus: 'runtime:status',
   runtimeRestart: 'runtime:restart',
   runtimeStatusChanged: 'runtime:status-changed',
@@ -196,6 +202,7 @@ export type BootstrapState = {
   projects: ProjectSummary[]
   runtime: CodexRuntimeSnapshot
   providers: ProviderStatus
+  updates: UpdateSnapshot
 }
 
 export type RemoveProjectInput = {
@@ -219,6 +226,11 @@ export type AsterDesktopApi = {
   setProjectPinned: (input: SetProjectPinnedInput) => Promise<ProjectSummary[]>
   openDeepLink: (target: DeepLinkTarget) => Promise<ConversationSnapshot | null>
   onDeepLink: (subscription: DeepLinkSubscription) => () => void
+  getUpdateState: () => Promise<UpdateSnapshot>
+  checkForUpdates: () => Promise<UpdateSnapshot>
+  downloadUpdate: () => Promise<UpdateSnapshot>
+  installUpdate: () => Promise<void>
+  onUpdateChanged: (subscription: UpdateSubscription) => () => void
   getRuntimeStatus: () => Promise<CodexRuntimeSnapshot>
   restartRuntime: () => Promise<CodexRuntimeSnapshot>
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void

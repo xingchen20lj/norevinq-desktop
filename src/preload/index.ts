@@ -66,6 +66,7 @@ import type {
   BrowserSnapshot,
   BrowserSubscription,
 } from '../shared/browser.js'
+import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -77,6 +78,15 @@ const api: AsterDesktopApi = {
     const listener = (_event: Electron.IpcRendererEvent, target: DeepLinkTarget): void => subscription(target)
     ipcRenderer.on(IPC_CHANNELS.deepLinkOpened, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.deepLinkOpened, listener)
+  },
+  getUpdateState: () => ipcRenderer.invoke(IPC_CHANNELS.updateState),
+  checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.updateCheck),
+  downloadUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.updateDownload),
+  installUpdate: () => ipcRenderer.invoke(IPC_CHANNELS.updateInstall),
+  onUpdateChanged: (subscription: UpdateSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: UpdateSnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.updateChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.updateChanged, listener)
   },
   getRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeStatus),
   restartRuntime: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeRestart),

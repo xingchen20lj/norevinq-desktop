@@ -20,6 +20,9 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
 
     await window.getByRole('button', { name: '设置', exact: true }).click()
     await expect(window.getByRole('heading', { name: '设置与集成' })).toBeVisible()
+    await window.getByRole('button', { name: '应用', exact: true }).click()
+    await expect(window.getByText('开发构建不会连接发布更新源。')).toBeVisible()
+    await window.screenshot({ path: 'test-results/aster-update-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
     await window.getByRole('button', { name: '安全', exact: true }).click()
     await expect(window.getByRole('heading', { name: '安全工作台' })).toBeVisible()

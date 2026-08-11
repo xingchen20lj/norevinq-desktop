@@ -1,7 +1,8 @@
 import { execFile } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { lstat, readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
+import { requireSecureUpdateUrl } from './update-release-config.mjs'
 
 const execute = promisify(execFile)
 const unpackedRoot = process.platform === 'darwin'
@@ -9,8 +10,13 @@ const unpackedRoot = process.platform === 'darwin'
   : process.platform === 'win32'
     ? resolve('release/win-unpacked/resources/app.asar.unpacked')
     : null
+const resourcesRoot = process.platform === 'darwin'
+  ? resolve('release/mac/Aster Code.app/Contents/Resources')
+  : process.platform === 'win32'
+    ? resolve('release/win-unpacked/resources')
+    : null
 
-if (!unpackedRoot) throw new Error(`Packaged runtime verification is not configured for ${process.platform}.`)
+if (!unpackedRoot || !resourcesRoot) throw new Error(`Packaged runtime verification is not configured for ${process.platform}.`)
 
 const binaries = await findCodexBinaries(join(unpackedRoot, 'node_modules', '@openai'))
 if (binaries.length !== 1) {
@@ -27,6 +33,7 @@ if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
 console.log(`Packaged Codex: ${version} (${binary})`)
 await verifyProtocolRegistration()
 console.log('Packaged deep-link protocol: aster-code')
+await verifyUpdateConfiguration(resourcesRoot)
 
 async function findCodexBinaries(directory) {
   const found = []
@@ -54,4 +61,24 @@ async function verifyProtocolRegistration() {
   if (!/<key>CFBundleURLSchemes<\/key>[\s\S]*?<string>aster-code<\/string>/u.test(info)) {
     throw new Error(`Packaged Info.plist is missing the aster-code URL scheme: ${infoPath}`)
   }
+}
+
+async function verifyUpdateConfiguration(directory) {
+  const path = join(directory, 'app-update.yml')
+  const metadata = await lstat(path).catch((error) => {
+    if (error && typeof error === 'object' && error.code === 'ENOENT') return null
+    throw error
+  })
+  if (!metadata) {
+    console.log('Packaged update channel: not configured')
+    return
+  }
+  if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size <= 0 || metadata.size > 64 * 1024) {
+    throw new Error(`Packaged update metadata is not a bounded regular file: ${path}`)
+  }
+  const source = await readFile(path, 'utf8')
+  if (!/^provider:\s*generic\s*$/mu.test(source)) throw new Error('Packaged updater must use the generic provider.')
+  const url = /^url:\s*([^\s]+)\s*$/mu.exec(source)?.[1]
+  const normalized = requireSecureUpdateUrl(url)
+  console.log(`Packaged update channel: ${normalized}`)
 }
