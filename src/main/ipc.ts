@@ -16,6 +16,7 @@ import type {
   RenameConversationInput,
   ResolveApprovalInput,
   SetConversationPinnedInput,
+  SetThreadGoalInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -104,6 +105,8 @@ export type AgentController = {
   forkThread: (input: ForkConversationInput) => Promise<ConversationSnapshot>
   compactThread: (threadId: string) => Promise<ConversationSnapshot>
   setThreadPinned: (input: SetConversationPinnedInput) => ConversationSnapshot
+  setThreadGoal: (input: SetThreadGoalInput) => Promise<ConversationSnapshot>
+  clearThreadGoal: (threadId: string) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>
@@ -326,6 +329,10 @@ export function registerIpc(
     agent.compactThread(threadInputSchema.parse(input).threadId))
   ipcMain.handle(IPC_CHANNELS.conversationPinnedSet, (_event, input: unknown) =>
     agent.setThreadPinned(threadPinnedSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.conversationGoalSet, (_event, input: unknown) =>
+    agent.setThreadGoal(threadGoalSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.conversationGoalClear, (_event, input: unknown) =>
+    agent.clearThreadGoal(threadInputSchema.parse(input).threadId))
   ipcMain.handle(IPC_CHANNELS.conversationStart, (_event, input: unknown) =>
     agent.startConversation(startConversationSchema.parse(input) as StartConversationInput))
   ipcMain.handle(IPC_CHANNELS.conversationTurnStart, (_event, input: unknown) =>
@@ -659,6 +666,11 @@ const conversationListSchema = z.object({
 const renameThreadSchema = threadInputSchema.extend({ name: z.string().trim().min(1).max(120) })
 const forkThreadSchema = threadInputSchema.extend({ lastTurnId: z.string().min(1).max(200).optional() })
 const threadPinnedSchema = threadInputSchema.extend({ pinned: z.boolean() })
+const threadGoalSchema = threadInputSchema.extend({
+  objective: z.string().trim().min(1).max(10_000),
+  status: z.enum(['active', 'paused', 'blocked', 'usageLimited', 'budgetLimited', 'complete']),
+  tokenBudget: z.number().int().positive().max(1_000_000_000).nullable(),
+})
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
   projectId: z.uuid(),

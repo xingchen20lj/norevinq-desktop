@@ -127,7 +127,7 @@ describe('AgentService', () => {
     await service.interruptTurn({ threadId: 'thread-1', turnId: 'turn-1' })
 
     expect(runtime.requests.map(({ method }) => method)).toEqual([
-      'thread/list', 'thread/resume', 'turn/steer', 'turn/interrupt',
+      'thread/list', 'thread/resume', 'thread/goal/get', 'turn/steer', 'turn/interrupt',
     ])
     service.dispose()
     database.close()
@@ -249,6 +249,38 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('loads, updates, synchronizes, and clears app-server thread goals', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    const selected = await service.selectThread('thread-1')
+    expect(selected.goals['thread-1']).toBeNull()
+
+    const set = await service.setThreadGoal({
+      threadId: 'thread-1',
+      objective: '  Complete the durable objective  ',
+      status: 'active',
+      tokenBudget: 50_000,
+    })
+    expect(set.goals['thread-1']).toMatchObject({
+      objective: 'Complete the durable objective',
+      status: 'active',
+      tokenBudget: 50_000,
+    })
+    runtime.emit('thread/goal/updated', {
+      threadId: 'thread-1',
+      turnId: null,
+      goal: goal('thread-1', 'Complete the durable objective', 'paused', 50_000, 1_200),
+    })
+    expect(service.getSnapshot().goals['thread-1']).toMatchObject({ status: 'paused', tokensUsed: 1_200 })
+    const cleared = await service.clearThreadGoal('thread-1')
+    expect(cleared.goals['thread-1']).toBeNull()
+
+    service.dispose()
+    database.close()
+  })
+
   it('resolves a managed worktree UUID to the server cwd without accepting renderer paths', async () => {
     const { database, projectId, root } = createDatabase()
     const worktreePath = mkdtempSync(join(root, 'worktree-'))
@@ -280,6 +312,7 @@ class FakeRuntime {
   readonly #handlers = new Map<string, JsonRpcRequestHandler>()
   turnStarts = 0
   turnCompletions = 0
+  goal: JsonValue | null = null
 
   start(): Promise<unknown> { return Promise.resolve({}) }
 
@@ -297,6 +330,20 @@ class FakeRuntime {
       const response = this.threadListResponses.shift()
         ?? { data: [thread], nextCursor: null, backwardsCursor: null }
       return Promise.resolve(response as T)
+    }
+    if (method === 'thread/goal/get') return Promise.resolve({ goal: this.goal } as unknown as T)
+    if (method === 'thread/goal/set') {
+      this.goal = goal(
+        requestedThreadId,
+        typeof parameters.objective === 'string' ? parameters.objective : 'Goal',
+        typeof parameters.status === 'string' ? parameters.status : 'active',
+        typeof parameters.tokenBudget === 'number' ? parameters.tokenBudget : null,
+      )
+      return Promise.resolve({ goal: this.goal } as unknown as T)
+    }
+    if (method === 'thread/goal/clear') {
+      this.goal = null
+      return Promise.resolve({} as T)
     }
     const responses: Record<string, JsonValue> = {
       'thread/resume': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
@@ -383,5 +430,24 @@ function turn(id: string, status: string): JsonValue {
     startedAt: 10,
     completedAt: status === 'completed' ? 11 : null,
     durationMs: status === 'completed' ? 1_000 : null,
+  }
+}
+
+function goal(
+  threadId: string,
+  objective: string,
+  status: string,
+  tokenBudget: number | null,
+  tokensUsed = 0,
+): JsonValue {
+  return {
+    threadId,
+    objective,
+    status,
+    tokenBudget,
+    tokensUsed,
+    timeUsedSeconds: 12,
+    createdAt: 10,
+    updatedAt: 11,
   }
 }

@@ -159,6 +159,10 @@
 - 固定任务为本地桌面偏好，不篡改上游 Codex thread；首屏会用 `thread/read` 补齐未落在第一页的固定任务，单项目上限 20，避免无界启动请求。
 - 完成项目/任务固定 IPC 与侧栏交互；Electron Renderer 重载后真实恢复固定图标和任务排序，1320×840 浅色截图无错位。
 - 固定阶段 `verify:ci`：28 个测试文件 121 项、覆盖率 80.57/68.67/85.15/87.66、2 项性能基准、类型、规范、脚本、workflow、许可证、构建和 bundle 预算全部通过。
+- 接入稳定 `thread/goal/set|get|clear` 及 `thread/goal/updated|cleared`，Renderer 不依赖生成协议类型；跨客户端通知作为目标状态真源。
+- 完成长期目标编辑、进行中/暂停/受阻/受限/完成状态、可选 token 预算、已用 token 与耗时卡片、清除确认；输入和数值均有 IPC 与领域双重边界。
+- 官方 `@openai/codex` 0.147.0 隔离集成真实执行目标 set/get/clear，不调用模型；离线 Electron E2E 完成创建、暂停、显示和清除，1320×840 截图无溢出。
+- 长期目标阶段 `verify:ci`：28 个测试文件 122 项、覆盖率 80.53/68.53/85.35/87.66、2 项性能基准、类型、规范、脚本、workflow、许可证、构建和 bundle 预算全部通过。
 
 ## 下一任务
 
@@ -188,7 +192,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 28 个测试文件 121 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务生命周期/固定恢复 Electron E2E、生产漏洞审计、目录包 packaged E2E 与挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 28 个测试文件 122 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标生命周期、固定恢复 Electron E2E、生产漏洞审计、目录包 packaged E2E 与挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 

@@ -51,6 +51,22 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByLabel('搜索任务').press('Enter')
     await taskRow('Lifecycle primary').click()
 
+    await window.getByRole('button', { name: '长期目标' }).click()
+    const goalDialog = window.getByRole('dialog', { name: '长期目标' })
+    await goalDialog.getByLabel('目标内容').fill('Ship the durable lifecycle')
+    await goalDialog.getByLabel('Token 预算').fill('50000')
+    await goalDialog.getByRole('button', { name: '保存目标' }).click()
+    await expect(window.getByRole('article', { name: '当前长期目标' })).toContainText('Ship the durable lifecycle')
+    await window.getByRole('button', { name: '长期目标' }).click()
+    await goalDialog.getByLabel('目标状态').selectOption('paused')
+    await goalDialog.getByRole('button', { name: '保存目标' }).click()
+    await expect(window.getByRole('article', { name: '当前长期目标' })).toContainText('已暂停')
+    await window.screenshot({ path: 'test-results/aster-thread-goal.png' })
+    await window.getByRole('button', { name: '长期目标' }).click()
+    window.once('dialog', async (dialog) => { await dialog.accept() })
+    await goalDialog.getByRole('button', { name: '清除目标' }).click()
+    await expect(window.getByRole('article', { name: '当前长期目标' })).toHaveCount(0)
+
     await window.getByRole('button', { name: '重命名任务' }).click()
     const rename = window.getByRole('dialog', { name: '重命名任务' })
     await rename.getByLabel('任务名称').fill('Renamed primary')
@@ -85,6 +101,9 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
       'thread/archive',
       'thread/unarchive',
       'thread/delete',
+      'thread/goal/get',
+      'thread/goal/set',
+      'thread/goal/clear',
     ]))
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.cursor === 'page-2')).toBe(true)
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.searchTerm === 'secondary')).toBe(true)

@@ -13,9 +13,12 @@ import type {
   RenameConversationInput,
   ResolveApprovalInput,
   SetConversationPinnedInput,
+  SetThreadGoalInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
+  ThreadGoal,
+  ThreadGoalStatus,
 } from '../../shared/conversation.js'
 import type { JsonRpcNotificationHandler, JsonRpcRequestHandler, JsonValue } from '../runtime/jsonlRpc.js'
 import type { StateDatabase } from '../state/database.js'
@@ -49,6 +52,7 @@ export class AgentService {
     listSearchTerm: '',
     nextCursor: null,
     threadStates: {},
+    goals: {},
     approvals: [],
     error: null,
   }
@@ -134,6 +138,7 @@ export class AgentService {
     const projectId = this.#snapshot.projectId
     if (projectId) this.#database.associateThread(projectId, threadId)
     this.#update({ selectedThreadId: threadId, error: null })
+    await this.#loadThreadGoal(threadId)
     return this.#snapshot
   }
 
@@ -194,6 +199,7 @@ export class AgentService {
       nextCursor: null,
       error: null,
     })
+    await this.#loadThreadGoal(threadId)
     return this.#snapshot
   }
 
@@ -214,6 +220,29 @@ export class AgentService {
         thread.id === input.threadId ? { ...thread, pinned: input.pinned } : thread)),
       error: null,
     })
+    return this.#snapshot
+  }
+
+  async setThreadGoal(input: SetThreadGoalInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
+    const objective = requireGoalObjective(input.objective)
+    const tokenBudget = requireTokenBudget(input.tokenBudget)
+    const result = asRecord(await this.#runtime.request('thread/goal/set', {
+      threadId: input.threadId,
+      objective,
+      status: input.status,
+      tokenBudget,
+    }))
+    const goal = toThreadGoal(asRecord(result.goal))
+    if (goal.threadId !== input.threadId) throw new Error('Codex returned a goal for another conversation.')
+    this.#update({ goals: { ...this.#snapshot.goals, [input.threadId]: goal }, error: null })
+    return this.#snapshot
+  }
+
+  async clearThreadGoal(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(threadId)
+    await this.#runtime.request('thread/goal/clear', { threadId })
+    this.#update({ goals: { ...this.#snapshot.goals, [threadId]: null }, error: null })
     return this.#snapshot
   }
 
@@ -394,6 +423,20 @@ export class AgentService {
       })
     }
 
+    if (event.method === 'thread/goal/updated' && params && threadId) {
+      const goal = asOptionalRecord(params.goal)
+      if (goal) {
+        const parsed = toThreadGoal(goal)
+        if (parsed.threadId === threadId) {
+          this.#update({ goals: { ...this.#snapshot.goals, [threadId]: parsed } })
+        }
+      }
+    }
+
+    if (event.method === 'thread/goal/cleared' && threadId) {
+      this.#update({ goals: { ...this.#snapshot.goals, [threadId]: null } })
+    }
+
     if (threadId && event.method === 'thread/archived') this.#database.setThreadArchived(threadId, true)
     if (threadId && event.method === 'thread/unarchived') this.#database.setThreadArchived(threadId, false)
     if (threadId && event.method === 'thread/deleted') this.#database.removeThreadAssociation(threadId)
@@ -430,6 +473,18 @@ export class AgentService {
       archived: this.#snapshot.listArchived,
       ...(this.#snapshot.listSearchTerm ? { searchTerm: this.#snapshot.listSearchTerm } : {}),
     })
+  }
+
+  async #loadThreadGoal(threadId: string): Promise<void> {
+    const result = asRecord(await this.#runtime.request('thread/goal/get', { threadId }))
+    const rawGoal = result.goal
+    if (rawGoal === null || rawGoal === undefined) {
+      this.#update({ goals: { ...this.#snapshot.goals, [threadId]: null } })
+      return
+    }
+    const goal = toThreadGoal(asRecord(rawGoal))
+    if (goal.threadId !== threadId) throw new Error('Codex returned a goal for another conversation.')
+    this.#update({ goals: { ...this.#snapshot.goals, [threadId]: goal } })
   }
 
   async #readMissingPinnedThreads(
@@ -536,10 +591,14 @@ export class AgentService {
     const threadStates = removeState
       ? Object.fromEntries(Object.entries(this.#snapshot.threadStates).filter(([id]) => id !== threadId))
       : this.#snapshot.threadStates
+    const goals = removeState
+      ? Object.fromEntries(Object.entries(this.#snapshot.goals).filter(([id]) => id !== threadId))
+      : this.#snapshot.goals
     this.#update({
       threads: this.#snapshot.threads.filter(({ id }) => id !== threadId),
       selectedThreadId: this.#snapshot.selectedThreadId === threadId ? null : this.#snapshot.selectedThreadId,
       threadStates,
+      goals,
       error: null,
     })
   }
@@ -566,6 +625,21 @@ function requireThreadName(value: string): string {
   if (!name) throw new Error('Conversation name cannot be empty.')
   if (name.length > 120) throw new Error('Conversation name exceeds the 120 character limit.')
   return name
+}
+
+function requireGoalObjective(value: string): string {
+  const objective = value.trim()
+  if (!objective) throw new Error('Goal objective cannot be empty.')
+  if (objective.length > 10_000) throw new Error('Goal objective exceeds the 10,000 character limit.')
+  return objective
+}
+
+function requireTokenBudget(value: number | null): number | null {
+  if (value === null) return null
+  if (!Number.isSafeInteger(value) || value <= 0 || value > 1_000_000_000) {
+    throw new Error('Goal token budget must be a positive safe integer no greater than 1,000,000,000.')
+  }
+  return value
 }
 
 function normalizeSearchTerm(value: string | undefined): string {
@@ -596,6 +670,34 @@ function toThreadStatus(value: unknown): ConversationThreadStatus {
   const type = optionalString(asOptionalRecord(value)?.type)
   if (type === 'notLoaded' || type === 'idle' || type === 'active' || type === 'systemError') return type
   return 'unknown'
+}
+
+function toThreadGoal(value: Record<string, unknown>): ThreadGoal {
+  const status = requireString(value.status, 'goal.status')
+  if (!isThreadGoalStatus(status)) throw new Error('Codex returned an invalid goal.status.')
+  const tokenBudget = value.tokenBudget === null ? null : requireFiniteNumber(value.tokenBudget, 'goal.tokenBudget')
+  return {
+    threadId: requireString(value.threadId, 'goal.threadId'),
+    objective: requireString(value.objective, 'goal.objective'),
+    status,
+    tokenBudget,
+    tokensUsed: requireFiniteNumber(value.tokensUsed, 'goal.tokensUsed'),
+    timeUsedSeconds: requireFiniteNumber(value.timeUsedSeconds, 'goal.timeUsedSeconds'),
+    createdAt: requireFiniteNumber(value.createdAt, 'goal.createdAt'),
+    updatedAt: requireFiniteNumber(value.updatedAt, 'goal.updatedAt'),
+  }
+}
+
+function isThreadGoalStatus(value: string): value is ThreadGoalStatus {
+  return value === 'active' || value === 'paused' || value === 'blocked'
+    || value === 'usageLimited' || value === 'budgetLimited' || value === 'complete'
+}
+
+function requireFiniteNumber(value: unknown, label: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    throw new Error(`Codex returned an invalid ${label}.`)
+  }
+  return value
 }
 
 function upsertThread(

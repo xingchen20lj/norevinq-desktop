@@ -62,6 +62,23 @@ test('official Codex app-server performs thread naming, search, fork, archive, r
     await peer.request('thread/name/set', { threadId: originalId, name: 'Aster lifecycle proof' })
     const named = asRecord(await peer.request('thread/read', { includeTurns: true, threadId: originalId }))
     expect(asRecord(named.thread).name).toBe('Aster lifecycle proof')
+    const setGoal = asRecord(await peer.request('thread/goal/set', {
+      threadId: originalId,
+      objective: 'Prove the official goal lifecycle',
+      status: 'active',
+      tokenBudget: 10_000,
+    }))
+    expect(asRecord(setGoal.goal)).toMatchObject({
+      threadId: originalId,
+      objective: 'Prove the official goal lifecycle',
+      status: 'active',
+      tokenBudget: 10_000,
+    })
+    const readGoal = asRecord(await peer.request('thread/goal/get', { threadId: originalId }))
+    expect(asRecord(readGoal.goal).objective).toBe('Prove the official goal lifecycle')
+    await peer.request('thread/goal/clear', { threadId: originalId })
+    const clearedGoal = asRecord(await peer.request('thread/goal/get', { threadId: originalId }))
+    expect(clearedGoal.goal).toBeNull()
     const listed = asRecord(await peer.request('thread/list', {
       archived: false,
       cwd: projectPath,

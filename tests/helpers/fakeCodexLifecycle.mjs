@@ -15,6 +15,7 @@ const threads = new Map([
   ['thread-secondary', makeThread('thread-secondary', 'Lifecycle secondary', 10)],
 ])
 const archived = new Set()
+const goals = new Map()
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue
@@ -34,6 +35,31 @@ function handle(method, params) {
   if (method === 'model/list') return { data: [{ id: 'fake-model', displayName: 'Fake Model', isDefault: true, defaultReasoningEffort: 'medium', supportedReasoningEfforts: ['medium'], inputModalities: ['text'] }] }
   if (method === 'thread/list') return listThreads(params)
   if (method === 'thread/read' || method === 'thread/resume') return { thread: requireThread(params.threadId) }
+  if (method === 'thread/goal/get') return { goal: goals.get(params.threadId) ?? null }
+  if (method === 'thread/goal/set') {
+    requireThread(params.threadId)
+    const previous = goals.get(params.threadId)
+    const now = Math.floor(Date.now() / 1000)
+    const goal = {
+      threadId: params.threadId,
+      objective: String(params.objective),
+      status: String(params.status),
+      tokenBudget: typeof params.tokenBudget === 'number' ? params.tokenBudget : null,
+      tokensUsed: previous?.tokensUsed ?? 0,
+      timeUsedSeconds: previous?.timeUsedSeconds ?? 0,
+      createdAt: previous?.createdAt ?? now,
+      updatedAt: now,
+    }
+    goals.set(params.threadId, goal)
+    queueMicrotask(() => notify('thread/goal/updated', { threadId: params.threadId, turnId: null, goal }))
+    return { goal }
+  }
+  if (method === 'thread/goal/clear') {
+    requireThread(params.threadId)
+    goals.delete(params.threadId)
+    queueMicrotask(() => notify('thread/goal/cleared', { threadId: params.threadId }))
+    return {}
+  }
   if (method === 'thread/name/set') {
     const thread = requireThread(params.threadId)
     thread.name = String(params.name)
@@ -57,6 +83,7 @@ function handle(method, params) {
   if (method === 'thread/unarchive') {
     const thread = requireThread(params.threadId)
     archived.delete(params.threadId)
+    goals.delete(params.threadId)
     queueMicrotask(() => notify('thread/unarchived', { threadId: params.threadId }))
     return { thread }
   }

@@ -34,6 +34,19 @@ export type PendingApproval = {
   grantRoot: string | null
 }
 
+export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete'
+
+export type ThreadGoal = {
+  threadId: string
+  objective: string
+  status: ThreadGoalStatus
+  tokenBudget: number | null
+  tokensUsed: number
+  timeUsedSeconds: number
+  createdAt: number
+  updatedAt: number
+}
+
 export type ConversationSnapshot = {
   projectId: string | null
   threads: ConversationThreadSummary[]
@@ -42,6 +55,7 @@ export type ConversationSnapshot = {
   listSearchTerm: string
   nextCursor: string | null
   threadStates: Record<string, AgentActivityState>
+  goals: Record<string, ThreadGoal | null>
   approvals: PendingApproval[]
   error: string | null
 }
@@ -84,6 +98,12 @@ export type ForkConversationInput = SelectConversationInput & {
 
 export type SetConversationPinnedInput = SelectConversationInput & {
   pinned: boolean
+}
+
+export type SetThreadGoalInput = SelectConversationInput & {
+  objective: string
+  status: ThreadGoalStatus
+  tokenBudget: number | null
 }
 
 export type SteerTurnInput = {

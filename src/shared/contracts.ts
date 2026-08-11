@@ -9,6 +9,7 @@ import type {
   ResolveApprovalInput,
   SelectConversationInput,
   SetConversationPinnedInput,
+  SetThreadGoalInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -98,6 +99,8 @@ export const IPC_CHANNELS = {
   conversationFork: 'conversation:fork',
   conversationCompact: 'conversation:compact',
   conversationPinnedSet: 'conversation:pinned-set',
+  conversationGoalSet: 'conversation:goal-set',
+  conversationGoalClear: 'conversation:goal-clear',
   conversationStart: 'conversation:start',
   conversationTurnStart: 'conversation:turn-start',
   conversationSteer: 'conversation:steer',
@@ -218,6 +221,8 @@ export type AsterDesktopApi = {
   forkConversation: (input: ForkConversationInput) => Promise<ConversationSnapshot>
   compactConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
   setConversationPinned: (input: SetConversationPinnedInput) => Promise<ConversationSnapshot>
+  setThreadGoal: (input: SetThreadGoalInput) => Promise<ConversationSnapshot>
+  clearThreadGoal: (input: SelectConversationInput) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>

@@ -30,6 +30,7 @@ import {
   Sparkles,
   Square,
   Sun,
+  Target,
   TerminalSquare,
   Trash2,
   Upload,
@@ -39,7 +40,12 @@ import {
 import { lazy, Suspense, useEffect, useState } from 'react'
 import type { AgentActivity, AgentActivityState } from '../../shared/agent'
 import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
-import type { ConversationSnapshot, PendingApproval } from '../../shared/conversation'
+import type {
+  ConversationSnapshot,
+  PendingApproval,
+  ThreadGoal,
+  ThreadGoalStatus,
+} from '../../shared/conversation'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitRepositorySnapshot } from '../../shared/git'
@@ -79,6 +85,10 @@ export function App(): React.JSX.Element {
   const [projectPinBusy, setProjectPinBusy] = useState<string | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState('')
+  const [goalOpen, setGoalOpen] = useState(false)
+  const [goalObjective, setGoalObjective] = useState('')
+  const [goalStatus, setGoalStatus] = useState<ThreadGoalStatus>('active')
+  const [goalTokenBudget, setGoalTokenBudget] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isOpening, setIsOpening] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -111,6 +121,7 @@ export function App(): React.JSX.Element {
   const theme: Theme = themePreference === 'system' ? systemTheme : themePreference
   const projects = bootstrap?.projects ?? []
   const selectedThread = conversations?.threads.find(({ id }) => id === conversations.selectedThreadId) ?? null
+  const selectedGoal = selectedThread ? conversations?.goals[selectedThread.id] ?? null : null
   const activityState = selectedThread ? conversations?.threadStates[selectedThread.id] ?? null : null
   const activeTurn = activityState?.turnStatus === 'inProgress'
   const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
@@ -167,6 +178,7 @@ export function App(): React.JSX.Element {
         void openTerminal()
       } else if (event.key === 'Escape' && !commandOpen) {
         if (renameOpen) setRenameOpen(false)
+        else if (goalOpen) setGoalOpen(false)
         else if (browserOpen) { void window.aster.closeBrowser(); setBrowserOpen(false) }
         else if (filesOpen) setFilesOpen(false)
         else if (terminalOpen) setTerminalOpen(false)
@@ -179,7 +191,7 @@ export function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [browserOpen, commandOpen, filesOpen, gitOpen, renameOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
+  }, [browserOpen, commandOpen, filesOpen, gitOpen, goalOpen, renameOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
 
   useEffect(() => {
     const unsubscribe = window.aster.onSecurityChanged(setSecurity)
@@ -363,6 +375,38 @@ export function App(): React.JSX.Element {
 
   async function toggleThreadPinned(threadId: string, pinned: boolean): Promise<void> {
     await runThreadAction(() => window.aster.setConversationPinned({ threadId, pinned: !pinned }))
+  }
+
+  function openGoalDialog(): void {
+    if (!selectedThread) return
+    setGoalObjective(selectedGoal?.objective ?? '')
+    setGoalStatus(selectedGoal?.status ?? 'active')
+    setGoalTokenBudget(selectedGoal?.tokenBudget === null || selectedGoal === null
+      ? ''
+      : String(selectedGoal.tokenBudget))
+    setGoalOpen(true)
+  }
+
+  async function saveGoal(): Promise<void> {
+    if (!selectedThread || !goalObjective.trim()) return
+    const parsedBudget = goalTokenBudget.trim() ? Number(goalTokenBudget) : null
+    if (parsedBudget !== null && (!Number.isSafeInteger(parsedBudget) || parsedBudget <= 0)) {
+      setError('目标 token 预算必须是正整数。')
+      return
+    }
+    await runThreadAction(() => window.aster.setThreadGoal({
+      threadId: selectedThread.id,
+      objective: goalObjective,
+      status: goalStatus,
+      tokenBudget: parsedBudget,
+    }))
+    setGoalOpen(false)
+  }
+
+  async function clearGoal(): Promise<void> {
+    if (!selectedThread || !selectedGoal || !window.confirm('清除此任务的长期目标？')) return
+    await runThreadAction(() => window.aster.clearThreadGoal({ threadId: selectedThread.id }))
+    setGoalOpen(false)
   }
 
   function renameSelectedThread(): void {
@@ -637,6 +681,7 @@ export function App(): React.JSX.Element {
           </div>
           <div className="topbar-actions">
             {selectedThread && !newTask && <>
+              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
               <button className="icon-button" aria-label="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
               <button className="icon-button" aria-label="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
               <button className="icon-button" aria-label="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
@@ -653,7 +698,7 @@ export function App(): React.JSX.Element {
 
         <section className={`workspace ${selectedThread && !newTask ? 'conversation-workspace' : ''}`}>
           {selectedThread && !newTask ? (
-            <ActivityTimeline state={activityState} openFile={(path) => openFiles(path)} />
+            <ActivityTimeline state={activityState} goal={selectedGoal} openFile={(path) => openFiles(path)} />
           ) : (
             <Welcome selectedProject={selectedProject} runtime={runtime} isOpening={isOpening} openProject={openProject} />
           )}
@@ -770,6 +815,27 @@ export function App(): React.JSX.Element {
           <div>
             <button type="button" onClick={() => setRenameOpen(false)}>取消</button>
             <button type="submit" disabled={!renameDraft.trim() || threadActionBusy}>保存名称</button>
+          </div>
+        </form>
+      </div>}
+      {goalOpen && <div className="thread-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGoalOpen(false) }}>
+        <form className="thread-dialog goal-dialog" role="dialog" aria-label="长期目标" onSubmit={(event) => { event.preventDefault(); void saveGoal() }}>
+          <h2>长期目标</h2>
+          <p>目标由 Codex app-server 持久化，可在后续任务中继续跟踪用量与状态。</p>
+          <label><span>目标</span><textarea autoFocus aria-label="目标内容" maxLength={10_000} rows={5} value={goalObjective} onChange={(event) => setGoalObjective(event.target.value)} /></label>
+          <label><span>状态</span><select aria-label="目标状态" value={goalStatus} onChange={(event) => setGoalStatus(event.target.value as ThreadGoalStatus)}>
+            <option value="active">进行中</option>
+            <option value="paused">已暂停</option>
+            <option value="blocked">受阻</option>
+            <option value="usageLimited">使用量受限</option>
+            <option value="budgetLimited">预算受限</option>
+            <option value="complete">已完成</option>
+          </select></label>
+          <label><span>Token 预算（可选）</span><input aria-label="Token 预算" inputMode="numeric" min="1" max="1000000000" type="number" value={goalTokenBudget} onChange={(event) => setGoalTokenBudget(event.target.value)} /></label>
+          <div>
+            {selectedGoal && <button type="button" className="goal-clear" disabled={threadActionBusy} onClick={() => void clearGoal()}>清除目标</button>}
+            <button type="button" onClick={() => setGoalOpen(false)}>取消</button>
+            <button type="submit" disabled={!goalObjective.trim() || threadActionBusy}>保存目标</button>
           </div>
         </form>
       </div>}
@@ -1128,11 +1194,23 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
   </div>
 }
 
-function ActivityTimeline({ state, openFile }: { state: AgentActivityState | null; openFile: (path: string) => void }): React.JSX.Element {
-  if (!state || state.activities.length === 0) return <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
+function ActivityTimeline({ state, goal, openFile }: {
+  state: AgentActivityState | null
+  goal: ThreadGoal | null
+  openFile: (path: string) => void
+}): React.JSX.Element {
   return <div className="activity-timeline" aria-label="智能体活动">
-    {state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
-    {state.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
+    {goal && <article className="goal-card" aria-label="当前长期目标">
+      <div><Target size={15} /><strong>长期目标</strong><span className={`goal-status ${goal.status}`}>{goalStatusLabel(goal.status)}</span></div>
+      <p>{goal.objective}</p>
+      <small>{goal.tokenBudget === null
+        ? `已使用 ${goal.tokensUsed.toLocaleString()} tokens`
+        : `${goal.tokensUsed.toLocaleString()} / ${goal.tokenBudget.toLocaleString()} tokens`} · {Math.round(goal.timeUsedSeconds).toLocaleString()} 秒</small>
+    </article>}
+    {!state || state.activities.length === 0
+      ? <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
+      : state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
+    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
   </div>
 }
 
@@ -1254,6 +1332,17 @@ function activityLabel(activity: AgentActivity): string {
     case 'collab': return '协作'
     case 'subagent': return '子智能体'
     default: return '活动'
+  }
+}
+
+function goalStatusLabel(status: ThreadGoalStatus): string {
+  switch (status) {
+    case 'active': return '进行中'
+    case 'paused': return '已暂停'
+    case 'blocked': return '受阻'
+    case 'usageLimited': return '使用量受限'
+    case 'budgetLimited': return '预算受限'
+    case 'complete': return '已完成'
   }
 }
 

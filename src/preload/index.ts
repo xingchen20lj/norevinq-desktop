@@ -15,6 +15,7 @@ import type {
   ResolveApprovalInput,
   SelectConversationInput,
   SetConversationPinnedInput,
+  SetThreadGoalInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -94,6 +95,10 @@ const api: AsterDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.conversationCompact, input),
   setConversationPinned: (input: SetConversationPinnedInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationPinnedSet, input),
+  setThreadGoal: (input: SetThreadGoalInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationGoalSet, input),
+  clearThreadGoal: (input: SelectConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationGoalClear, input),
   startConversation: (input: StartConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationStart, input),
   startTurn: (input: StartTurnInput) => ipcRenderer.invoke(IPC_CHANNELS.conversationTurnStart, input),

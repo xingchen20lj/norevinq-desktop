@@ -30,7 +30,7 @@
 | 智能体 | 命令、文件修改、工具调用活动 | 已测试 | 真实 `sleep` 命令、结构化 command 活动、apply_patch 文件落盘与内容断言 E2E 通过 |
 | 智能体 | 追加指令/steer | 已测试 | 真实运行中命令接收 steer，最终返回 `ASTER_STEER_OK` |
 | 智能体 | 停止/中断 | 已测试 | 真实 `sleep 20` turn 被 UI 中断，禁止的最终文本未产生；悬空 item 归一为 interrupted |
-| 智能体 | 目标与长期任务状态 | 尚未开发 | thread/goal API |
+| 智能体 | 目标与长期任务状态 | 已测试 | 稳定 `thread/goal/set|get|clear`、updated/cleared 通知、目标/状态/token 预算/用量 UI；官方 Codex 0.147.0 集成与 Electron E2E 通过 |
 | 智能体 | 多智能体/子任务显示 | 部分实现 | 领域事件与活动卡已实现；真实协作回归待补 |
 | 审批 | 命令执行审批 | 部分实现 | 双向 request 挂起、IPC 决策与拒绝/一次/会话 UI 已测试；真实命令待验证 |
 | 审批 | 文件修改审批 | 已测试 | read-only 沙箱真实触发审批，UI 明确允许后 apply_patch 落盘且内容精确匹配 |
@@ -100,6 +100,6 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 28 个测试文件 121 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 thread 生命周期集成、离线 Electron 生命周期/固定恢复、目录包和挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 28 个测试文件 122 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 thread/goal 生命周期集成、离线 Electron 生命周期/固定恢复、目录包和挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |
