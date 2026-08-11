@@ -82,6 +82,7 @@ import type {
   BrowserSubscription,
 } from './browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from './update.js'
+import type { DiagnosticsExportResult, DiagnosticsSnapshot } from './diagnostics.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -95,6 +96,8 @@ export const IPC_CHANNELS = {
   updateDownload: 'app:update-download',
   updateInstall: 'app:update-install',
   updateChanged: 'app:update-changed',
+  diagnosticsState: 'app:diagnostics-state',
+  diagnosticsExport: 'app:diagnostics-export',
   runtimeStatus: 'runtime:status',
   runtimeRestart: 'runtime:restart',
   runtimeStatusChanged: 'runtime:status-changed',
@@ -203,6 +206,7 @@ export type BootstrapState = {
   runtime: CodexRuntimeSnapshot
   providers: ProviderStatus
   updates: UpdateSnapshot
+  diagnostics: DiagnosticsSnapshot
 }
 
 export type RemoveProjectInput = {
@@ -231,6 +235,8 @@ export type AsterDesktopApi = {
   downloadUpdate: () => Promise<UpdateSnapshot>
   installUpdate: () => Promise<void>
   onUpdateChanged: (subscription: UpdateSubscription) => () => void
+  getDiagnosticsState: () => Promise<DiagnosticsSnapshot>
+  exportDiagnostics: () => Promise<DiagnosticsExportResult>
   getRuntimeStatus: () => Promise<CodexRuntimeSnapshot>
   restartRuntime: () => Promise<CodexRuntimeSnapshot>
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void

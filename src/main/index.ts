@@ -1,3 +1,4 @@
+import { lstatSync } from 'node:fs'
 import { join } from 'node:path'
 import { app, BrowserWindow, protocol, safeStorage, screen, shell } from 'electron'
 import { registerIpc } from './ipc.js'
@@ -30,7 +31,7 @@ import { extractAsterDeepLinks, parseAsterDeepLink } from './app/deepLinks.js'
 import { IPC_CHANNELS } from '../shared/contracts.js'
 import { UpdateService } from './update/updateService.js'
 import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
-import { lstatSync } from 'node:fs'
+import { DiagnosticsService } from './diagnostics/diagnosticsService.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -55,8 +56,44 @@ let schedulerService: SchedulerService | null = null
 let fileService: FileService | null = null
 let browserService: BrowserService | null = null
 let updateService: UpdateService | null = null
+let diagnosticsService: DiagnosticsService | null = null
 let rendererReady = false
 const pendingDeepLinks = extractAsterDeepLinks(process.argv)
+
+process.on('uncaughtExceptionMonitor', (error, origin) => {
+  recordCrashSafely({
+    process: 'main',
+    reason: origin,
+    message: `${error.name}: ${error.message}`,
+  })
+})
+
+app.on('render-process-gone', (_event, _contents, details) => {
+  if (details.reason === 'clean-exit') return
+  recordCrashSafely({
+    process: 'renderer',
+    reason: details.reason,
+    exitCode: details.exitCode,
+  })
+})
+
+app.on('child-process-gone', (_event, details) => {
+  if (details.reason === 'clean-exit') return
+  recordCrashSafely({
+    process: 'utility',
+    reason: details.reason,
+    exitCode: details.exitCode,
+    processType: details.type,
+  })
+})
+
+function recordCrashSafely(input: Parameters<DiagnosticsService['recordCrash']>[0]): void {
+  try {
+    diagnosticsService?.recordCrash(input)
+  } catch {
+    // Crash telemetry is local best-effort and must never create a second failure.
+  }
+}
 
 type PersistedWindowState = {
   x: number
@@ -172,6 +209,16 @@ if (!gotLock) {
       filePath: join(userData, 'logs', 'runtime.jsonl'),
       rotation: new SizeLimitedRotation(),
     })
+    diagnosticsService = new DiagnosticsService({
+      appVersion: app.getVersion(),
+      arch: process.arch,
+      crashFilePath: join(userData, 'diagnostics', 'crashes.jsonl'),
+      isPackaged: app.isPackaged,
+      platform: process.platform,
+      redactionRoots: [userData, app.getAppPath(), app.getPath('home'), app.getPath('temp')],
+      runtimeLogPath: join(userData, 'logs', 'runtime.jsonl'),
+      versions: process.versions,
+    })
     const environmentDeepSeekKey = getDeepSeekEnvironmentValue(process.env)
     const vaultDeepSeekKey = readStoredDeepSeekKey(credentialStore)
     const deepSeekKey = environmentDeepSeekKey ?? vaultDeepSeekKey
@@ -219,6 +266,7 @@ if (!gotLock) {
       createdFileService,
       browserService,
       updateService,
+      diagnosticsService,
       (event) => {
         const window = mainWindow
         return window !== null
@@ -271,6 +319,7 @@ app.on('before-quit', () => {
   browserService = null
   updateService?.dispose()
   updateService = null
+  diagnosticsService = null
   fileService?.clear()
   fileService = null
 })

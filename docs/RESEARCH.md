@@ -94,6 +94,12 @@
 - 正式包在启动 30 秒后检查，并每 6 小时检查；发现新版本后由用户确认下载，下载完成可立即安装或在正常退出时安装。禁用预发布、降级和 NSIS web installer。
 - electron-updater 校验 update metadata 的 SHA-512，并在 macOS/Windows 执行平台代码签名校验；真实跨版本更新仍必须用同一发布身份的两个签名版本在目标系统验证。
 
+## 崩溃记录与诊断导出
+
+- Electron `app` 稳定公开 `render-process-gone` 与 `child-process-gone`，后者不包含 Renderer；两者都给出 reason/exitCode，可区分 crash、OOM、killed、launch failure 和 clean exit。来源：[Electron app API](https://www.electronjs.org/docs/latest/api/app#event-render-process-gone)。
+- Node `uncaughtExceptionMonitor` 在默认崩溃行为前触发，不会像 `uncaughtException` handler 那样改变退出语义；Aster 只做同步、best-effort 本地记录，绝不尝试在未定义进程状态中恢复。来源：[Node.js process API](https://nodejs.org/docs/latest-v24.x/api/process.html#event-uncaughtexceptionmonitor)。
+- 不启用第三方自动遥测或隐式上传。崩溃 journal 最多保留 100 条，ZIP 只在用户选择保存位置后生成，对日志字段密钥、自由文本密钥与本地绝对路径再次脱敏。
+
 来源：
 
 - [electron-builder Auto Update](https://www.electron.build/docs/features/auto-update/)

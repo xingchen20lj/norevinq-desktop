@@ -22,6 +22,8 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
     await expect(window.getByRole('heading', { name: '设置与集成' })).toBeVisible()
     await window.getByRole('button', { name: '应用', exact: true }).click()
     await expect(window.getByText('开发构建不会连接发布更新源。')).toBeVisible()
+    await expect(window.getByText('不会自动上传。', { exact: false })).toBeVisible()
+    await expect(window.getByRole('button', { name: '导出诊断包' })).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-update-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
     await window.getByRole('button', { name: '安全', exact: true }).click()
@@ -64,6 +66,20 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
       }
     })
     expect(unauthorizedResult).toContain('Unauthorized IPC sender')
+
+    await application.evaluate(({ app, BrowserWindow }) => {
+      const contents = BrowserWindow.getAllWindows()[0]?.webContents
+      if (!contents) throw new Error('Main window is missing.')
+      const emitter = app as unknown as { emit: (event: string, ...args: unknown[]) => boolean }
+      emitter.emit('render-process-gone', {}, contents, { reason: 'crashed', exitCode: 88 })
+    })
+    const diagnostics = await window.evaluate(async () => {
+      const bridge = Reflect.get(window, 'aster') as {
+        getDiagnosticsState: () => Promise<{ retainedCrashCount: number; automaticUpload: boolean }>
+      }
+      return bridge.getDiagnosticsState()
+    })
+    expect(diagnostics).toMatchObject({ retainedCrashCount: 1, automaticUpload: false })
   } finally {
     await application.close()
     rmSync(profile, { force: true, recursive: true })

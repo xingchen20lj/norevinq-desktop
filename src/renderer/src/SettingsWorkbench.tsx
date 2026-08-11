@@ -1,6 +1,7 @@
 import {
   Check,
   Download,
+  FileArchive,
   ExternalLink,
   FileText,
   KeyRound,
@@ -27,6 +28,7 @@ import type {
 import type { ProviderStatus } from '../../shared/providers'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { UpdateSnapshot } from '../../shared/update'
+import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
 
 type SettingsTab = 'providers' | 'mcp' | 'skills' | 'config' | 'app'
 
@@ -38,10 +40,12 @@ export function SettingsWorkbench({
   threadId,
   integrations,
   updates,
+  diagnostics,
   close,
   onError,
   onUpdated,
   onUpdate,
+  onDiagnostics,
 }: {
   providers: ProviderStatus | null
   apiKey: string
@@ -50,10 +54,12 @@ export function SettingsWorkbench({
   threadId: string | null
   integrations: IntegrationSnapshot | null
   updates: UpdateSnapshot | null
+  diagnostics: DiagnosticsSnapshot | null
   close: () => void
   onError: (message: string | null) => void
   onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
   onUpdate: (snapshot: UpdateSnapshot) => void
+  onDiagnostics: (snapshot: DiagnosticsSnapshot) => void
 }): React.JSX.Element {
   const [tab, setTab] = useState<SettingsTab>('providers')
   const [busy, setBusy] = useState(false)
@@ -95,18 +101,21 @@ export function SettingsWorkbench({
         />}
         {tab === 'skills' && <SkillsTab project={project} snapshot={integrations} busy={busy} run={run} />}
         {tab === 'config' && <ConfigTab project={project} snapshot={integrations} busy={busy} run={run} />}
-        {tab === 'app' && <ApplicationTab snapshot={updates} busy={busy} run={run} onUpdate={onUpdate} />}
+        {tab === 'app' && <ApplicationTab snapshot={updates} diagnostics={diagnostics} busy={busy} run={run} onUpdate={onUpdate} onDiagnostics={onDiagnostics} />}
       </div>
     </section>
   </div>
 }
 
-function ApplicationTab({ snapshot, busy, run, onUpdate }: {
+function ApplicationTab({ snapshot, diagnostics, busy, run, onUpdate, onDiagnostics }: {
   snapshot: UpdateSnapshot | null
+  diagnostics: DiagnosticsSnapshot | null
   busy: boolean
   run: (action: () => Promise<unknown>) => Promise<void>
   onUpdate: (snapshot: UpdateSnapshot) => void
+  onDiagnostics: (snapshot: DiagnosticsSnapshot) => void
 }): React.JSX.Element {
+  const [exportedFile, setExportedFile] = useState<string | null>(null)
   const phaseLabel = snapshot ? updatePhaseLabel(snapshot.phase) : '正在读取'
   const canCheck = snapshot?.phase === 'idle' || snapshot?.phase === 'upToDate' || snapshot?.phase === 'error'
   return <div className="settings-section">
@@ -125,6 +134,19 @@ function ApplicationTab({ snapshot, busy, run, onUpdate }: {
       {snapshot?.phase === 'available' && <button className="primary-button" disabled={busy} onClick={() => void run(async () => onUpdate(await window.aster.downloadUpdate()))}><Download size={13} />下载 {snapshot.availableVersion}</button>}
       {snapshot?.phase === 'downloaded' && <button className="primary-button" disabled={busy} onClick={() => void run(() => window.aster.installUpdate())}><RefreshCw size={13} />重启并安装</button>}
     </div>
+    <div className="section-heading diagnostic-heading"><div><h3>诊断与崩溃</h3><p>本地保留 {diagnostics?.retainedCrashCount ?? 0} 条崩溃记录，不会自动上传。</p></div></div>
+    <div className="provider-state">
+      <div className="provider-icon"><FileArchive size={17} /></div>
+      <div><strong>{diagnostics?.latestCrashAt ? '已记录最近崩溃' : '没有崩溃记录'}</strong><p>{diagnostics?.runtimeLogAvailable ? '可附加最近 1 MiB 运行日志' : '当前没有运行日志'}</p></div>
+      <span>{diagnostics?.automaticUpload === false ? '本地优先' : '—'}</span>
+    </div>
+    <p className="settings-note">导出 ZIP 仅包含版本/平台摘要、有界崩溃元数据和二次脱敏日志；不包含对话正文、项目文件、密钥或绝对路径。保存后由你自行检查和分享。</p>
+    {exportedFile && <div className="provider-warning"><strong>诊断包已导出</strong><span>{exportedFile}</span></div>}
+    <div className="settings-actions"><button disabled={busy} onClick={() => void run(async () => {
+      const result = await window.aster.exportDiagnostics()
+      if (result.exported) setExportedFile(`${result.fileName ?? '诊断包'} · ${formatBytes(result.bytes)}`)
+      onDiagnostics(await window.aster.getDiagnosticsState())
+    })}><FileArchive size={13} />导出诊断包</button></div>
   </div>
 }
 

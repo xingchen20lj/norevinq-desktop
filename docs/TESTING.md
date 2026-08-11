@@ -27,7 +27,7 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 1. 单元测试覆盖协议解析、领域 reducer、路径约束、日志脱敏和状态转换。
 2. 集成测试使用真实临时 SQLite、Git 仓库和工作树；数据库覆盖 v7→v8 固定元数据迁移、排序、20 项任务补读上限和项目–任务深链接关联。任务生命周期还会直接启动随依赖固定的官方 `@openai/codex` 0.147.0 app-server，在隔离 `CODEX_HOME` 中验证命名、读取、搜索请求、分叉、归档、恢复、删除及长期目标 set/get/clear，不调用模型或消耗在线额度。
 3. 崩溃注入测试验证空闲 app-server 自动恢复，而活动 turn 失败关闭且绝不自动重放副作用请求。
-4. 构建脚本测试验证 notice 生成器使用 pinned package-manager 入口、仅生成 HTTP(S) 链接，并拒绝最终符号链接覆盖仓库外文件；更新发布配置拒绝非 HTTPS、凭据、query、fragment 与 localhost。
+4. 构建脚本测试验证 notice 生成器使用 pinned package-manager 入口、仅生成 HTTP(S) 链接，并拒绝最终符号链接覆盖仓库外文件；更新发布配置拒绝非 HTTPS、凭据、query、fragment 与 localhost。诊断包测试解压真实 ZIP，核对 manifest/hash、0600 权限、路径/密钥脱敏与 symlink 拒绝。
 5. Electron E2E 使用临时真实仓库，验证沙箱 Renderer、在线 Codex、DeepSeek（存在密钥时）、审批允许/拒绝、Git/diff/worktree、终端、文件预览、本地网页、计划任务、单实例深链接、更新设置和应用重启恢复；深链接只允许 UUID 目标并在主进程重新校验 SQLite 关联。
 6. 性能层对 5,000 条活动、3,000 条计划运行和真实冷启动建立可重复基线；详见 [性能基线](PERFORMANCE.md)。
 7. GitHub Actions 在 macOS 与 Windows 上执行 `verify:ci`、生产依赖审计和离线 Electron IPC 对抗测试。CI 构建通过不能替代 Windows 真机 UI、签名或安装程序验证。

@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 完成自动更新阶段质量门、普通无渠道包复验与提交。
-- 继续逐项审计功能一致性表，优先处理本地可实现的尚未开发项。
+- 完成本地崩溃记录、脱敏诊断 ZIP、桌面实测、文档与提交。
+- 继续逐项审计功能一致性表，下一项处理沙箱网络/路径权限。
 
 ## 已完成任务
 
@@ -174,11 +174,15 @@
 - 发布 workflow 只为要求签名的构建生成更新元数据；无签名内部构建保持无渠道，避免不可验证的升级产物。生产依赖审计为 0 已知漏洞，third-party notices 更新为 104 包。
 - 自动更新阶段 `verify:ci`：31 个测试文件 137 项、覆盖率 80.81/69.35/85.41/87.77、2 项性能基准、类型、规范、脚本、workflow、notices、构建和 bundle 预算全部通过；配置渠道与普通无渠道两种目录包均通过 packaged E2E。
 - 复核 Codex Security 发布链报告：报告来自旧提交 `685dc51` 的扫描快照；当前基线已用 40 位 SHA 固定所有远程 Action，并由 main-only、不可变 `github.sha`、禁用 checkout credential 与受保护 `release` environment 关闭手工发布越权路径；`check:workflows` 对这些不变量持续守门，当前无需追加修复。
+- 实现 main `uncaughtExceptionMonitor`、Electron Renderer/utility 异常退出的 best-effort 本地记录；不改变默认崩溃退出语义，clean exit 不记录。
+- 诊断 journal 限 256 KiB + 1 个轮转文件，内存与导出最多 100 条；用户通过系统保存对话框显式导出 0600 ZIP，Renderer 不能提供路径。
+- ZIP 包含 manifest/SHA-256、崩溃元数据与最近 1 MiB 运行日志；字段密钥、自由文本密钥和绝对路径再次脱敏，不包含对话/项目文件，不自动上传。
+- 诊断阶段 `verify:ci`：32 个测试文件 142 项、覆盖率 80.74/69.47/85.23/87.61、2 项性能基准、类型、规范、workflow、105 包 notices、构建和 bundle 预算全部通过；Electron 真实模拟 Renderer crash 计数，普通目录包与官方 Codex 0.147.0 packaged E2E 通过。
 
 ## 下一任务
 
-1. 从 `docs/FEATURE_PARITY.md` 继续逐项审计尚未研究/尚未开发/部分实现项目。
-2. 优先实现无需外部账户的崩溃诊断包或网络/路径权限控制。
+1. 实现沙箱网络/路径权限的结构化读取、请求和审批闭环。
+2. 随后评估 app-server OpenAI API Key/ChatGPT 登录与 GitHub PR 创建的公开接口。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -202,10 +206,11 @@
 - 窗口状态只由主进程内部写入，恢复前必须验证显示器交集；Renderer 不能任意读写 app_settings。
 - 深链接只承载数据库 UUID，不承载文件路径、命令或凭据；项目–任务关联在接收 URL 和执行打开动作时分别校验。
 - 更新 URL 只在受保护发布构建时注入并固化进签名包；Renderer 无权读写 feed URL，未签名内部包不生成更新渠道。
+- 诊断默认本地优先；不引入自动遥测、不保存内存 dump，只在用户明确导出时产生二次脱敏的有界 ZIP。
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 31 个测试文件 137 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新生命周期、固定恢复 Electron E2E、生产漏洞审计、配置渠道与普通无渠道目录包 packaged E2E、既有挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 32 个测试文件 142 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断生命周期、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 

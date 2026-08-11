@@ -68,6 +68,7 @@ Run `pnpm notices:generate` after changing production dependencies. CI runs `pnp
 | fast-wrap-ansi | 0.2.2 | MIT | [link](https://github.com/43081j/fast-wrap-ansi#readme) |
 | fd-slicer | 1.1.0 | MIT | [link](https://github.com/andrewrk/node-fd-slicer#readme) |
 | fflate | 0.8.2 | MIT | [link](https://101arrowz.github.io/fflate) |
+| fflate | 0.8.3 | MIT | [link](https://101arrowz.github.io/fflate) |
 | fs-extra | 10.1.0 | MIT | [link](https://github.com/jprichardson/node-fs-extra) |
 | get-stream | 5.2.0 | MIT | [link](https://github.com/sindresorhus/get-stream#readme) |
 | graceful-fs | 4.2.11 | ISC | [link](https://github.com/isaacs/node-graceful-fs#readme) |

@@ -57,6 +57,7 @@ import type { SecuritySnapshot } from '../../shared/security'
 import type { SchedulerSnapshot } from '../../shared/scheduler'
 import type { BrowserSnapshot } from '../../shared/browser'
 import type { UpdateSnapshot } from '../../shared/update'
+import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
 import type { CommandAction } from './CommandPalette'
 
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
@@ -113,6 +114,7 @@ export function App(): React.JSX.Element {
   const [browserOpen, setBrowserOpen] = useState(false)
   const [browser, setBrowser] = useState<BrowserSnapshot | null>(null)
   const [updates, setUpdates] = useState<UpdateSnapshot | null>(null)
+  const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aster-sidebar-collapsed') === 'true')
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
@@ -157,6 +159,7 @@ export function App(): React.JSX.Element {
       setRuntime(state.runtime)
       setProviders(state.providers)
       setUpdates(state.updates)
+      setDiagnostics(state.diagnostics)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [])
@@ -826,10 +829,12 @@ export function App(): React.JSX.Element {
         threadId={selectedThread?.id ?? null}
         integrations={integrations}
         updates={updates}
+        diagnostics={diagnostics}
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
         onUpdate={setUpdates}
+        onDiagnostics={setDiagnostics}
       /></Suspense>}
       {securityOpen && <Suspense fallback={<WorkbenchLoading label="正在加载安全工作台…" overlay />}><SecurityWorkbench
         snapshot={security}

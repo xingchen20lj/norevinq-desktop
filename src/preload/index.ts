@@ -67,6 +67,7 @@ import type {
   BrowserSubscription,
 } from '../shared/browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
+import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -88,6 +89,8 @@ const api: AsterDesktopApi = {
     ipcRenderer.on(IPC_CHANNELS.updateChanged, listener)
     return () => ipcRenderer.removeListener(IPC_CHANNELS.updateChanged, listener)
   },
+  getDiagnosticsState: (): Promise<DiagnosticsSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.diagnosticsState),
+  exportDiagnostics: (): Promise<DiagnosticsExportResult> => ipcRenderer.invoke(IPC_CHANNELS.diagnosticsExport),
   getRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeStatus),
   restartRuntime: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeRestart),
   onRuntimeStatus: (subscription: RuntimeSubscription) => {

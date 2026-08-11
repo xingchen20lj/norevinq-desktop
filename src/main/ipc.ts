@@ -5,6 +5,7 @@ import {
   type IpcMainInvokeEvent,
   type WebContents,
 } from 'electron'
+import { join } from 'node:path'
 import { z } from 'zod'
 import { IPC_CHANNELS, type BootstrapState } from '../shared/contracts.js'
 import type {
@@ -63,6 +64,7 @@ import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } fro
 import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
 import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
+import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
 import {
   requireAuthorizedIpcSender,
   type IpcSenderAuthorizer,
@@ -229,6 +231,11 @@ export type UpdateController = {
   installUpdate: () => void
 }
 
+export type DiagnosticsController = {
+  getSnapshot: () => DiagnosticsSnapshot
+  exportBundle: (destinationPath: string) => Promise<DiagnosticsExportResult>
+}
+
 export function registerIpc(
   database: StateDatabase,
   runtime: RuntimeController,
@@ -244,6 +251,7 @@ export function registerIpc(
   files: FileController,
   browser: BrowserController,
   updates: UpdateController,
+  diagnostics: DiagnosticsController,
   authorizeSender: IpcSenderAuthorizer,
 ): () => void {
   if (activeSenderAuthorizer) throw new Error('IPC handlers are already registered.')
@@ -297,6 +305,7 @@ export function registerIpc(
     runtime: runtime.getSnapshot(),
     providers: providers.getStatus(),
     updates: updates.getSnapshot(),
+    diagnostics: diagnostics.getSnapshot(),
   }))
 
   ipcMain.handle(IPC_CHANNELS.selectProject, async () => {
@@ -334,6 +343,20 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.updateCheck, () => updates.checkForUpdates())
   ipcMain.handle(IPC_CHANNELS.updateDownload, () => updates.downloadUpdate())
   ipcMain.handle(IPC_CHANNELS.updateInstall, () => updates.installUpdate())
+  ipcMain.handle(IPC_CHANNELS.diagnosticsState, () => diagnostics.getSnapshot())
+  ipcMain.handle(IPC_CHANNELS.diagnosticsExport, async () => {
+    const now = new Date().toISOString().slice(0, 10)
+    const result = await dialog.showSaveDialog({
+      title: '导出 Aster Code 诊断包',
+      defaultPath: join(app.getPath('downloads'), `Aster-Code-Diagnostics-${now}.zip`),
+      buttonLabel: '导出诊断包',
+      filters: [{ name: 'ZIP 诊断包', extensions: ['zip'] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    })
+    const destinationPath = result.filePath
+    if (result.canceled || !destinationPath) return { exported: false, fileName: null, bytes: 0 }
+    return diagnostics.exportBundle(destinationPath)
+  })
 
   ipcMain.handle(IPC_CHANNELS.runtimeStatus, (event) => {
     webContents.add(event.sender)
