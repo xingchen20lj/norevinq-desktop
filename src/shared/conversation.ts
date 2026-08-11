@@ -37,6 +37,9 @@ export type ConversationSnapshot = {
   projectId: string | null
   threads: ConversationThreadSummary[]
   selectedThreadId: string | null
+  listArchived: boolean
+  listSearchTerm: string
+  nextCursor: string | null
   threadStates: Record<string, AgentActivityState>
   approvals: PendingApproval[]
   error: string | null
@@ -61,10 +64,21 @@ export type StartTurnInput = {
 
 export type LoadProjectConversationsInput = {
   projectId: string
+  archived?: boolean
+  searchTerm?: string
+  cursor?: string
 }
 
 export type SelectConversationInput = {
   threadId: string
+}
+
+export type RenameConversationInput = SelectConversationInput & {
+  name: string
+}
+
+export type ForkConversationInput = SelectConversationInput & {
+  lastTurnId?: string
 }
 
 export type SteerTurnInput = {

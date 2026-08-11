@@ -16,7 +16,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs",
     "check:workflows": "node scripts/check-workflows.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:package": "node scripts/check-packaged-runtime.mjs",

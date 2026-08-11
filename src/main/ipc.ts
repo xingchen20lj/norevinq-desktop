@@ -10,7 +10,10 @@ import { IPC_CHANNELS, type BootstrapState } from '../shared/contracts.js'
 import type {
   ConversationSnapshot,
   ConversationSubscription,
+  ForkConversationInput,
   InterruptTurnInput,
+  LoadProjectConversationsInput,
+  RenameConversationInput,
   ResolveApprovalInput,
   StartConversationInput,
   StartTurnInput,
@@ -90,8 +93,14 @@ export type RuntimeController = {
 
 export type AgentController = {
   subscribe: (subscription: ConversationSubscription) => () => void
-  loadProject: (projectId: string) => Promise<ConversationSnapshot>
+  loadProject: (input: LoadProjectConversationsInput) => Promise<ConversationSnapshot>
   selectThread: (threadId: string) => Promise<ConversationSnapshot>
+  renameThread: (input: RenameConversationInput) => Promise<ConversationSnapshot>
+  archiveThread: (threadId: string) => Promise<ConversationSnapshot>
+  unarchiveThread: (threadId: string) => Promise<ConversationSnapshot>
+  deleteThread: (threadId: string) => Promise<ConversationSnapshot>
+  forkThread: (input: ForkConversationInput) => Promise<ConversationSnapshot>
+  compactThread: (threadId: string) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>
@@ -288,13 +297,25 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.runtimeRestart, () => runtime.restart())
 
   ipcMain.handle(IPC_CHANNELS.conversationsLoad, (_event, input: unknown) => {
-    const parsed = projectInputSchema.parse(input)
-    return agent.loadProject(parsed.projectId)
+    const parsed = conversationListSchema.parse(input)
+    return agent.loadProject(parsed as LoadProjectConversationsInput)
   })
   ipcMain.handle(IPC_CHANNELS.conversationSelect, (_event, input: unknown) => {
     const parsed = threadInputSchema.parse(input)
     return agent.selectThread(parsed.threadId)
   })
+  ipcMain.handle(IPC_CHANNELS.conversationRename, (_event, input: unknown) =>
+    agent.renameThread(renameThreadSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.conversationArchive, (_event, input: unknown) =>
+    agent.archiveThread(threadInputSchema.parse(input).threadId))
+  ipcMain.handle(IPC_CHANNELS.conversationUnarchive, (_event, input: unknown) =>
+    agent.unarchiveThread(threadInputSchema.parse(input).threadId))
+  ipcMain.handle(IPC_CHANNELS.conversationDelete, (_event, input: unknown) =>
+    agent.deleteThread(threadInputSchema.parse(input).threadId))
+  ipcMain.handle(IPC_CHANNELS.conversationFork, (_event, input: unknown) =>
+    agent.forkThread(forkThreadSchema.parse(input) as ForkConversationInput))
+  ipcMain.handle(IPC_CHANNELS.conversationCompact, (_event, input: unknown) =>
+    agent.compactThread(threadInputSchema.parse(input).threadId))
   ipcMain.handle(IPC_CHANNELS.conversationStart, (_event, input: unknown) =>
     agent.startConversation(startConversationSchema.parse(input) as StartConversationInput))
   ipcMain.handle(IPC_CHANNELS.conversationTurnStart, (_event, input: unknown) =>
@@ -619,6 +640,14 @@ const browserBoundsSchema = z.object({
 })
 const browserExternalSchema = z.object({ url: z.string().trim().min(1).max(2_048), confirmed: z.literal(true) })
 const threadInputSchema = z.object({ threadId: z.string().min(1).max(200) })
+const conversationListSchema = z.object({
+  projectId: z.uuid(),
+  archived: z.boolean().optional(),
+  searchTerm: z.string().trim().max(200).optional(),
+  cursor: z.string().min(1).max(2_048).optional(),
+})
+const renameThreadSchema = threadInputSchema.extend({ name: z.string().trim().min(1).max(120) })
+const forkThreadSchema = threadInputSchema.extend({ lastTurnId: z.string().min(1).max(200).optional() })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
   projectId: z.uuid(),

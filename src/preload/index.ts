@@ -3,8 +3,10 @@ import { IPC_CHANNELS, type AsterDesktopApi, type RemoveProjectInput } from '../
 import type {
   ConversationSnapshot,
   ConversationSubscription,
+  ForkConversationInput,
   InterruptTurnInput,
   LoadProjectConversationsInput,
+  RenameConversationInput,
   ResolveApprovalInput,
   SelectConversationInput,
   StartConversationInput,
@@ -71,6 +73,18 @@ const api: AsterDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.conversationsLoad, input),
   selectConversation: (input: SelectConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationSelect, input),
+  renameConversation: (input: RenameConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationRename, input),
+  archiveConversation: (input: SelectConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationArchive, input),
+  unarchiveConversation: (input: SelectConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationUnarchive, input),
+  deleteConversation: (input: SelectConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationDelete, input),
+  forkConversation: (input: ForkConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationFork, input),
+  compactConversation: (input: SelectConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationCompact, input),
   startConversation: (input: StartConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationStart, input),
   startTurn: (input: StartTurnInput) => ipcRenderer.invoke(IPC_CHANNELS.conversationTurnStart, input),

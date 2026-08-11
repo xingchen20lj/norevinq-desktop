@@ -147,6 +147,10 @@ export class StateDatabase {
     return rows.map(({ thread_id }) => thread_id)
   }
 
+  removeThreadAssociation(threadId: string): void {
+    this.#database.prepare('DELETE FROM project_threads WHERE thread_id = ?').run(threadId)
+  }
+
   insertManagedWorktree(worktree: Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>): void {
     this.#database.prepare(`
       INSERT INTO managed_worktrees

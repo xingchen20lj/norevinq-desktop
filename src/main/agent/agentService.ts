@@ -6,8 +6,11 @@ import type {
   ConversationSubscription,
   ConversationThreadStatus,
   ConversationThreadSummary,
+  ForkConversationInput,
   InterruptTurnInput,
+  LoadProjectConversationsInput,
   PendingApproval,
+  RenameConversationInput,
   ResolveApprovalInput,
   StartConversationInput,
   StartTurnInput,
@@ -41,6 +44,9 @@ export class AgentService {
     projectId: null,
     threads: [],
     selectedThreadId: null,
+    listArchived: false,
+    listSearchTerm: '',
+    nextCursor: null,
     threadStates: {},
     approvals: [],
     error: null,
@@ -72,21 +78,37 @@ export class AgentService {
     return () => this.#subscriptions.delete(subscription)
   }
 
-  async loadProject(projectId: string): Promise<ConversationSnapshot> {
-    const project = this.#requireProject(projectId)
+  async loadProject(input: LoadProjectConversationsInput): Promise<ConversationSnapshot> {
+    const project = this.#requireProject(input.projectId)
+    const archived = input.archived ?? false
+    const searchTerm = normalizeSearchTerm(input.searchTerm)
+    const cursor = input.cursor ?? null
+    if (cursor && (
+      this.#snapshot.projectId !== input.projectId
+      || this.#snapshot.listArchived !== archived
+      || this.#snapshot.listSearchTerm !== searchTerm
+      || this.#snapshot.nextCursor !== cursor
+    )) throw new Error('The conversation page cursor is stale.')
     await this.#runtime.start()
-    const result = asRecord(await this.#runtime.request('thread/list', {
-      archived: false,
+    const params: Record<string, JsonValue> = {
+      archived,
       cwd: project.path,
-      limit: 100,
+      limit: 50,
       sortDirection: 'desc',
       sortKey: 'updated_at',
-    }))
-    const threads = asArray(result.data).map((value) => toThreadSummary(asRecord(value)))
-    for (const thread of threads) this.#database.associateThread(projectId, thread.id)
+    }
+    if (searchTerm) params.searchTerm = searchTerm
+    if (cursor) params.cursor = cursor
+    const result = asRecord(await this.#runtime.request('thread/list', params))
+    const page = asArray(result.data).map((value) => toThreadSummary(asRecord(value)))
+    const threads = cursor ? mergeThreadPage(this.#snapshot.threads, page) : page
+    for (const thread of page) this.#database.associateThread(input.projectId, thread.id)
     this.#update({
-      projectId,
+      projectId: input.projectId,
       threads,
+      listArchived: archived,
+      listSearchTerm: searchTerm,
+      nextCursor: optionalString(result.nextCursor),
       selectedThreadId: threads.some(({ id }) => id === this.#snapshot.selectedThreadId)
         ? this.#snapshot.selectedThreadId
         : null,
@@ -96,6 +118,7 @@ export class AgentService {
   }
 
   async selectThread(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(threadId)
     await this.#runtime.start()
     const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
     const thread = asRecord(result.thread)
@@ -103,6 +126,71 @@ export class AgentService {
     const projectId = this.#snapshot.projectId
     if (projectId) this.#database.associateThread(projectId, threadId)
     this.#update({ selectedThreadId: threadId, error: null })
+    return this.#snapshot
+  }
+
+  async renameThread(input: RenameConversationInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
+    const name = requireThreadName(input.name)
+    await this.#runtime.request('thread/name/set', { threadId: input.threadId, name })
+    this.#update({
+      threads: this.#snapshot.threads.map((thread) =>
+        thread.id === input.threadId ? { ...thread, name } : thread),
+      error: null,
+    })
+    return this.#snapshot
+  }
+
+  async archiveThread(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireIdleVisibleThread(threadId)
+    await this.#runtime.request('thread/archive', { threadId })
+    this.#removeThreadFromCurrentList(threadId)
+    return this.#reloadCurrentList()
+  }
+
+  async unarchiveThread(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(threadId)
+    await this.#runtime.request('thread/unarchive', { threadId })
+    this.#removeThreadFromCurrentList(threadId)
+    return this.#reloadCurrentList()
+  }
+
+  async deleteThread(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireIdleVisibleThread(threadId)
+    await this.#runtime.request('thread/delete', { threadId })
+    this.#database.removeThreadAssociation(threadId)
+    this.#removeThreadFromCurrentList(threadId, true)
+    return this.#reloadCurrentList()
+  }
+
+  async forkThread(input: ForkConversationInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
+    await this.#runtime.start()
+    const result = asRecord(await this.#runtime.request('thread/fork', {
+      threadId: input.threadId,
+      ...(input.lastTurnId ? { lastTurnId: input.lastTurnId } : {}),
+    }))
+    const thread = asRecord(result.thread)
+    const threadId = requireString(thread.id, 'thread.id')
+    const projectId = this.#snapshot.projectId
+    if (!projectId) throw new Error('No project is loaded.')
+    this.#database.associateThread(projectId, threadId)
+    this.#hydrateThread(thread)
+    this.#update({
+      threads: [toThreadSummary(thread)],
+      selectedThreadId: threadId,
+      listArchived: false,
+      listSearchTerm: '',
+      nextCursor: null,
+      error: null,
+    })
+    return this.#snapshot
+  }
+
+  async compactThread(threadId: string): Promise<ConversationSnapshot> {
+    this.#requireIdleVisibleThread(threadId)
+    await this.#runtime.request('thread/compact/start', { threadId })
+    this.#update({ error: null })
     return this.#snapshot
   }
 
@@ -181,6 +269,7 @@ export class AgentService {
   }
 
   async startTurn(input: StartTurnInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
     await this.#runtime.start()
     await this.#startTurn({ ...input, text: requirePrompt(input.text) })
     this.#update({ selectedThreadId: input.threadId, error: null })
@@ -188,6 +277,7 @@ export class AgentService {
   }
 
   async steerTurn(input: SteerTurnInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
     await this.#runtime.request('turn/steer', {
       expectedTurnId: input.turnId,
       input: [textInput(requirePrompt(input.text))],
@@ -197,6 +287,7 @@ export class AgentService {
   }
 
   async interruptTurn(input: InterruptTurnInput): Promise<ConversationSnapshot> {
+    this.#requireVisibleThread(input.threadId)
     await this.#runtime.request('turn/interrupt', input)
     return this.#snapshot
   }
@@ -280,6 +371,12 @@ export class AgentService {
       })
     }
 
+    if ((event.method === 'thread/archived' && !this.#snapshot.listArchived)
+      || (event.method === 'thread/unarchived' && this.#snapshot.listArchived)
+      || event.method === 'thread/deleted') {
+      if (threadId) this.#removeThreadFromCurrentList(threadId, event.method === 'thread/deleted')
+    }
+
     if (event.method === 'thread/status/changed' && params && threadId) {
       const status = toThreadStatus(params.status)
       this.#update({
@@ -296,6 +393,16 @@ export class AgentService {
     } catch {
       // Completion is authoritative even when the optional metadata refresh fails.
     }
+  }
+
+  async #reloadCurrentList(): Promise<ConversationSnapshot> {
+    const projectId = this.#snapshot.projectId
+    if (!projectId) return this.#snapshot
+    return this.loadProject({
+      projectId,
+      archived: this.#snapshot.listArchived,
+      ...(this.#snapshot.listSearchTerm ? { searchTerm: this.#snapshot.listSearchTerm } : {}),
+    })
   }
 
   #requestApproval(
@@ -356,6 +463,35 @@ export class AgentService {
     return worktree.path
   }
 
+  #requireVisibleThread(threadId: string): ConversationThreadSummary {
+    const thread = this.#snapshot.threads.find(({ id }) => id === threadId)
+    if (!thread) throw new Error('Conversation is not available in the current project view.')
+    return thread
+  }
+
+  #requireIdleVisibleThread(threadId: string): ConversationThreadSummary {
+    const thread = this.#requireVisibleThread(threadId)
+    if (this.#snapshot.threadStates[threadId]?.turnStatus === 'inProgress') {
+      throw new Error('Stop the active turn before changing this conversation.')
+    }
+    if (this.#snapshot.approvals.some((approval) => approval.threadId === threadId)) {
+      throw new Error('Resolve pending approvals before changing this conversation.')
+    }
+    return thread
+  }
+
+  #removeThreadFromCurrentList(threadId: string, removeState = false): void {
+    const threadStates = removeState
+      ? Object.fromEntries(Object.entries(this.#snapshot.threadStates).filter(([id]) => id !== threadId))
+      : this.#snapshot.threadStates
+    this.#update({
+      threads: this.#snapshot.threads.filter(({ id }) => id !== threadId),
+      selectedThreadId: this.#snapshot.selectedThreadId === threadId ? null : this.#snapshot.selectedThreadId,
+      threadStates,
+      error: null,
+    })
+  }
+
   #update(patch: Partial<ConversationSnapshot>): void {
     this.#snapshot = { ...this.#snapshot, ...patch }
     for (const subscription of this.#subscriptions) subscription(this.#snapshot)
@@ -371,6 +507,19 @@ function requirePrompt(text: string): string {
   if (!trimmed) throw new Error('Task instructions cannot be empty.')
   if (trimmed.length > 100_000) throw new Error('Task instructions exceed the 100,000 character limit.')
   return trimmed
+}
+
+function requireThreadName(value: string): string {
+  const name = value.trim()
+  if (!name) throw new Error('Conversation name cannot be empty.')
+  if (name.length > 120) throw new Error('Conversation name exceeds the 120 character limit.')
+  return name
+}
+
+function normalizeSearchTerm(value: string | undefined): string {
+  const term = value?.trim() ?? ''
+  if (term.length > 200) throw new Error('Conversation search exceeds the 200 character limit.')
+  return term
 }
 
 function toThreadSummary(thread: Record<string, unknown>): ConversationThreadSummary {
@@ -402,6 +551,15 @@ function upsertThread(
 ): ConversationThreadSummary[] {
   return [thread, ...threads.filter(({ id }) => id !== thread.id)]
     .sort((left, right) => right.updatedAt - left.updatedAt)
+}
+
+function mergeThreadPage(
+  current: ConversationThreadSummary[],
+  page: ConversationThreadSummary[],
+): ConversationThreadSummary[] {
+  const byId = new Map(current.map((thread) => [thread.id, thread]))
+  for (const thread of page) byId.set(thread.id, thread)
+  return [...byId.values()].sort((left, right) => right.updatedAt - left.updatedAt)
 }
 
 function turnKey(threadId: string, turnId: string): string {

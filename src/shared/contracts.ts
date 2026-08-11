@@ -2,8 +2,10 @@ import type { CodexRuntimeSnapshot, RuntimeSubscription } from './runtime.js'
 import type {
   ConversationSnapshot,
   ConversationSubscription,
+  ForkConversationInput,
   InterruptTurnInput,
   LoadProjectConversationsInput,
+  RenameConversationInput,
   ResolveApprovalInput,
   SelectConversationInput,
   StartConversationInput,
@@ -87,6 +89,12 @@ export const IPC_CHANNELS = {
   runtimeStatusChanged: 'runtime:status-changed',
   conversationsLoad: 'conversations:load',
   conversationSelect: 'conversation:select',
+  conversationRename: 'conversation:rename',
+  conversationArchive: 'conversation:archive',
+  conversationUnarchive: 'conversation:unarchive',
+  conversationDelete: 'conversation:delete',
+  conversationFork: 'conversation:fork',
+  conversationCompact: 'conversation:compact',
   conversationStart: 'conversation:start',
   conversationTurnStart: 'conversation:turn-start',
   conversationSteer: 'conversation:steer',
@@ -194,6 +202,12 @@ export type AsterDesktopApi = {
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void
   loadProjectConversations: (input: LoadProjectConversationsInput) => Promise<ConversationSnapshot>
   selectConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  renameConversation: (input: RenameConversationInput) => Promise<ConversationSnapshot>
+  archiveConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  unarchiveConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  deleteConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  forkConversation: (input: ForkConversationInput) => Promise<ConversationSnapshot>
+  compactConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>

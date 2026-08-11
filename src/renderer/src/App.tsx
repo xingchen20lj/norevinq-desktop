@@ -1,4 +1,6 @@
 import {
+  Archive,
+  ArchiveRestore,
   Bot,
   Brain,
   Check,
@@ -12,12 +14,14 @@ import {
   FolderOpen,
   GitBranch,
   GitCommitHorizontal,
+  GitFork,
   Globe2,
   LoaderCircle,
   MessageSquare,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
+  Pencil,
   Plus,
   Search,
   Settings,
@@ -26,6 +30,7 @@ import {
   Square,
   Sun,
   TerminalSquare,
+  Trash2,
   Upload,
   Wrench,
   X,
@@ -67,6 +72,11 @@ export function App(): React.JSX.Element {
   const [model, setModel] = useState('')
   const [effort, setEffort] = useState('')
   const [newTask, setNewTask] = useState(true)
+  const [threadSearch, setThreadSearch] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
+  const [threadActionBusy, setThreadActionBusy] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
+  const [renameDraft, setRenameDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isOpening, setIsOpening] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -154,7 +164,8 @@ export function App(): React.JSX.Element {
         event.preventDefault()
         void openTerminal()
       } else if (event.key === 'Escape' && !commandOpen) {
-        if (browserOpen) { void window.aster.closeBrowser(); setBrowserOpen(false) }
+        if (renameOpen) setRenameOpen(false)
+        else if (browserOpen) { void window.aster.closeBrowser(); setBrowserOpen(false) }
         else if (filesOpen) setFilesOpen(false)
         else if (terminalOpen) setTerminalOpen(false)
         else if (gitOpen) setGitOpen(false)
@@ -166,7 +177,7 @@ export function App(): React.JSX.Element {
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
-  }, [browserOpen, commandOpen, filesOpen, gitOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
+  }, [browserOpen, commandOpen, filesOpen, gitOpen, renameOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
 
   useEffect(() => {
     const unsubscribe = window.aster.onSecurityChanged(setSecurity)
@@ -230,6 +241,8 @@ export function App(): React.JSX.Element {
   useEffect(() => {
     if (!selectedProject || runtime?.phase !== 'ready') return
     setError(null)
+    setThreadSearch('')
+    setShowArchived(false)
     void window.aster.loadProjectConversations({ projectId: selectedProject.id })
       .then((snapshot) => {
         setConversations(snapshot)
@@ -291,6 +304,77 @@ export function App(): React.JSX.Element {
     } catch (reason) {
       setError(toErrorMessage(reason))
     }
+  }
+
+  async function loadConversationPage(options: { archived?: boolean; searchTerm?: string; cursor?: string } = {}): Promise<void> {
+    if (!selectedProject) return
+    const archived = options.archived ?? showArchived
+    const searchTerm = options.searchTerm ?? threadSearch
+    setError(null)
+    try {
+      const snapshot = await window.aster.loadProjectConversations({
+        projectId: selectedProject.id,
+        archived,
+        ...(searchTerm.trim() ? { searchTerm: searchTerm.trim() } : {}),
+        ...(options.cursor ? { cursor: options.cursor } : {}),
+      })
+      setConversations(snapshot)
+      setShowArchived(snapshot.listArchived)
+      setThreadSearch(snapshot.listSearchTerm)
+      if (!snapshot.selectedThreadId) setNewTask(true)
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+    }
+  }
+
+  async function runThreadAction(action: () => Promise<ConversationSnapshot>): Promise<void> {
+    setThreadActionBusy(true)
+    setError(null)
+    try {
+      const snapshot = await action()
+      setConversations(snapshot)
+      setShowArchived(snapshot.listArchived)
+      setThreadSearch(snapshot.listSearchTerm)
+      setNewTask(snapshot.selectedThreadId === null)
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+    } finally {
+      setThreadActionBusy(false)
+    }
+  }
+
+  function renameSelectedThread(): void {
+    if (!selectedThread) return
+    setRenameDraft(selectedThread.name ?? selectedThread.preview)
+    setRenameOpen(true)
+  }
+
+  async function confirmRename(): Promise<void> {
+    if (!selectedThread || !renameDraft.trim()) return
+    await runThreadAction(() => window.aster.renameConversation({ threadId: selectedThread.id, name: renameDraft }))
+    setRenameOpen(false)
+  }
+
+  async function forkSelectedThread(): Promise<void> {
+    if (!selectedThread) return
+    await runThreadAction(() => window.aster.forkConversation({ threadId: selectedThread.id }))
+  }
+
+  async function compactSelectedThread(): Promise<void> {
+    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Codex 会保留摘要并继续使用同一任务。')) return
+    await runThreadAction(() => window.aster.compactConversation({ threadId: selectedThread.id }))
+  }
+
+  async function archiveSelectedThread(): Promise<void> {
+    if (!selectedThread) return
+    await runThreadAction(() => conversations?.listArchived
+      ? window.aster.unarchiveConversation({ threadId: selectedThread.id })
+      : window.aster.archiveConversation({ threadId: selectedThread.id }))
+  }
+
+  async function deleteSelectedThread(): Promise<void> {
+    if (!selectedThread || !window.confirm('永久删除此任务及其 Codex 历史？此操作无法撤销。')) return
+    await runThreadAction(() => window.aster.deleteConversation({ threadId: selectedThread.id }))
   }
 
   async function submit(): Promise<void> {
@@ -455,6 +539,18 @@ export function App(): React.JSX.Element {
               </button>
               {selectedProject?.id === project.id && conversations?.projectId === project.id && (
                 <div className="thread-list" aria-label={`${project.name} 任务`}>
+                  <div className="thread-filter">
+                    <input
+                      aria-label="搜索任务"
+                      value={threadSearch}
+                      onChange={(event) => setThreadSearch(event.target.value)}
+                      onKeyDown={(event) => { if (event.key === 'Enter') void loadConversationPage({ searchTerm: threadSearch }) }}
+                      placeholder="搜索任务"
+                    />
+                    <button className={showArchived ? 'active' : ''} title={showArchived ? '显示活动任务' : '显示已归档任务'} onClick={() => void loadConversationPage({ archived: !showArchived })}>
+                      {showArchived ? <ArchiveRestore size={12} /> : <Archive size={12} />}
+                    </button>
+                  </div>
                   {conversations.threads.map((thread) => (
                     <button
                       className={`thread-row ${!newTask && conversations.selectedThreadId === thread.id ? 'selected' : ''}`}
@@ -466,6 +562,11 @@ export function App(): React.JSX.Element {
                       {thread.status === 'active' && <span className="active-indicator" />}
                     </button>
                   ))}
+                  {conversations.threads.length === 0 && <div className="thread-empty">{showArchived ? '没有已归档任务' : '没有匹配任务'}</div>}
+                  {conversations.nextCursor && <button className="thread-load-more" onClick={() => {
+                    const cursor = conversations.nextCursor
+                    if (cursor) void loadConversationPage({ cursor })
+                  }}>加载更多</button>}
                 </div>
               )}
             </div>
@@ -498,6 +599,13 @@ export function App(): React.JSX.Element {
             </span>
           </div>
           <div className="topbar-actions">
+            {selectedThread && !newTask && <>
+              <button className="icon-button" aria-label="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
+              <button className="icon-button" aria-label="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
+              <button className="icon-button" aria-label="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
+              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
+              <button className="icon-button danger-action" aria-label="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
+            </>}
             <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
             <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
             <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
@@ -617,6 +725,17 @@ export function App(): React.JSX.Element {
         close={() => setSchedulerOpen(false)}
         onError={setError}
       /></Suspense>}
+      {renameOpen && <div className="thread-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setRenameOpen(false) }}>
+        <form className="thread-dialog" role="dialog" aria-label="重命名任务" onSubmit={(event) => { event.preventDefault(); void confirmRename() }}>
+          <h2>重命名任务</h2>
+          <p>名称只改变任务在列表中的显示，不修改项目文件。</p>
+          <input autoFocus aria-label="任务名称" maxLength={120} value={renameDraft} onChange={(event) => setRenameDraft(event.target.value)} />
+          <div>
+            <button type="button" onClick={() => setRenameOpen(false)}>取消</button>
+            <button type="submit" disabled={!renameDraft.trim() || threadActionBusy}>保存名称</button>
+          </div>
+        </form>
+      </div>}
       {commandOpen && <Suspense fallback={<WorkbenchLoading label="正在加载命令面板…" overlay />}><CommandPalette actions={commands} close={() => setCommandOpen(false)} onError={setError} /></Suspense>}
     </div>
   )

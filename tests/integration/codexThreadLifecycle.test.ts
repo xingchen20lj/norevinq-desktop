@@ -1,0 +1,129 @@
+import { spawn } from 'node:child_process'
+import { existsSync } from 'node:fs'
+import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { afterEach, expect, test } from 'vitest'
+import { JsonlRpcPeer, type JsonValue } from '../../src/main/runtime/jsonlRpc.js'
+
+const temporaryRoots: string[] = []
+
+afterEach(async () => {
+  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })))
+})
+
+test('official Codex app-server performs thread naming, search, fork, archive, restore, and delete', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'aster-codex-lifecycle-'))
+  temporaryRoots.push(root)
+  const codexHome = join(root, 'codex-home')
+  const projectPath = join(root, 'project')
+  await Promise.all([mkdir(codexHome), mkdir(projectPath)])
+  const entrypoint = resolve('node_modules', '@openai', 'codex', 'bin', 'codex.js')
+  expect(existsSync(entrypoint)).toBe(true)
+
+  const child = spawn(process.execPath, [entrypoint, 'app-server', '--stdio'], {
+    cwd: projectPath,
+    env: childEnvironment(codexHome),
+    stdio: ['pipe', 'pipe', 'pipe'],
+    windowsHide: true,
+  })
+  const peer = new JsonlRpcPeer(child.stdout, child.stdin, {
+    acceptMissingJsonrpc: true,
+    omitJsonrpcHeader: true,
+    defaultTimeoutMs: 20_000,
+  })
+  let stderr = ''
+  child.stderr.setEncoding('utf8')
+  child.stderr.on('data', (chunk: string) => { stderr += chunk.slice(0, 8_192) })
+
+  try {
+    await peer.request('initialize', {
+      clientInfo: { name: 'aster-code-integration-test', version: '0.1.0' },
+      capabilities: {},
+    })
+    await peer.notify('initialized')
+    const started = asRecord(await peer.request('thread/start', {
+      approvalPolicy: 'never',
+      cwd: projectPath,
+      ephemeral: false,
+      sandbox: 'read-only',
+    }))
+    const originalId = requireId(asRecord(started.thread).id)
+
+    await peer.request('thread/inject_items', {
+      threadId: originalId,
+      items: [{
+        type: 'message',
+        role: 'user',
+        content: [{ type: 'input_text', text: 'Aster lifecycle seed' }],
+      }],
+    })
+
+    await peer.request('thread/name/set', { threadId: originalId, name: 'Aster lifecycle proof' })
+    const named = asRecord(await peer.request('thread/read', { includeTurns: true, threadId: originalId }))
+    expect(asRecord(named.thread).name).toBe('Aster lifecycle proof')
+    const listed = asRecord(await peer.request('thread/list', {
+      archived: false,
+      cwd: projectPath,
+      limit: 10,
+      searchTerm: 'lifecycle proof',
+    }))
+    expect(Array.isArray(listed.data)).toBe(true)
+
+    const forked = asRecord(await peer.request('thread/fork', { threadId: originalId }))
+    const forkId = requireId(asRecord(forked.thread).id)
+    expect(forkId).not.toBe(originalId)
+    expect(asRecord(forked.thread).forkedFromId).toBe(originalId)
+
+    await peer.request('thread/archive', { threadId: forkId })
+    const archived = asRecord(await peer.request('thread/list', {
+      archived: true,
+      cwd: projectPath,
+      limit: 10,
+    }))
+    expect(Array.isArray(archived.data)).toBe(true)
+    const restored = asRecord(await peer.request('thread/unarchive', { threadId: forkId }))
+    expect(requireId(asRecord(restored.thread).id)).toBe(forkId)
+
+    await peer.request('thread/delete', { threadId: forkId })
+    await peer.request('thread/delete', { threadId: originalId })
+    const remaining = asRecord(await peer.request('thread/list', {
+      archived: false,
+      cwd: projectPath,
+      limit: 10,
+      useStateDbOnly: true,
+    }))
+    expect(asArray(remaining.data)).toEqual([])
+  } catch (error) {
+    throw new Error(
+      `Codex thread lifecycle failed: ${error instanceof Error ? error.message : String(error)}\n${stderr}`,
+      { cause: error },
+    )
+  } finally {
+    peer.close()
+    child.kill()
+  }
+}, 30_000)
+
+function childEnvironment(codexHome: string): NodeJS.ProcessEnv {
+  const environment: NodeJS.ProcessEnv = { CODEX_HOME: codexHome, NO_COLOR: '1' }
+  for (const key of ['HOME', 'PATH', 'PATHEXT', 'SystemRoot', 'TEMP', 'TMP', 'TMPDIR', 'USERPROFILE']) {
+    const value = process.env[key]
+    if (value) environment[key] = value
+  }
+  return environment
+}
+
+function asRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Expected an object response.')
+  return value as Record<string, unknown>
+}
+
+function asArray(value: unknown): JsonValue[] {
+  return Array.isArray(value) ? value as JsonValue[] : []
+}
+
+function requireId(value: unknown): string {
+  if (typeof value !== 'string' || !value) throw new Error('Expected a thread id.')
+  return value
+}

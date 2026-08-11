@@ -114,7 +114,7 @@ describe('AgentService', () => {
     const runtime = new FakeRuntime()
     const service = new AgentService(runtime, database)
 
-    const loaded = await service.loadProject(projectId)
+    const loaded = await service.loadProject({ projectId })
     expect(loaded.threads.map(({ id }) => id)).toEqual(['thread-1'])
     const selected = await service.selectThread('thread-1')
     expect(selected.selectedThreadId).toBe('thread-1')
@@ -129,6 +129,88 @@ describe('AgentService', () => {
     expect(runtime.requests.map(({ method }) => method)).toEqual([
       'thread/list', 'thread/resume', 'turn/steer', 'turn/interrupt',
     ])
+    service.dispose()
+    database.close()
+  })
+
+  it('searches and paginates with opaque cursors, rejecting stale continuation tokens', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    runtime.threadListResponses.push(
+      { data: [protocolThread([], 'thread-1', 30)], nextCursor: 'cursor-2', backwardsCursor: null },
+      { data: [protocolThread([], 'thread-2', 20)], nextCursor: null, backwardsCursor: 'back-2' },
+    )
+    const service = new AgentService(runtime, database)
+
+    const first = await service.loadProject({ projectId, searchTerm: '  hello  ' })
+    expect(first).toMatchObject({ listArchived: false, listSearchTerm: 'hello', nextCursor: 'cursor-2' })
+    const second = await service.loadProject({ projectId, searchTerm: 'hello', cursor: 'cursor-2' })
+    expect(second.threads.map(({ id }) => id)).toEqual(['thread-1', 'thread-2'])
+    expect(second.nextCursor).toBeNull()
+    await expect(service.loadProject({ projectId, searchTerm: 'hello', cursor: 'stale' }))
+      .rejects.toThrow('cursor is stale')
+    const firstParams = runtime.requests[0]?.params as Record<string, JsonValue> | undefined
+    expect(typeof firstParams?.cwd).toBe('string')
+    expect(firstParams).toMatchObject({ limit: 50, searchTerm: 'hello' })
+    expect(runtime.requests[1]?.params).toMatchObject({ cursor: 'cursor-2', searchTerm: 'hello' })
+
+    service.dispose()
+    database.close()
+  })
+
+  it('renames, compacts, forks, archives, restores, and permanently deletes protocol threads', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+
+    await service.loadProject({ projectId })
+    await service.renameThread({ threadId: 'thread-1', name: '  Release review  ' })
+    expect(service.getSnapshot().threads[0]?.name).toBe('Release review')
+    await service.compactThread('thread-1')
+    const forked = await service.forkThread({ threadId: 'thread-1' })
+    expect(forked).toMatchObject({ selectedThreadId: 'thread-fork', listArchived: false, listSearchTerm: '' })
+    expect(forked.threads.map(({ id }) => id)).toEqual(['thread-fork'])
+    await service.archiveThread('thread-fork')
+    expect(service.getSnapshot()).toMatchObject({ selectedThreadId: null })
+    expect(service.getSnapshot().threads.map(({ id }) => id)).toEqual(['thread-1'])
+
+    runtime.threadListResponses.push({ data: [protocolThread([], 'thread-1')], nextCursor: null, backwardsCursor: null })
+    await service.loadProject({ projectId, archived: true })
+    runtime.threadListResponses.push({ data: [], nextCursor: null, backwardsCursor: null })
+    await service.unarchiveThread('thread-1')
+    expect(service.getSnapshot().threads).toEqual([])
+
+    runtime.threadListResponses.push({ data: [protocolThread([], 'thread-1')], nextCursor: null, backwardsCursor: null })
+    await service.loadProject({ projectId })
+    runtime.threadListResponses.push({ data: [], nextCursor: null, backwardsCursor: null })
+    await service.deleteThread('thread-1')
+    expect(database.listProjectThreadIds(projectId)).toEqual(['thread-fork'])
+    expect(runtime.requests.map(({ method }) => method)).toEqual(expect.arrayContaining([
+      'thread/name/set',
+      'thread/compact/start',
+      'thread/fork',
+      'thread/archive',
+      'thread/unarchive',
+      'thread/delete',
+    ]))
+
+    service.dispose()
+    database.close()
+  })
+
+  it('fails closed on destructive lifecycle operations while a turn is active', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.emit('turn/started', { threadId: 'thread-1', turn: turn('turn-active', 'inProgress') })
+
+    await expect(service.archiveThread('thread-1')).rejects.toThrow('Stop the active turn')
+    await expect(service.compactThread('thread-1')).rejects.toThrow('Stop the active turn')
+    await expect(service.deleteThread('thread-1')).rejects.toThrow('Stop the active turn')
+    expect(runtime.requests.filter(({ method }) => method.startsWith('thread/')).map(({ method }) => method))
+      .toEqual(['thread/list'])
+
     service.dispose()
     database.close()
   })
@@ -159,6 +241,7 @@ describe('AgentService', () => {
 
 class FakeRuntime {
   readonly requests: { method: string; params: JsonValue | undefined }[] = []
+  readonly threadListResponses: JsonValue[] = []
   readonly #notifications = new Set<JsonRpcNotificationHandler>()
   readonly #handlers = new Map<string, JsonRpcRequestHandler>()
   turnStarts = 0
@@ -169,10 +252,20 @@ class FakeRuntime {
   request<T extends JsonValue = JsonValue>(method: string, params?: JsonValue): Promise<T> {
     this.requests.push({ method, params })
     const thread = protocolThread(method === 'thread/resume' ? [turn('turn-old', 'completed')] : [])
+    if (method === 'thread/list') {
+      const response = this.threadListResponses.shift()
+        ?? { data: [thread], nextCursor: null, backwardsCursor: null }
+      return Promise.resolve(response as T)
+    }
     const responses: Record<string, JsonValue> = {
-      'thread/list': { data: [thread], nextCursor: null, backwardsCursor: null },
       'thread/resume': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
       'thread/start': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
+      'thread/name/set': {},
+      'thread/archive': {},
+      'thread/unarchive': { thread },
+      'thread/delete': {},
+      'thread/fork': { thread: protocolThread([], 'thread-fork'), model: 'gpt-5.4', modelProvider: 'openai' },
+      'thread/compact/start': {},
       'turn/start': { turn: turn('turn-1', 'inProgress') },
       'turn/steer': { turnId: 'turn-1' },
       'turn/interrupt': {},
@@ -220,16 +313,16 @@ function createDatabase(): { database: StateDatabase; projectId: string; root: s
   return { database, projectId: database.upsertProject(projectPath).id, root }
 }
 
-function protocolThread(turns: JsonValue[]): JsonValue {
+function protocolThread(turns: JsonValue[], id = 'thread-1', updatedAt = 20): JsonValue {
   return {
-    id: 'thread-1',
-    sessionId: 'session-1',
+    id,
+    sessionId: `session-${id}`,
     forkedFromId: null,
     parentThreadId: null,
     preview: 'Say hello',
     modelProvider: 'openai',
     createdAt: 10,
-    updatedAt: 20,
+    updatedAt,
     status: { type: 'idle' },
     cwd: '/project',
     cliVersion: '0.147.0',
