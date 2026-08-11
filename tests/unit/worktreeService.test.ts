@@ -17,42 +17,48 @@ afterEach(() => {
 describe('WorktreeService', () => {
   it('creates, persists, locks, unlocks, and removes a detached managed worktree', async () => {
     const setup = createRepository()
-    const service = new WorktreeService(setup.database, setup.managedRoot)
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot)
 
-    const created = await service.create({ projectId: setup.projectId })
-    expect(created).toMatchObject({ projectId: setup.projectId, branch: null, locked: false, missing: false })
-    expect(created.path.startsWith(join(realpathSync(setup.managedRoot), setup.projectId))).toBe(true)
-    expect(readFileSync(join(created.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# worktree\n')
-    expect(runGit(created.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('HEAD')
+      const created = await service.create({ projectId: setup.projectId })
+      expect(created).toMatchObject({ projectId: setup.projectId, branch: null, locked: false, missing: false })
+      expect(created.path.startsWith(join(realpathSync(setup.managedRoot), setup.projectId))).toBe(true)
+      expect(readFileSync(join(created.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# worktree\n')
+      expect(runGit(created.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('HEAD')
 
-    expect((await service.lock({ worktreeId: created.id }))[0]?.locked).toBe(true)
-    expect((await service.unlock({ worktreeId: created.id }))[0]?.locked).toBe(false)
-    const reloaded = new WorktreeService(setup.database, setup.managedRoot)
-    expect((await reloaded.list(setup.projectId))[0]?.id).toBe(created.id)
-    expect(await service.remove({ worktreeId: created.id })).toEqual([])
-    expect(existsSync(created.path)).toBe(false)
-    setup.database.close()
+      expect((await service.lock({ worktreeId: created.id }))[0]?.locked).toBe(true)
+      expect((await service.unlock({ worktreeId: created.id }))[0]?.locked).toBe(false)
+      const reloaded = new WorktreeService(setup.database, setup.managedRoot)
+      expect((await reloaded.list(setup.projectId))[0]?.id).toBe(created.id)
+      expect(await service.remove({ worktreeId: created.id })).toEqual([])
+      expect(existsSync(created.path)).toBe(false)
+    } finally {
+      setup.database.close()
+    }
   }, 30_000)
 
   it('creates an explicit branch and copies only ignored .worktreeinclude matches', async () => {
     const setup = createRepository()
-    mkdirSync(join(setup.projectPath, 'config'))
-    writeFileSync(join(setup.projectPath, '.gitignore'), 'config/\n*.secret\n')
-    writeFileSync(join(setup.projectPath, '.worktreeinclude'), 'config/*.txt\n!config/skip.txt\n')
-    writeFileSync(join(setup.projectPath, 'config', 'local.txt'), 'copied\n')
-    writeFileSync(join(setup.projectPath, 'config', 'skip.txt'), 'skip\n')
-    writeFileSync(join(setup.projectPath, 'private.secret'), 'not copied\n')
-    const service = new WorktreeService(setup.database, setup.managedRoot)
+    try {
+      mkdirSync(join(setup.projectPath, 'config'))
+      writeFileSync(join(setup.projectPath, '.gitignore'), 'config/\n*.secret\n')
+      writeFileSync(join(setup.projectPath, '.worktreeinclude'), 'config/*.txt\n!config/skip.txt\n')
+      writeFileSync(join(setup.projectPath, 'config', 'local.txt'), 'copied\n')
+      writeFileSync(join(setup.projectPath, 'config', 'skip.txt'), 'skip\n')
+      writeFileSync(join(setup.projectPath, 'private.secret'), 'not copied\n')
+      const service = new WorktreeService(setup.database, setup.managedRoot)
 
-    const created = await service.create({ projectId: setup.projectId, branch: 'codex/worktree-test' })
-    expect(created.branch).toBe('codex/worktree-test')
-    expect(created.copiedIncludeFiles).toBe(1)
-    expect(readFileSync(join(created.path, 'config', 'local.txt'), 'utf8')).toBe('copied\n')
-    expect(existsSync(join(created.path, 'config', 'skip.txt'))).toBe(false)
-    expect(existsSync(join(created.path, 'private.secret'))).toBe(false)
-    await expect(service.create({ projectId: setup.projectId, branch: 'codex/worktree-test' })).rejects.toThrow()
-    await service.remove({ worktreeId: created.id, force: true })
-    setup.database.close()
+      const created = await service.create({ projectId: setup.projectId, branch: 'codex/worktree-test' })
+      expect(created.branch).toBe('codex/worktree-test')
+      expect(created.copiedIncludeFiles).toBe(1)
+      expect(readFileSync(join(created.path, 'config', 'local.txt'), 'utf8')).toBe('copied\n')
+      expect(existsSync(join(created.path, 'config', 'skip.txt'))).toBe(false)
+      expect(existsSync(join(created.path, 'private.secret'))).toBe(false)
+      await expect(service.create({ projectId: setup.projectId, branch: 'codex/worktree-test' })).rejects.toThrow()
+      await service.remove({ worktreeId: created.id, force: true })
+    } finally {
+      setup.database.close()
+    }
   }, 30_000)
 })
 

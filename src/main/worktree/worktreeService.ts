@@ -185,7 +185,7 @@ async function readWorktreeMetadata(repositoryPath: string): Promise<Map<string,
     headOid = null
     locked = false
   }
-  for (const line of `${result.stdout}\n`.split('\n')) {
+  for (const line of `${result.stdout}\n`.split(/\r?\n/u)) {
     if (!line) { flush(); continue }
     if (line.startsWith('worktree ')) path = line.slice(9)
     else if (line.startsWith('HEAD ')) headOid = line.slice(5)
