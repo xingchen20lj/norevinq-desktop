@@ -8,8 +8,7 @@
 
 ## 当前任务
 
-- 完成 GitHub CLI 认证/远端预检、显式推送、幂等 Pull Request 创建、桌面实测、文档与提交。
-- 创建用户授权的首个私有 GitHub 远端并推送已验证的 `main` 历史。
+- 通过 Aster 桌面自身向新建私有仓库创建真实 GitHub Draft Pull Request，补齐线上闭环证据。
 - 继续逐项审计功能一致性表，下一项处理工作树 Handoff。
 
 ## 已完成任务
@@ -198,10 +197,12 @@
 - 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
 - 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
 - GitHub PR 阶段最终 `verify:ci`：34 个测试文件 158 项、覆盖率 80.62/69.20/85.37/87.50、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
+- 仓库级 Git 身份固定为 `xingchen20lj <71823107+xingchen20lj@users.noreply.github.com>`；从首条提交到 GitHub PR 阶段提交的作者身份均已核对一致，无需重写历史。
+- 按用户授权创建私有仓库 `xingchen20lj/aster-code-desktop` 并首次推送完整 `main`；GitHub 回读确认 `PRIVATE`、默认分支 `main`，本地/远端 SHA 同为 `d154183f41783f2139e07b017800357b36a43ebc`。
 
 ## 下一任务
 
-1. 创建私有 GitHub 仓库 `xingchen20lj/aster-code-desktop` 并首次推送已验证 `main` 历史。
+1. 在 `codex/github-pr-validation` 上通过 Aster UI 创建真实 Draft PR 并回读验证。
 2. 处理工作树 Handoff 与剩余部分实现项。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
@@ -257,7 +258,8 @@
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
 - Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
-- 自动更新发布域名/对象存储：当前仓库没有远端或实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
+- 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
+- GitHub 私有远端已建立并由系统 keyring 中的 `xingchen20lj` 账户验证；Aster 不保存或显示其 token。
 
 ## 待验证问题
 

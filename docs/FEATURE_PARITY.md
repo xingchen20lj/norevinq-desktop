@@ -52,7 +52,7 @@
 | Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
 | Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage、区块 stage/unstage/revert 已真实测试；整文件 recoverable discard 待文件工作台 |
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
-| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；真实线上仓库将在首个私有远端创建后验证 |
+| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；私有远端与真实 `main` push 已验证，真实线上 Draft PR 正在执行 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
 | 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根、默认 detached、可选显式分支；真实仓库/E2E 通过 |
 | 工作树 | 本地与工作树 Handoff | 部分实现 | Local/Worktree composer 上下文切换和新任务 cwd 已实现；已有 turn/未提交修改 Handoff 待补 |
