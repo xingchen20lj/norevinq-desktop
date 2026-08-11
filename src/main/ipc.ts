@@ -71,6 +71,10 @@ const removeProjectSchema = z.object({
   projectId: z.uuid(),
 })
 const projectPinnedSchema = removeProjectSchema.extend({ pinned: z.boolean() })
+const deepLinkTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('project'), projectId: z.uuid() }),
+  z.object({ kind: z.literal('thread'), projectId: z.uuid(), threadId: z.uuid() }),
+])
 
 type AuthorizedIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
 
@@ -98,6 +102,7 @@ export type AgentController = {
   subscribe: (subscription: ConversationSubscription) => () => void
   loadProject: (input: LoadProjectConversationsInput) => Promise<ConversationSnapshot>
   selectThread: (threadId: string) => Promise<ConversationSnapshot>
+  openLinkedThread: (projectId: string, threadId: string) => Promise<ConversationSnapshot>
   renameThread: (input: RenameConversationInput) => Promise<ConversationSnapshot>
   archiveThread: (threadId: string) => Promise<ConversationSnapshot>
   unarchiveThread: (threadId: string) => Promise<ConversationSnapshot>
@@ -297,6 +302,13 @@ export function registerIpc(
     const parsed = projectPinnedSchema.parse(input)
     database.setProjectPinned(parsed.projectId, parsed.pinned)
     return database.listProjects()
+  })
+  ipcMain.handle(IPC_CHANNELS.deepLinkOpen, (_event, input: unknown) => {
+    const target = deepLinkTargetSchema.parse(input)
+    if (!database.getProject(target.projectId)) throw new Error('Deep-link project not found.')
+    return target.kind === 'thread'
+      ? agent.openLinkedThread(target.projectId, target.threadId)
+      : null
   })
 
   ipcMain.handle(IPC_CHANNELS.runtimeStatus, (event) => {

@@ -133,6 +133,31 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('opens only a conversation already associated with the deep-linked project', async () => {
+    const { database, projectId } = createDatabase()
+    const otherPath = mkdtempSync(join(tmpdir(), 'aster-deep-link-project-'))
+    temporaryPaths.push(otherPath)
+    const otherProjectId = database.upsertProject(otherPath).id
+    database.associateThread(projectId, 'thread-2')
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+
+    await expect(service.openLinkedThread(otherProjectId, 'thread-2'))
+      .rejects.toThrow('not associated')
+    const opened = await service.openLinkedThread(projectId, 'thread-2')
+    expect(opened).toMatchObject({
+      projectId,
+      selectedThreadId: 'thread-2',
+      listArchived: false,
+      listSearchTerm: '',
+    })
+    expect(opened.threads.map(({ id }) => id)).toEqual(['thread-2'])
+    expect(runtime.requests.map(({ method }) => method)).toEqual(['thread/resume', 'thread/goal/get'])
+
+    service.dispose()
+    database.close()
+  })
+
   it('searches and paginates with opaque cursors, rejecting stale continuation tokens', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()

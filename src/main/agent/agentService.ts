@@ -142,6 +142,31 @@ export class AgentService {
     return this.#snapshot
   }
 
+  async openLinkedThread(projectId: string, threadId: string): Promise<ConversationSnapshot> {
+    this.#requireProject(projectId)
+    if (!this.#database.hasProjectThread(projectId, threadId)) {
+      throw new Error('Conversation is not associated with the requested project.')
+    }
+    await this.#runtime.start()
+    const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
+    const thread = asRecord(result.thread)
+    if (requireString(thread.id, 'thread.id') !== threadId) {
+      throw new Error('Codex returned another conversation for the deep link.')
+    }
+    this.#hydrateThread(thread)
+    this.#update({
+      projectId,
+      threads: [this.#toThreadSummary(thread)],
+      selectedThreadId: threadId,
+      listArchived: false,
+      listSearchTerm: '',
+      nextCursor: null,
+      error: null,
+    })
+    await this.#loadThreadGoal(threadId)
+    return this.#snapshot
+  }
+
   async renameThread(input: RenameConversationInput): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(input.threadId)
     const name = requireThreadName(input.name)

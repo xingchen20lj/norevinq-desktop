@@ -43,6 +43,12 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByRole('button', { name: '取消固定任务 Lifecycle secondary' }).click()
     await expect(window.locator('.thread-row').first()).toContainText('Lifecycle primary')
 
+    const secondaryThreadId = '22222222-2222-7222-8222-222222222222'
+    await application.evaluate(({ app }, url) => {
+      app.emit('second-instance', { preventDefault: () => undefined }, [url], '', {})
+    }, `aster-code://thread/${secondaryThreadId}?project=${project.id}`)
+    await expect(window.locator('.topbar-title')).toContainText('Lifecycle secondary')
+
     await window.getByLabel('搜索任务').fill('secondary')
     await window.getByLabel('搜索任务').press('Enter')
     await expect(taskRow('Lifecycle secondary')).toBeVisible()

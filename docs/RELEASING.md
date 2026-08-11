@@ -36,6 +36,8 @@ pnpm package:win
 
 `test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready。
 
+应用注册 `aster-code` 自定义协议，只接受 `aster-code://project/<project-uuid>` 与 `aster-code://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
+
 2026-08-11 本机 Intel macOS 无签名实测：目录包 697 MiB，DMG 259 MiB，ZIP 273 MiB；DMG CRC、ZIP 全文件校验、目录包启动和只读挂载 DMG 启动均通过。体积主要由 Electron、Codex 0.147.0 原生运行时和 Codex Security 依赖组成。files 规则明确去除 pnpm 嵌套图中重复的平台二进制，但保留根平台 runtime。完整生产依赖许可证元数据见根目录 `THIRD_PARTY_NOTICES.md`。
 
 ## macOS 签名和公证
@@ -94,5 +96,5 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 2. 同步并审阅 Codex schema；确认 package runtime 与 schema 版本。
 3. 运行 `pnpm verify:ci`、`pnpm audit:dependencies` 和平台 packaged E2E。
 4. 在目标系统安装产物，验证项目、任务、终端、Git、文件预览、DeepSeek 和安全诊断。
-5. 验证签名、公证/SmartScreen、安装、升级、卸载和用户数据保留。
+5. 验证签名、公证/SmartScreen、安装、`aster-code` 外部唤起、升级、卸载和用户数据保留。
 6. 记录产物 SHA-256；人工批准后再发布。

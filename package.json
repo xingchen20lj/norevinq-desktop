@@ -77,6 +77,12 @@
   "build": {
     "appId": "dev.astercode.desktop",
     "productName": "Aster Code",
+    "protocols": [
+      {
+        "name": "Aster Code",
+        "schemes": ["aster-code"]
+      }
+    ],
     "asar": true,
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {

@@ -35,6 +35,8 @@ describe('StateDatabase', () => {
     database.associateThread(first.id, 'thread-b')
     database.associateThread(first.id, 'thread-a')
     expect(database.listProjectThreadIds(first.id)).toEqual(['thread-a', 'thread-b'])
+    expect(database.hasProjectThread(first.id, 'thread-a')).toBe(true)
+    expect(database.hasProjectThread(other.id, 'thread-a')).toBe(false)
     database.setThreadPinned(first.id, 'thread-b', true)
     expect(database.listProjectThreadIds(first.id)).toEqual(['thread-b', 'thread-a'])
     expect(database.listPinnedProjectThreadIds(first.id, false)).toEqual(['thread-b'])

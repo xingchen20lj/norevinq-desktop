@@ -2,6 +2,8 @@ import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC_CHANNELS,
   type AsterDesktopApi,
+  type DeepLinkSubscription,
+  type DeepLinkTarget,
   type RemoveProjectInput,
   type SetProjectPinnedInput,
 } from '../shared/contracts.js'
@@ -70,6 +72,12 @@ const api: AsterDesktopApi = {
   selectProject: () => ipcRenderer.invoke(IPC_CHANNELS.selectProject),
   removeProject: (input: RemoveProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.removeProject, input),
   setProjectPinned: (input: SetProjectPinnedInput) => ipcRenderer.invoke(IPC_CHANNELS.projectPinnedSet, input),
+  openDeepLink: (target: DeepLinkTarget) => ipcRenderer.invoke(IPC_CHANNELS.deepLinkOpen, target),
+  onDeepLink: (subscription: DeepLinkSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, target: DeepLinkTarget): void => subscription(target)
+    ipcRenderer.on(IPC_CHANNELS.deepLinkOpened, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.deepLinkOpened, listener)
+  },
   getRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeStatus),
   restartRuntime: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeRestart),
   onRuntimeStatus: (subscription: RuntimeSubscription) => {

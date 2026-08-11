@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process'
-import { readdir } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { join, resolve } from 'node:path'
 import { promisify } from 'node:util'
 
@@ -25,6 +25,8 @@ if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
   throw new Error(`Packaged Codex version does not match 0.147.0: ${version || '<empty>'}`)
 }
 console.log(`Packaged Codex: ${version} (${binary})`)
+await verifyProtocolRegistration()
+console.log('Packaged deep-link protocol: aster-code')
 
 async function findCodexBinaries(directory) {
   const found = []
@@ -37,4 +39,19 @@ async function findCodexBinaries(directory) {
     }
   }
   return found
+}
+
+async function verifyProtocolRegistration() {
+  const packageDocument = JSON.parse(await readFile(resolve('package.json'), 'utf8'))
+  const protocols = packageDocument?.build?.protocols
+  const configured = Array.isArray(protocols) && protocols.some((protocol) =>
+    Array.isArray(protocol?.schemes) && protocol.schemes.includes('aster-code'))
+  if (!configured) throw new Error('electron-builder is missing the aster-code protocol registration.')
+
+  if (process.platform !== 'darwin') return
+  const infoPath = resolve('release/mac/Aster Code.app/Contents/Info.plist')
+  const info = await readFile(infoPath, 'utf8')
+  if (!/<key>CFBundleURLSchemes<\/key>[\s\S]*?<string>aster-code<\/string>/u.test(info)) {
+    throw new Error(`Packaged Info.plist is missing the aster-code URL scheme: ${infoPath}`)
+  }
 }

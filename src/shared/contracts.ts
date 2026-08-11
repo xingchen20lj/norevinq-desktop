@@ -87,6 +87,8 @@ export const IPC_CHANNELS = {
   selectProject: 'project:select',
   removeProject: 'project:remove',
   projectPinnedSet: 'project:pinned-set',
+  deepLinkOpened: 'app:deep-link-opened',
+  deepLinkOpen: 'app:deep-link-open',
   runtimeStatus: 'runtime:status',
   runtimeRestart: 'runtime:restart',
   runtimeStatusChanged: 'runtime:status-changed',
@@ -204,11 +206,19 @@ export type SetProjectPinnedInput = RemoveProjectInput & {
   pinned: boolean
 }
 
+export type DeepLinkTarget =
+  | { kind: 'project'; projectId: string }
+  | { kind: 'thread'; projectId: string; threadId: string }
+
+export type DeepLinkSubscription = (target: DeepLinkTarget) => void
+
 export type AsterDesktopApi = {
   getBootstrapState: () => Promise<BootstrapState>
   selectProject: () => Promise<ProjectSummary | null>
   removeProject: (input: RemoveProjectInput) => Promise<void>
   setProjectPinned: (input: SetProjectPinnedInput) => Promise<ProjectSummary[]>
+  openDeepLink: (target: DeepLinkTarget) => Promise<ConversationSnapshot | null>
+  onDeepLink: (subscription: DeepLinkSubscription) => () => void
   getRuntimeStatus: () => Promise<CodexRuntimeSnapshot>
   restartRuntime: () => Promise<CodexRuntimeSnapshot>
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void

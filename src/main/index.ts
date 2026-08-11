@@ -26,6 +26,8 @@ import type { ConversationSnapshot } from '../shared/conversation.js'
 import { FileService } from './files/fileService.js'
 import { serveFilePreview } from './files/fileProtocol.js'
 import { BrowserService } from './browser/browserService.js'
+import { extractAsterDeepLinks, parseAsterDeepLink } from './app/deepLinks.js'
+import { IPC_CHANNELS } from '../shared/contracts.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -49,6 +51,8 @@ let securityService: SecurityService | null = null
 let schedulerService: SchedulerService | null = null
 let fileService: FileService | null = null
 let browserService: BrowserService | null = null
+let rendererReady = false
+const pendingDeepLinks = extractAsterDeepLinks(process.argv)
 
 type PersistedWindowState = {
   x: number
@@ -96,6 +100,11 @@ function createMainWindow(): BrowserWindow {
     if (restored?.fullScreen) window.setFullScreen(true)
     window.show()
   })
+  window.webContents.on('did-finish-load', () => {
+    rendererReady = true
+    flushDeepLinks()
+  })
+  window.on('closed', () => { rendererReady = false })
   window.on('close', () => {
     const bounds = window.getNormalBounds()
     database?.setAppSetting('window.state', {
@@ -131,13 +140,16 @@ function windowIntersectsDisplay(value: PersistedWindowState): boolean {
 }
 
 const gotLock = app.requestSingleInstanceLock()
+if (app.isPackaged) app.setAsDefaultProtocolClient('aster-code')
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
-    if (!mainWindow) return
-    if (mainWindow.isMinimized()) mainWindow.restore()
-    mainWindow.focus()
+  app.on('second-instance', (_event, commandLine) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore()
+      mainWindow.focus()
+    }
+    for (const url of extractAsterDeepLinks(commandLine)) routeDeepLink(url)
   })
 
   void app.whenReady().then(() => {
@@ -211,6 +223,11 @@ if (!gotLock) {
   })
 }
 
+app.on('open-url', (event, url) => {
+  event.preventDefault()
+  routeDeepLink(url)
+})
+
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })
@@ -253,6 +270,20 @@ function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
   } catch {
     return null
   }
+}
+
+function routeDeepLink(url: string): void {
+  if (!url.toLowerCase().startsWith('aster-code:')) return
+  if (!database || !mainWindow || !rendererReady) {
+    if (pendingDeepLinks.length < 8 && !pendingDeepLinks.includes(url)) pendingDeepLinks.push(url)
+    return
+  }
+  const target = parseAsterDeepLink(url, database)
+  if (target) mainWindow.webContents.send(IPC_CHANNELS.deepLinkOpened, target)
+}
+
+function flushDeepLinks(): void {
+  for (const url of pendingDeepLinks.splice(0)) routeDeepLink(url)
 }
 
 async function executeScheduledTask(

@@ -162,6 +162,13 @@ export class StateDatabase {
     return rows.map(({ thread_id }) => thread_id)
   }
 
+  hasProjectThread(projectId: string, threadId: string): boolean {
+    const row = this.#database.prepare(`
+      SELECT 1 AS found FROM project_threads WHERE project_id = ? AND thread_id = ?
+    `).get(projectId, threadId) as { found: number } | undefined
+    return row?.found === 1
+  }
+
   removeThreadAssociation(threadId: string): void {
     this.#database.prepare('DELETE FROM project_threads WHERE thread_id = ?').run(threadId)
   }

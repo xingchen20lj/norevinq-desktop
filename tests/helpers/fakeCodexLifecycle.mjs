@@ -10,9 +10,12 @@ if (process.argv.includes('--version')) {
 
 const cwd = process.cwd()
 const logPath = join(process.env.CODEX_HOME ?? cwd, 'fake-lifecycle-requests.jsonl')
+const primaryThreadId = '11111111-1111-7111-8111-111111111111'
+const secondaryThreadId = '22222222-2222-7222-8222-222222222222'
+const forkThreadId = '33333333-3333-7333-8333-333333333333'
 const threads = new Map([
-  ['thread-primary', makeThread('thread-primary', 'Lifecycle primary', 20)],
-  ['thread-secondary', makeThread('thread-secondary', 'Lifecycle secondary', 10)],
+  [primaryThreadId, makeThread(primaryThreadId, 'Lifecycle primary', 20)],
+  [secondaryThreadId, makeThread(secondaryThreadId, 'Lifecycle secondary', 10)],
 ])
 const archived = new Set()
 const goals = new Map()
@@ -69,7 +72,7 @@ function handle(method, params) {
   }
   if (method === 'thread/fork') {
     const source = requireThread(params.threadId)
-    const fork = makeThread('thread-fork', `${source.name ?? source.preview} fork`, 30)
+    const fork = makeThread(forkThreadId, `${source.name ?? source.preview} fork`, 30)
     fork.forkedFromId = source.id
     threads.set(fork.id, fork)
     return { thread: fork, model: 'fake-model', modelProvider: 'openai' }

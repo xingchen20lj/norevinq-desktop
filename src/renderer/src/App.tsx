@@ -39,7 +39,7 @@ import {
 } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import type { AgentActivity, AgentActivityState } from '../../shared/agent'
-import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
+import type { BootstrapState, DeepLinkTarget, ProjectSummary } from '../../shared/contracts'
 import type {
   ConversationSnapshot,
   PendingApproval,
@@ -83,6 +83,7 @@ export function App(): React.JSX.Element {
   const [showArchived, setShowArchived] = useState(false)
   const [threadActionBusy, setThreadActionBusy] = useState(false)
   const [projectPinBusy, setProjectPinBusy] = useState<string | null>(null)
+  const [pendingDeepLink, setPendingDeepLink] = useState<DeepLinkTarget | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState('')
   const [goalOpen, setGoalOpen] = useState(false)
@@ -156,6 +157,31 @@ export function App(): React.JSX.Element {
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [])
+
+  useEffect(() => window.aster.onDeepLink(setPendingDeepLink), [])
+
+  useEffect(() => {
+    if (!pendingDeepLink || !bootstrap || runtime?.phase !== 'ready') return
+    const target = pendingDeepLink
+    const project = bootstrap.projects.find(({ id }) => id === target.projectId)
+    if (!project) {
+      setError('深链接引用的项目已不存在。')
+      setPendingDeepLink(null)
+      return
+    }
+    setSelectedProject(project)
+    setThreadSearch('')
+    setShowArchived(false)
+    void (target.kind === 'thread'
+      ? window.aster.openDeepLink(target)
+      : window.aster.loadProjectConversations({ projectId: project.id }))
+      .then((snapshot) => {
+        if (snapshot) setConversations(snapshot)
+        setNewTask(target.kind !== 'thread')
+      })
+      .catch((reason: unknown) => setError(toErrorMessage(reason)))
+      .finally(() => setPendingDeepLink(null))
+  }, [bootstrap, pendingDeepLink, runtime?.phase])
 
   useEffect(() => {
     const unsubscribe = window.aster.onBrowserChanged(setBrowser)
@@ -253,7 +279,7 @@ export function App(): React.JSX.Element {
   })
 
   useEffect(() => {
-    if (!selectedProject || runtime?.phase !== 'ready') return
+    if (!selectedProject || runtime?.phase !== 'ready' || pendingDeepLink?.projectId === selectedProject.id) return
     setError(null)
     setThreadSearch('')
     setShowArchived(false)
