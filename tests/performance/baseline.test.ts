@@ -11,7 +11,9 @@ import type { ScheduledRun } from '../../src/shared/scheduler.js'
 const temporaryPaths: string[] = []
 
 afterEach(() => {
-  for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true, recursive: true })
+  for (const path of temporaryPaths.splice(0)) rmSync(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })
 })
 
 describe('performance baselines', () => {
@@ -72,19 +74,24 @@ describe('performance baselines', () => {
       error: null,
       unread: true,
     }
-    for (let index = 0; index < 3_000; index += 1) {
-      database.upsertScheduledRun({ ...run, id: `run-${String(index)}`, scheduledFor: new Date(index * 1_000).toISOString() })
+    try {
+      database.upsertScheduledRuns(Array.from({ length: 3_000 }, (_, index) => ({
+        ...run,
+        id: `run-${String(index)}`,
+        scheduledFor: new Date(index * 1_000).toISOString(),
+      })))
+
+      const startedAt = performance.now()
+      const latest = database.listScheduledRuns(1_000)
+      database.markScheduledRunsRead()
+      const durationMs = performance.now() - startedAt
+
+      expect(latest).toHaveLength(1_000)
+      expect(database.listScheduledRuns(1_000).every(({ unread }) => !unread)).toBe(true)
+      expect(durationMs).toBeLessThan(2_000)
+      console.info(`scheduler list+bulk-read: ${durationMs.toFixed(1)}ms`)
+    } finally {
+      database.close()
     }
-
-    const startedAt = performance.now()
-    const latest = database.listScheduledRuns(1_000)
-    database.markScheduledRunsRead()
-    const durationMs = performance.now() - startedAt
-
-    expect(latest).toHaveLength(1_000)
-    expect(database.listScheduledRuns(1_000).every(({ unread }) => !unread)).toBe(true)
-    expect(durationMs).toBeLessThan(2_000)
-    console.info(`scheduler list+bulk-read: ${durationMs.toFixed(1)}ms`)
-    database.close()
   })
 })

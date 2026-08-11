@@ -17,6 +17,12 @@ type ProjectRow = {
 }
 
 const MAX_PINNED_THREADS_PER_PROJECT = 20
+const UPSERT_SCHEDULED_RUN_SQL = `
+  INSERT INTO scheduled_runs (id, task_id, run_json, status, scheduled_for, unread)
+  VALUES (?, ?, ?, ?, ?, ?)
+  ON CONFLICT(id) DO UPDATE SET run_json=excluded.run_json, status=excluded.status,
+    scheduled_for=excluded.scheduled_for, unread=excluded.unread
+`
 
 type WorktreeRow = {
   id: string
@@ -316,12 +322,20 @@ export class StateDatabase {
   }
 
   upsertScheduledRun(run: ScheduledRun): void {
-    this.#database.prepare(`
-      INSERT INTO scheduled_runs (id, task_id, run_json, status, scheduled_for, unread)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET run_json=excluded.run_json, status=excluded.status,
-        scheduled_for=excluded.scheduled_for, unread=excluded.unread
-    `).run(run.id, run.taskId, JSON.stringify(run), run.status, run.scheduledFor, run.unread ? 1 : 0)
+    this.#writeScheduledRun(this.#database.prepare(UPSERT_SCHEDULED_RUN_SQL), run)
+  }
+
+  upsertScheduledRuns(runs: readonly ScheduledRun[]): void {
+    if (runs.length === 0) return
+    const statement = this.#database.prepare(UPSERT_SCHEDULED_RUN_SQL)
+    this.#database.exec('BEGIN IMMEDIATE')
+    try {
+      for (const run of runs) this.#writeScheduledRun(statement, run)
+      this.#database.exec('COMMIT')
+    } catch (error) {
+      this.#database.exec('ROLLBACK')
+      throw error
+    }
   }
 
   listScheduledRuns(limit = 200): ScheduledRun[] {
@@ -368,6 +382,10 @@ export class StateDatabase {
         unread: true,
       })
     }
+  }
+
+  #writeScheduledRun(statement: ReturnType<DatabaseSync['prepare']>, run: ScheduledRun): void {
+    statement.run(run.id, run.taskId, JSON.stringify(run), run.status, run.scheduledFor, run.unread ? 1 : 0)
   }
 
   #migrate(): void {

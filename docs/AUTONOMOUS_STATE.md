@@ -207,6 +207,7 @@
 - CI 的 feature branch `push` 与 `pull_request` 双触发已收敛为仅 `main` push + PR，单次 PR 更新不再重复执行两组矩阵并发送重复通知；本地完整 `verify:ci` 再次通过。
 - Windows PR runner 继续暴露出目标平台路径解析、工作树路径大小写、Codex launcher 子进程锁、CRLF、POSIX mode 断言和大小写环境变量等 7 类跨平台问题；产品代码与测试夹具已逐项修复，定向 21 项和本地完整 159 项回归通过。
 - 私有仓库 `main` ruleset/classic branch protection API 均返回 GitHub 403（当前套餐要求升级 GitHub Pro 或公开仓库）；为保护源码隐私未擅自公开，限制已作为外部仓库治理依赖记录。
+- Windows 远端 34 个测试文件已全部通过；随后性能夹具暴露出逐条造 3,000 条历史在 Windows 文件系统耗时约 58 秒，而实际查询/批量已读仅 418.5 ms。状态库现提供原子事务批量写入，新增回归后本地 160 项通过，3,000 条夹具与被测操作合计约 105 ms。
 
 ## 下一任务
 
@@ -242,7 +243,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：Windows 跨平台修复后的 `verify:ci` 有 34 个测试文件 159 项、2 项性能基准，覆盖率 80.64/69.22/85.44/87.47，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：Windows 跨平台与计划历史批量写入修复后的 `verify:ci` 有 34 个测试文件 160 项、2 项性能基准，覆盖率 80.63/69.24/85.47/87.42，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
