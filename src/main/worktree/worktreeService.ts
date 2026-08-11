@@ -169,7 +169,15 @@ function validateRef(value: string, label: string): string {
 type WorktreeMetadata = { headOid: string | null; locked: boolean }
 
 function worktreePathKey(path: string): string {
-  const key = resolve(path)
+  // Git for Windows may report the same directory through its 8.3 short path
+  // while Node stores the long path (or vice versa). Resolve both spellings to
+  // the operating-system file identity before applying case folding.
+  let key: string
+  try {
+    key = realpathSync.native(path)
+  } catch {
+    key = resolve(path)
+  }
   return process.platform === 'win32' ? key.toLowerCase() : key
 }
 
