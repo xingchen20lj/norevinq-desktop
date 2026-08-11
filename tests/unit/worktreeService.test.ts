@@ -9,7 +9,9 @@ import { WorktreeService } from '../../src/main/worktree/worktreeService.js'
 const temporaryPaths: string[] = []
 
 afterEach(() => {
-  for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true, recursive: true })
+  for (const path of temporaryPaths.splice(0)) rmSync(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })
 })
 
 describe('WorktreeService', () => {
@@ -20,7 +22,7 @@ describe('WorktreeService', () => {
     const created = await service.create({ projectId: setup.projectId })
     expect(created).toMatchObject({ projectId: setup.projectId, branch: null, locked: false, missing: false })
     expect(created.path.startsWith(join(realpathSync(setup.managedRoot), setup.projectId))).toBe(true)
-    expect(readFileSync(join(created.path, 'README.md'), 'utf8')).toBe('# worktree\n')
+    expect(readFileSync(join(created.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# worktree\n')
     expect(runGit(created.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('HEAD')
 
     expect((await service.lock({ worktreeId: created.id }))[0]?.locked).toBe(true)
@@ -65,6 +67,7 @@ function createRepository(): {
   const projectPath = mkdtempSync(join(root, 'project-'))
   const managedRoot = join(root, 'managed')
   runGit(projectPath, ['init', '-b', 'main'])
+  runGit(projectPath, ['config', 'core.autocrlf', 'false'])
   runGit(projectPath, ['config', 'user.name', 'Aster Test'])
   runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
   writeFileSync(join(projectPath, 'README.md'), '# worktree\n')

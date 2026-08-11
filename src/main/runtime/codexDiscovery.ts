@@ -1,6 +1,6 @@
 import { constants as fsConstants } from 'node:fs'
 import { access } from 'node:fs/promises'
-import { delimiter, isAbsolute, join, normalize, resolve } from 'node:path'
+import { posix, win32 } from 'node:path'
 import { execFile as nodeExecFile } from 'node:child_process'
 import { promisify } from 'node:util'
 
@@ -54,7 +54,7 @@ export function getBundledCodexPath(
 ): string | null {
   const target = BUNDLED_CODEX_TARGETS[platform]?.[arch]
   if (!target) return null
-  return join(
+  return pathApi(platform).join(
     resourcesPath,
     'app.asar.unpacked',
     'node_modules',
@@ -65,6 +65,10 @@ export function getBundledCodexPath(
     'bin',
     target.executable,
   )
+}
+
+function pathApi(platform: NodeJS.Platform): typeof posix {
+  return platform === 'win32' ? win32 : posix
 }
 
 function commandNames(platform: NodeJS.Platform): readonly string[] {
@@ -81,17 +85,18 @@ function configuredCandidate(
   platform: NodeJS.Platform,
   pathValue: string,
 ): CodexBinaryCandidate[] {
+  const paths = pathApi(platform)
   const trimmed = value.trim()
   if (!trimmed) return []
-  if (isAbsolute(trimmed)) return [{ path: normalize(trimmed), source }]
-  if (hasPathSeparator(trimmed, platform)) return [{ path: resolve(trimmed), source }]
+  if (paths.isAbsolute(trimmed)) return [{ path: paths.normalize(trimmed), source }]
+  if (hasPathSeparator(trimmed, platform)) return [{ path: paths.resolve(trimmed), source }]
 
   const names = platform === 'win32' && !/\.[a-z0-9]+$/i.test(trimmed)
     ? [`${trimmed}.exe`, `${trimmed}.cmd`, `${trimmed}.bat`, trimmed]
     : [trimmed]
-  return pathValue.split(platform === 'win32' ? ';' : delimiter)
+  return pathValue.split(paths.delimiter)
     .filter(Boolean)
-    .flatMap((entry) => names.map((name) => ({ path: join(entry, name), source })))
+    .flatMap((entry) => names.map((name) => ({ path: paths.join(entry, name), source })))
 }
 
 /** Returns candidates in strict precedence order without probing or invoking a shell. */
@@ -101,6 +106,7 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
   const arch = options.arch ?? process.arch
   const resourcesPath = options.resourcesPath ?? runtimeResourcesPath()
   const pathValue = env.PATH ?? ''
+  const paths = pathApi(platform)
   const candidates: CodexBinaryCandidate[] = []
 
   if (options.explicitBinary) {
@@ -113,8 +119,8 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
     const bundledPath = getBundledCodexPath(resourcesPath, platform, arch)
     if (bundledPath) candidates.push({ path: bundledPath, source: 'bundled' })
   }
-  for (const entry of pathValue.split(platform === 'win32' ? ';' : delimiter).filter(Boolean)) {
-    for (const name of commandNames(platform)) candidates.push({ path: join(entry, name), source: 'path' })
+  for (const entry of pathValue.split(paths.delimiter).filter(Boolean)) {
+    for (const name of commandNames(platform)) candidates.push({ path: paths.join(entry, name), source: 'path' })
   }
   if (platform === 'darwin') {
     for (const bundlePath of options.knownBundlePaths ?? KNOWN_CHATGPT_MACOS_CODEX_PATHS) {

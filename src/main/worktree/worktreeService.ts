@@ -8,7 +8,7 @@ import {
   readFileSync,
   realpathSync,
 } from 'node:fs'
-import { dirname, isAbsolute, join, matchesGlob, normalize, sep } from 'node:path'
+import { dirname, isAbsolute, join, matchesGlob, normalize, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
   CreateWorktreeInput,
@@ -36,7 +36,7 @@ export class WorktreeService {
     const project = this.#requireProject(projectId)
     const actual = await readWorktreeMetadata(project.path)
     return this.#database.listManagedWorktrees(projectId).map((record) => {
-      const metadata = actual.get(record.path)
+      const metadata = actual.get(worktreePathKey(record.path))
       return {
         ...record,
         headOid: metadata?.headOid ?? null,
@@ -168,6 +168,11 @@ function validateRef(value: string, label: string): string {
 
 type WorktreeMetadata = { headOid: string | null; locked: boolean }
 
+function worktreePathKey(path: string): string {
+  const key = resolve(path)
+  return process.platform === 'win32' ? key.toLowerCase() : key
+}
+
 async function readWorktreeMetadata(repositoryPath: string): Promise<Map<string, WorktreeMetadata>> {
   const result = await runGit(repositoryPath, ['worktree', 'list', '--porcelain'])
   const worktrees = new Map<string, WorktreeMetadata>()
@@ -175,7 +180,7 @@ async function readWorktreeMetadata(repositoryPath: string): Promise<Map<string,
   let headOid: string | null = null
   let locked = false
   const flush = (): void => {
-    if (path) worktrees.set(path, { headOid, locked })
+    if (path) worktrees.set(worktreePathKey(path), { headOid, locked })
     path = null
     headOid = null
     locked = false

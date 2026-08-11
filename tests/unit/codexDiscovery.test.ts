@@ -1,5 +1,5 @@
 import { chmod, mkdtemp, rm, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, posix, win32 } from 'node:path'
 import { tmpdir } from 'node:os'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
@@ -12,7 +12,9 @@ import {
 const temporaryDirectories: string[] = []
 
 afterEach(async () => {
-  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })))
+  await Promise.all(temporaryDirectories.splice(0).map((directory) => rm(directory, {
+    recursive: true, force: true, maxRetries: 5, retryDelay: 100,
+  })))
 })
 
 async function executable(name: string, body = '#!/bin/sh\necho codex-cli-test 1.2.3\n'): Promise<string> {
@@ -47,10 +49,10 @@ describe('Codex binary discovery', () => {
 
   it('maps supported packaged targets without guessing unsupported platforms', () => {
     expect(getBundledCodexPath('C:\\resources', 'win32', 'x64')).toBe(
-      'C:\\resources/app.asar.unpacked/node_modules/@openai/codex-win32-x64/vendor/x86_64-pc-windows-msvc/bin/codex.exe',
+      win32.join('C:\\resources', 'app.asar.unpacked', 'node_modules', '@openai', 'codex-win32-x64', 'vendor', 'x86_64-pc-windows-msvc', 'bin', 'codex.exe'),
     )
     expect(getBundledCodexPath('/resources', 'darwin', 'arm64')).toBe(
-      '/resources/app.asar.unpacked/node_modules/@openai/codex-darwin-arm64/vendor/aarch64-apple-darwin/bin/codex',
+      posix.join('/resources', 'app.asar.unpacked', 'node_modules', '@openai', 'codex-darwin-arm64', 'vendor', 'aarch64-apple-darwin', 'bin', 'codex'),
     )
     expect(getBundledCodexPath('/resources', 'linux', 'x64')).toBeNull()
   })

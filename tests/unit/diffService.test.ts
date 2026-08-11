@@ -8,7 +8,11 @@ import { GitService } from '../../src/main/git/gitService.js'
 import { StateDatabase } from '../../src/main/state/database.js'
 
 const temporaryPaths: string[] = []
-afterEach(() => { for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true, recursive: true }) })
+afterEach(() => {
+  for (const path of temporaryPaths.splice(0)) rmSync(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })
+})
 
 describe('DiffService', () => {
   it('returns bounded working and staged patches including untracked text and binary markers', async () => {
@@ -16,6 +20,7 @@ describe('DiffService', () => {
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
+    runGit(projectPath, ['config', 'core.autocrlf', 'false'])
     runGit(projectPath, ['config', 'user.name', 'Aster Test'])
     runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
     writeFileSync(join(projectPath, 'tracked.txt'), 'before\n')
@@ -50,6 +55,7 @@ describe('DiffService', () => {
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
+    runGit(projectPath, ['config', 'core.autocrlf', 'false'])
     runGit(projectPath, ['config', 'user.name', 'Aster Test'])
     runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
     const baseline = Array.from({ length: 24 }, (_, index) => `line-${String(index + 1)}`)
@@ -92,8 +98,9 @@ describe('DiffService', () => {
     const secondHunk = refreshed.files[0]?.hunks.find((hunk) => hunk.lines.some(({ newLine }) => newLine === 22))
     if (!secondHunk) throw new Error('Missing second hunk')
     await diffs.applyHunk({ projectId: project.id, snapshotId: refreshed.id, hunkId: secondHunk.id, action: 'revert' })
-    expect(readFileSync(join(projectPath, 'tracked.txt'), 'utf8')).toContain('line-2 changed')
-    expect(readFileSync(join(projectPath, 'tracked.txt'), 'utf8')).toContain('line-22\n')
+    const reverted = readFileSync(join(projectPath, 'tracked.txt'), 'utf8').replace(/\r\n?/gu, '\n')
+    expect(reverted).toContain('line-2 changed')
+    expect(reverted).toContain('line-22\n')
     database.close()
   }, 30_000)
 
@@ -102,6 +109,7 @@ describe('DiffService', () => {
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
+    runGit(projectPath, ['config', 'core.autocrlf', 'false'])
     writeFileSync(join(projectPath, 'new file.txt'), 'safe')
     symlinkSync(join(root, 'outside.txt'), join(projectPath, 'external-link'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
