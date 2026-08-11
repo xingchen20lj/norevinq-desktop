@@ -8,9 +8,8 @@
 
 ## 当前任务
 
-- 完成 GitHub CLI 认证/远端预检、显式推送、幂等 Pull Request 创建、桌面实测、文档与提交。
-- 创建用户授权的首个私有 GitHub 远端并推送已验证的 `main` 历史。
-- 继续逐项审计功能一致性表，下一项处理工作树 Handoff。
+- 实现已有任务和未提交修改在 Local/托管 worktree 之间的安全 Handoff。
+- 继续逐项审计剩余“部分实现”功能。
 
 ## 已完成任务
 
@@ -197,12 +196,24 @@
 - Git remote 快照在进入共享领域层前清除 URL userinfo、query 与 fragment；旧仓库即使把 token 写入远端 URL也不会向 Renderer 暴露。
 - 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
 - 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
-- GitHub PR 阶段最终 `verify:ci`：34 个测试文件 158 项、覆盖率 80.62/69.20/85.37/87.50、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
+- GitHub PR 线上修复后最终 `verify:ci`：34 个测试文件 159 项、覆盖率 80.62/69.16/85.40/87.45、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
+- 仓库级 Git 身份固定为 `xingchen20lj <71823107+xingchen20lj@users.noreply.github.com>`；从首条提交到 GitHub PR 阶段提交的作者身份均已核对一致，无需重写历史。
+- 按用户授权创建私有仓库 `xingchen20lj/aster-code-desktop` 并首次推送完整 `main`；GitHub 回读确认 `PRIVATE`、默认分支 `main`，本地/远端 SHA 同为 `d154183f41783f2139e07b017800357b36a43ebc`。
+- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位 `/Users/cyber/bin/gh`，未发生外部写入；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
+- 第二次真实桌面测试已由 Aster 成功推送 `codex/github-pr-validation` 并创建 Draft PR #1，但创建后验证错误使用 `gh pr list --head owner:branch` 而未识别结果；改为纯分支过滤并严格匹配 `headRepositoryOwner.login`，避免重复创建和 fork 同名分支误认。
+- 第三次真实 Electron 回归通过 Aster 自身重新读取私有 GitHub Draft PR #1，精确验证仓库 `xingchen20lj/aster-code-desktop`、head `codex/github-pr-validation`、base `main`、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
+- 实际检查真实 PR 完成态截图：GitHub 登录、origin head/base、Draft 卡片和“在 GitHub 打开”在 1320×840 浅色界面无明显溢出或错位。
+- 首次 GitHub Actions 远端运行准确暴露跨平台 notices 漂移：pnpm 将 Codex 与 `@napi-rs/canvas` 原生 alias 报告为不同的 `darwin-*`/`win32-*` 名称或版本，Windows checkout 还会物化 CRLF；生成器现规范化相同上游组件并以逻辑换行比较，macOS/Windows 输出保持确定性。
+- CI 的 feature branch `push` 与 `pull_request` 双触发已收敛为仅 `main` push + PR，单次 PR 更新不再重复执行两组矩阵并发送重复通知；本地完整 `verify:ci` 再次通过。
+- Windows PR runner 继续暴露出目标平台路径解析、工作树路径大小写、Codex launcher 子进程锁、CRLF、POSIX mode 断言和大小写环境变量等 7 类跨平台问题；产品代码与测试夹具已逐项修复，定向 21 项和本地完整 159 项回归通过。
+- 私有仓库 `main` ruleset/classic branch protection API 均返回 GitHub 403（当前套餐要求升级 GitHub Pro 或公开仓库）；为保护源码隐私未擅自公开，限制已作为外部仓库治理依赖记录。
+- Windows 远端 34 个测试文件已全部通过；随后性能夹具暴露出逐条造 3,000 条历史在 Windows 文件系统耗时约 58 秒，而实际查询/批量已读仅 418.5 ms。状态库现提供原子事务批量写入，新增回归后本地 160 项通过，3,000 条夹具与被测操作合计约 105 ms。
+- 事务批量写入后的 Windows 远端 160 项、性能和生产构建通过；Electron 冒烟准确打开安全工作台，但测试定位器同时命中总览卡片与弹窗同名标题，现按语义 dialog 范围限定安全/计划任务断言。
 
 ## 下一任务
 
-1. 创建私有 GitHub 仓库 `xingchen20lj/aster-code-desktop` 并首次推送已验证 `main` 历史。
-2. 处理工作树 Handoff 与剩余部分实现项。
+1. 处理工作树 Handoff 与已有任务/未提交修改迁移。
+2. 继续审计剩余部分实现项。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -233,7 +244,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 34 个测试文件 158 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：Windows 跨平台与计划历史批量写入修复后的 `verify:ci` 有 34 个测试文件 160 项、2 项性能基准，覆盖率 80.63/69.24/85.47/87.42，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
@@ -257,9 +268,11 @@
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
 - Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
-- 自动更新发布域名/对象存储：当前仓库没有远端或实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
+- 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
+- GitHub 私有远端已建立并由系统 keyring 中的 `xingchen20lj` 账户验证；Aster 不保存或显示其 token。
+- GitHub 私有仓库主分支保护：当前账户套餐的 ruleset/classic protection API 返回 403；需要升级 GitHub Pro，公开仓库虽可启用但不符合用户要求的私有边界。
 
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的真实进程重新 resume 与订阅恢复语义（替身层已测试）。
-- GitHub Actions macOS/Windows 远端首次执行结果。
+- GitHub Actions 修复后 macOS/Windows 远端复跑结果。

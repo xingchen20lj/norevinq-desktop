@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { StateDatabase } from '../../src/main/state/database.js'
+import type { ScheduledRun } from '../../src/shared/scheduler.js'
 
 const temporaryPaths: string[] = []
 
@@ -104,6 +105,39 @@ describe('StateDatabase', () => {
     database.associateThread(project.id, 'thread-overflow')
     expect(() => database.setThreadPinned(project.id, 'thread-overflow', true)).toThrow('at most 20')
     expect(database.listPinnedProjectThreadIds(project.id, false)).toHaveLength(20)
+    database.close()
+  })
+
+  it('writes scheduler history atomically in a batch', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-db-scheduler-batch-'))
+    temporaryPaths.push(root)
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const base: ScheduledRun = {
+      id: 'run-1',
+      taskId: 'task-1',
+      taskName: 'Batch task',
+      projectId: 'project-1',
+      projectName: 'Batch project',
+      scheduledFor: '2026-08-11T00:00:00.000Z',
+      startedAt: null,
+      finishedAt: null,
+      status: 'queued',
+      attempt: 1,
+      threadId: null,
+      worktreeId: null,
+      summary: null,
+      error: null,
+      unread: true,
+    }
+    database.upsertScheduledRuns([
+      base,
+      { ...base, id: 'run-2', scheduledFor: '2026-08-11T00:01:00.000Z' },
+    ])
+    expect(database.listScheduledRuns()).toEqual([
+      expect.objectContaining({ id: 'run-2' }),
+      expect.objectContaining({ id: 'run-1' }),
+    ])
+    database.upsertScheduledRuns([])
     database.close()
   })
 })

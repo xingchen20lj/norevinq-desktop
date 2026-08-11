@@ -11,7 +11,9 @@ const generatorPath = fileURLToPath(new URL('../../scripts/generate-third-party-
 const temporaryRoots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })))
+  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })))
 })
 
 describe('third-party notice generator', () => {
@@ -56,10 +58,13 @@ async function createFixture(packages: { name: string; homepage: string }[]): Pr
 }
 
 async function runGenerator(root: string): Promise<void> {
+  const environment = Object.fromEntries(
+    Object.entries(process.env).filter(([key]) => key.toLowerCase() !== 'npm_execpath'),
+  )
   await execute(process.execPath, [generatorPath], {
     cwd: root,
     env: {
-      ...process.env,
+      ...environment,
       npm_execpath: join(root, 'fake-pnpm.mjs'),
     },
     timeout: 10_000,

@@ -15,6 +15,7 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `ASTER_UPDATE_URL='https://updates.invalid/aster-code/' pnpm package:update`：仅用于本地生成元数据测试，验证 app-update/latest/blockmap/SHA-512；`.invalid` 构建不可发布。
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：不调用模型，以确定性 app-server 进程验证任务搜索、分页、重命名、分叉、压缩、归档、恢复、永久删除、单实例任务深链接及网络/路径权限子集审批的完整桌面流程。
 - `pnpm exec playwright test tests/e2e/github-pr.spec.ts`：不访问真实 GitHub；真实 Git 仓库向本地 bare remote 推送 feature 分支，确定性 `gh` 替身验证登录、仓库、Draft PR、正文 stdin、结构化回读、重复创建幂等和无关密钥隔离。
+- 2026-08-11 一次性显式线上回归：Aster Electron 主进程真实创建并回读私有 Draft PR #1；验证 `~/bin/gh` 发现、真实 push、owner/head/base/URL 和在线幂等。该外部写入测试不进入常规 CI，避免在重复运行中修改用户仓库。
 - `ASTER_TEST_LIVE_AUTH=1 pnpm exec vitest run tests/integration/codexThreadLifecycle.test.ts`：在隔离 `CODEX_HOME` 中额外向官方认证服务发起设备码登录并立即取消；不调用模型、不完成用户授权，常规 CI 不依赖该网络检查。
 - `pnpm check:bundle`：从生产 HTML 校验首屏 JS/CSS 与 Renderer 总资产预算。
 - `pnpm check:workflows`：拒绝非完整提交 SHA 的远程 Action，并验证发布 workflow 的 main/ref/environment/签名守门。
@@ -24,7 +25,7 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 
 覆盖率是回归缺口信号，不等同于功能完成。全局最低门槛为 statements 78%、branches 65%、functions 80%、lines 85%；关键安全边界仍要求针对性断言和真实运行证据。
 
-2026-08-11 GitHub PR 阶段基线：34 个测试文件、158 项；statements 80.62%、branches 69.20%、functions 85.37%、lines 87.50%。
+2026-08-11 GitHub PR 线上修复后基线：34 个测试文件、159 项；statements 80.62%、branches 69.16%、functions 85.40%、lines 87.45%。
 
 ## 自动化层级
 

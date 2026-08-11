@@ -7,7 +7,9 @@ import { DiagnosticsService } from '../../src/main/diagnostics/diagnosticsServic
 
 const temporaryDirectories: string[] = []
 afterEach(() => {
-  for (const path of temporaryDirectories.splice(0)) rmSync(path, { force: true, recursive: true })
+  for (const path of temporaryDirectories.splice(0)) rmSync(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })
 })
 
 describe('DiagnosticsService', () => {
@@ -31,7 +33,7 @@ describe('DiagnosticsService', () => {
       latestCrashAt: '2026-08-11T04:00:00.000Z',
       automaticUpload: false,
     })
-    expect(lstatSync(fixture.crashPath).mode & 0o777).toBe(0o600)
+    if (process.platform !== 'win32') expect(lstatSync(fixture.crashPath).mode & 0o777).toBe(0o600)
     expect(createService(fixture).getSnapshot().retainedCrashCount).toBe(1)
   })
 
@@ -62,7 +64,7 @@ describe('DiagnosticsService', () => {
     expect(log).not.toContain(fixture.root)
     expect(log).not.toContain('secret-value')
     expect(crashes).not.toContain('sk-project-secret-value')
-    expect(lstatSync(destination).mode & 0o777).toBe(0o600)
+    if (process.platform !== 'win32') expect(lstatSync(destination).mode & 0o777).toBe(0o600)
   })
 
   it('rejects symlink destinations and ignores symlinked logs', async () => {

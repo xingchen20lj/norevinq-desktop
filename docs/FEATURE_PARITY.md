@@ -52,7 +52,7 @@
 | Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
 | Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage、区块 stage/unstage/revert 已真实测试；整文件 recoverable discard 待文件工作台 |
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
-| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；真实线上仓库将在首个私有远端创建后验证 |
+| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读私有 Draft PR #1，在线重复调用未创建第二项 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
 | 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根、默认 detached、可选显式分支；真实仓库/E2E 通过 |
 | 工作树 | 本地与工作树 Handoff | 部分实现 | Local/Worktree composer 上下文切换和新任务 cwd 已实现；已有 turn/未提交修改 Handoff 待补 |
@@ -100,6 +100,6 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 33 个测试文件 152 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 34 个测试文件 160 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；Windows 跨平台路径/工作树/进程/CRLF/mode 和 3,000 条计划历史事务夹具回归已补，远端 CI 复跑与目标真机、在线账户恢复待验证 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |

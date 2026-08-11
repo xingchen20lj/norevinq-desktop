@@ -3,13 +3,16 @@ import { existsSync } from 'node:fs'
 import { mkdtemp, mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { setTimeout as delay } from 'node:timers/promises'
 import { afterEach, expect, test } from 'vitest'
 import { JsonlRpcPeer, type JsonValue } from '../../src/main/runtime/jsonlRpc.js'
 
 const temporaryRoots: string[] = []
 
 afterEach(async () => {
-  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })))
+  await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })))
 })
 
 test('official Codex app-server exposes account state, permission profiles, and the thread lifecycle', async () => {
@@ -18,10 +21,12 @@ test('official Codex app-server exposes account state, permission profiles, and 
   const codexHome = join(root, 'codex-home')
   const projectPath = join(root, 'project')
   await Promise.all([mkdir(codexHome), mkdir(projectPath)])
-  const entrypoint = resolve('node_modules', '@openai', 'codex', 'bin', 'codex.js')
+  const entrypoint = bundledCodexEntrypoint()
   expect(existsSync(entrypoint)).toBe(true)
 
-  const child = spawn(process.execPath, [entrypoint, 'app-server', '--stdio'], {
+  // Spawn the pinned native binary directly. The JavaScript launcher creates a
+  // grandchild process that can keep the temporary repository locked on Windows.
+  const child = spawn(entrypoint, ['app-server', '--stdio'], {
     cwd: projectPath,
     env: childEnvironment(codexHome),
     stdio: ['pipe', 'pipe', 'pipe'],
@@ -157,9 +162,31 @@ test('official Codex app-server exposes account state, permission profiles, and 
     )
   } finally {
     peer.close()
-    child.kill()
+    child.stdin.end()
+    const exited = new Promise<void>((resolveExit) => child.once('exit', () => resolveExit()))
+    if (child.exitCode === null && child.signalCode === null) {
+      const graceful = await Promise.race([exited.then(() => true), delay(2_000, false)])
+      if (!graceful) child.kill()
+      await Promise.race([exited, delay(2_000)])
+    }
   }
 }, 30_000)
+
+function bundledCodexEntrypoint(): string {
+  const target = process.platform === 'darwin'
+    ? process.arch === 'arm64'
+      ? ['codex-darwin-arm64', 'aarch64-apple-darwin', 'codex']
+      : ['codex-darwin-x64', 'x86_64-apple-darwin', 'codex']
+    : process.platform === 'win32'
+      ? process.arch === 'arm64'
+        ? ['codex-win32-arm64', 'aarch64-pc-windows-msvc', 'codex.exe']
+        : ['codex-win32-x64', 'x86_64-pc-windows-msvc', 'codex.exe']
+      : null
+  if (!target) throw new Error(`Unsupported Codex integration target: ${process.platform}-${process.arch}`)
+  const [packageName, triple, executable] = target
+  if (!packageName || !triple || !executable) throw new Error('Invalid bundled Codex target.')
+  return resolve('node_modules', '@openai', packageName, 'vendor', triple, 'bin', executable)
+}
 
 function childEnvironment(codexHome: string): NodeJS.ProcessEnv {
   const environment: NodeJS.ProcessEnv = { CODEX_HOME: codexHome, NO_COLOR: '1' }

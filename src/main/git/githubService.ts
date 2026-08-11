@@ -1,4 +1,7 @@
 import { spawn } from 'node:child_process'
+import { accessSync, constants } from 'node:fs'
+import { homedir } from 'node:os'
+import { delimiter, isAbsolute, join } from 'node:path'
 import type {
   CreateGitHubPullRequestInput,
   CreateGitHubPullRequestResult,
@@ -52,6 +55,7 @@ type PullRequestJson = {
   isDraft?: unknown
   baseRefName?: unknown
   headRefName?: unknown
+  headRepositoryOwner?: unknown
 }
 
 export class GitHubService {
@@ -68,7 +72,7 @@ export class GitHubService {
   ) {
     this.#database = database
     this.#git = git
-    this.#ghBinary = options.ghBinary ?? 'gh'
+    this.#ghBinary = options.ghBinary ?? discoverGitHubCli()
     this.#runCommand = options.runCommand ?? runGitHubCommand
   }
 
@@ -237,20 +241,65 @@ export class GitHubService {
     const result = await this.#gh(cwd, [
       'pr', 'list',
       '--repo', repositorySpecifier(repository.host, repository.repository),
-      '--head', `${headOwner}:${branch}`,
+      '--head', branch,
       '--state', 'open',
-      '--limit', '1',
-      '--json', 'number,title,url,state,isDraft,baseRefName,headRefName',
+      '--limit', '100',
+      '--json', 'number,title,url,state,isDraft,baseRefName,headRefName,headRepositoryOwner',
     ])
     const value: unknown = JSON.parse(result.stdout)
     if (!Array.isArray(value)) throw new Error('GitHub CLI returned an invalid Pull Request list.')
-    const first = value[0] as PullRequestJson | undefined
-    return first ? parsePullRequest(first, repository) : null
+    const matching = (value as PullRequestJson[]).find((item) => {
+      const owner = item.headRepositoryOwner
+      return item.headRefName === branch
+        && owner !== null
+        && typeof owner === 'object'
+        && !Array.isArray(owner)
+        && typeof (owner as Record<string, unknown>).login === 'string'
+        && ((owner as Record<string, unknown>).login as string).toLowerCase() === headOwner.toLowerCase()
+    })
+    return matching ? parsePullRequest(matching, repository) : null
   }
 
   #gh(cwd: string, args: readonly string[], timeoutMs = DEFAULT_TIMEOUT_MS, stdin?: string): Promise<CommandResult> {
     return this.#runCommand(this.#ghBinary, args, { cwd, timeoutMs, ...(stdin === undefined ? {} : { stdin }) })
   }
+}
+
+export function discoverGitHubCli(
+  environment: NodeJS.ProcessEnv = process.env,
+  platform: NodeJS.Platform = process.platform,
+  homeDirectory = homedir(),
+): string {
+  const executable = platform === 'win32' ? 'gh.exe' : 'gh'
+  const candidates: string[] = []
+  const explicit = environment.GH_BINARY
+  if (explicit && isAbsolute(explicit)) candidates.push(explicit)
+  for (const directory of (environment.PATH ?? '').split(delimiter)) {
+    if (directory && isAbsolute(directory)) candidates.push(join(directory, executable))
+  }
+  if (platform === 'win32') {
+    for (const root of [environment.ProgramFiles, environment.LOCALAPPDATA]) {
+      if (root && isAbsolute(root)) {
+        candidates.push(join(root, root === environment.ProgramFiles ? 'GitHub CLI' : join('Programs', 'GitHub CLI'), executable))
+      }
+    }
+  } else {
+    candidates.push(
+      join(homeDirectory, 'bin', executable),
+      join(homeDirectory, '.local', 'bin', executable),
+      `/opt/homebrew/bin/${executable}`,
+      `/usr/local/bin/${executable}`,
+    )
+  }
+  for (const candidate of new Set(candidates)) {
+    try {
+      accessSync(candidate, platform === 'win32' ? constants.F_OK : constants.X_OK)
+      return candidate
+    } catch {
+      // Continue through deterministic candidates; falling back to the command name preserves OS lookup behavior.
+    }
+  }
+  return executable
 }
 
 export function runGitHubCommand(

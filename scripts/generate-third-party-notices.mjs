@@ -21,8 +21,8 @@ const report = JSON.parse(stdout)
 const packages = Object.values(report)
   .flatMap((entries) => entries)
   .flatMap((entry) => entry.versions.map((version) => ({
-    name: entry.name,
-    version,
+    name: normalizeName(entry.name),
+    version: normalizeVersion(entry.name, version),
     license: entry.license,
     homepage: entry.homepage ?? '',
   })))
@@ -53,7 +53,10 @@ const expected = `${lines.join('\n')}`
 
 if (checkOnly) {
   const current = await readFile(outputPath, 'utf8').catch(() => '')
-  if (current !== expected) {
+  // Git may materialize text files with CRLF on Windows runners. Notices are
+  // content-addressed at the logical text level, so line-ending conversion is
+  // not dependency drift.
+  if (current.replace(/\r\n?/gu, '\n') !== expected) {
     throw new Error('THIRD_PARTY_NOTICES.md is stale. Run pnpm notices:generate.')
   }
   console.log(`Third-party notices are current (${String(packages.length)} packages).`)
@@ -64,6 +67,25 @@ if (checkOnly) {
 
 function escapeCell(value) {
   return String(value).replaceAll('|', '\\|').replace(/[\r\n]+/gu, ' ')
+}
+
+function normalizeVersion(name, version) {
+  // pnpm reports the platform package aliases used by Codex as the package
+  // name "@openai/codex" with an OS/CPU suffix in the version. The selected
+  // alias varies by runner, while all variants are the same licensed Codex
+  // release. Collapse that transport suffix so notices are deterministic on
+  // macOS and Windows and still identify the exact upstream release.
+  if (name !== '@openai/codex') return version
+  return String(version).replace(/-(?:darwin|linux|win32)-(?:arm64|x64)$/u, '')
+}
+
+function normalizeName(name) {
+  // @napi-rs/canvas uses one native package name per OS/CPU. The generic
+  // package is already listed and carries the same version and MIT license.
+  // Reporting the wrapper keeps the notice complete without making it depend
+  // on the architecture that happened to run the generator.
+  if (/^@napi-rs\/canvas-(?:android|darwin|linux|win32)-/u.test(name)) return '@napi-rs/canvas'
+  return name
 }
 
 function formatProjectLink(value) {

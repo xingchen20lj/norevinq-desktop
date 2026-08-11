@@ -7,7 +7,9 @@ import { CredentialStore, type EncryptionAdapter } from '../../src/main/security
 const temporaryPaths: string[] = []
 
 afterEach(() => {
-  for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true, recursive: true })
+  for (const path of temporaryPaths.splice(0)) rmSync(path, {
+    force: true, recursive: true, maxRetries: 5, retryDelay: 100,
+  })
 })
 
 describe('CredentialStore', () => {
@@ -21,7 +23,7 @@ describe('CredentialStore', () => {
 
     expect(store.get('provider.deepseek.api-key')).toBe('sk-sensitive-value')
     expect(readFileSync(path, 'utf8')).not.toContain('sk-sensitive-value')
-    expect(statSync(path).mode & 0o777).toBe(0o600)
+    if (process.platform !== 'win32') expect(statSync(path).mode & 0o777).toBe(0o600)
     store.delete('provider.deepseek.api-key')
     expect(store.get('provider.deepseek.api-key')).toBeNull()
   })
