@@ -22,7 +22,7 @@ const packages = Object.values(report)
   .flatMap((entries) => entries)
   .flatMap((entry) => entry.versions.map((version) => ({
     name: entry.name,
-    version,
+    version: normalizeVersion(entry.name, version),
     license: entry.license,
     homepage: entry.homepage ?? '',
   })))
@@ -64,6 +64,16 @@ if (checkOnly) {
 
 function escapeCell(value) {
   return String(value).replaceAll('|', '\\|').replace(/[\r\n]+/gu, ' ')
+}
+
+function normalizeVersion(name, version) {
+  // pnpm reports the platform package aliases used by Codex as the package
+  // name "@openai/codex" with an OS/CPU suffix in the version. The selected
+  // alias varies by runner, while all variants are the same licensed Codex
+  // release. Collapse that transport suffix so notices are deterministic on
+  // macOS and Windows and still identify the exact upstream release.
+  if (name !== '@openai/codex') return version
+  return String(version).replace(/-(?:darwin|linux|win32)-(?:arm64|x64)$/u, '')
 }
 
 function formatProjectLink(value) {

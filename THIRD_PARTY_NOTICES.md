@@ -38,8 +38,7 @@ Run `pnpm notices:generate` after changing production dependencies. CI runs `pnp
 | @octokit/types | 16.0.0 | MIT | [link](https://github.com/octokit/types.ts#readme) |
 | @octokit/types | 17.0.0 | MIT | [link](https://github.com/octokit/types.ts#readme) |
 | @openai/codex | 0.144.6 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
-| @openai/codex | 0.144.6-darwin-x64 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
-| @openai/codex | 0.147.0-darwin-x64 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
+| @openai/codex | 0.147.0 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
 | @openai/codex-sdk | 0.144.6 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
 | @openai/codex-security | 0.1.8 | Apache-2.0 | [link](https://developers.openai.com/codex/security) |
 | @scalar/openapi-types | 0.8.0 | MIT | [link](https://github.com/scalar/scalar) |
