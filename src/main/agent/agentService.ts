@@ -12,6 +12,7 @@ import type {
   PendingApproval,
   RenameConversationInput,
   ResolveApprovalInput,
+  SetConversationPinnedInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -100,9 +101,16 @@ export class AgentService {
     if (searchTerm) params.searchTerm = searchTerm
     if (cursor) params.cursor = cursor
     const result = asRecord(await this.#runtime.request('thread/list', params))
-    const page = asArray(result.data).map((value) => toThreadSummary(asRecord(value)))
-    const threads = cursor ? mergeThreadPage(this.#snapshot.threads, page) : page
-    for (const thread of page) this.#database.associateThread(input.projectId, thread.id)
+    const pinnedIds = new Set(this.#database.listPinnedProjectThreadIds(input.projectId, archived))
+    const page = asArray(result.data).map((value) => {
+      const thread = asRecord(value)
+      return toThreadSummary(thread, pinnedIds.has(requireString(thread.id, 'thread.id')))
+    })
+    for (const thread of page) this.#database.associateThread(input.projectId, thread.id, archived)
+    const pinned = cursor ? [] : await this.#readMissingPinnedThreads(pinnedIds, page, searchTerm)
+    const threads = cursor
+      ? mergeThreadPage(this.#snapshot.threads, page)
+      : mergeThreadPage(pinned, page)
     this.#update({
       projectId: input.projectId,
       threads,
@@ -144,6 +152,7 @@ export class AgentService {
   async archiveThread(threadId: string): Promise<ConversationSnapshot> {
     this.#requireIdleVisibleThread(threadId)
     await this.#runtime.request('thread/archive', { threadId })
+    this.#database.setThreadArchived(threadId, true)
     this.#removeThreadFromCurrentList(threadId)
     return this.#reloadCurrentList()
   }
@@ -151,6 +160,7 @@ export class AgentService {
   async unarchiveThread(threadId: string): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(threadId)
     await this.#runtime.request('thread/unarchive', { threadId })
+    this.#database.setThreadArchived(threadId, false)
     this.#removeThreadFromCurrentList(threadId)
     return this.#reloadCurrentList()
   }
@@ -191,6 +201,19 @@ export class AgentService {
     this.#requireIdleVisibleThread(threadId)
     await this.#runtime.request('thread/compact/start', { threadId })
     this.#update({ error: null })
+    return this.#snapshot
+  }
+
+  setThreadPinned(input: SetConversationPinnedInput): ConversationSnapshot {
+    this.#requireVisibleThread(input.threadId)
+    const projectId = this.#snapshot.projectId
+    if (!projectId) throw new Error('No project is loaded.')
+    this.#database.setThreadPinned(projectId, input.threadId, input.pinned)
+    this.#update({
+      threads: sortThreads(this.#snapshot.threads.map((thread) =>
+        thread.id === input.threadId ? { ...thread, pinned: input.pinned } : thread)),
+      error: null,
+    })
     return this.#snapshot
   }
 
@@ -344,7 +367,7 @@ export class AgentService {
 
     if (event.method === 'thread/started' && params) {
       const thread = asOptionalRecord(params.thread)
-      if (thread) this.#update({ threads: upsertThread(this.#snapshot.threads, toThreadSummary(thread)) })
+      if (thread) this.#update({ threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(thread)) })
     }
 
     if (event.method === 'turn/started' && params) {
@@ -371,6 +394,10 @@ export class AgentService {
       })
     }
 
+    if (threadId && event.method === 'thread/archived') this.#database.setThreadArchived(threadId, true)
+    if (threadId && event.method === 'thread/unarchived') this.#database.setThreadArchived(threadId, false)
+    if (threadId && event.method === 'thread/deleted') this.#database.removeThreadAssociation(threadId)
+
     if ((event.method === 'thread/archived' && !this.#snapshot.listArchived)
       || (event.method === 'thread/unarchived' && this.#snapshot.listArchived)
       || event.method === 'thread/deleted') {
@@ -389,7 +416,7 @@ export class AgentService {
   async #refreshThreadMetadata(threadId: string): Promise<void> {
     try {
       const result = asRecord(await this.#runtime.request('thread/read', { includeTurns: false, threadId }))
-      this.#update({ threads: upsertThread(this.#snapshot.threads, toThreadSummary(asRecord(result.thread))) })
+      this.#update({ threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(asRecord(result.thread))) })
     } catch {
       // Completion is authoritative even when the optional metadata refresh fails.
     }
@@ -403,6 +430,31 @@ export class AgentService {
       archived: this.#snapshot.listArchived,
       ...(this.#snapshot.listSearchTerm ? { searchTerm: this.#snapshot.listSearchTerm } : {}),
     })
+  }
+
+  async #readMissingPinnedThreads(
+    pinnedIds: ReadonlySet<string>,
+    page: readonly ConversationThreadSummary[],
+    searchTerm: string,
+  ): Promise<ConversationThreadSummary[]> {
+    const visibleIds = new Set(page.map(({ id }) => id))
+    const threads = await Promise.all([...pinnedIds]
+      .filter((threadId) => !visibleIds.has(threadId))
+      .map(async (threadId): Promise<ConversationThreadSummary | null> => {
+        try {
+          const result = asRecord(await this.#runtime.request('thread/read', { includeTurns: false, threadId }))
+          return toThreadSummary(asRecord(result.thread), true)
+        } catch {
+          return null
+        }
+      }))
+    return threads.filter((thread): thread is ConversationThreadSummary =>
+      thread !== null && matchesThreadSearch(thread, searchTerm))
+  }
+
+  #toThreadSummary(thread: Record<string, unknown>): ConversationThreadSummary {
+    const threadId = requireString(thread.id, 'thread.id')
+    return toThreadSummary(thread, this.#database.isThreadPinned(threadId))
   }
 
   #requestApproval(
@@ -445,7 +497,7 @@ export class AgentService {
       state = reduceAgentActivity(state, { method: 'turn/completed', params: { threadId, turn } })
     }
     this.#update({
-      threads: upsertThread(this.#snapshot.threads, toThreadSummary(thread)),
+      threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(thread)),
       threadStates: { ...this.#snapshot.threadStates, [threadId]: state },
     })
   }
@@ -522,7 +574,7 @@ function normalizeSearchTerm(value: string | undefined): string {
   return term
 }
 
-function toThreadSummary(thread: Record<string, unknown>): ConversationThreadSummary {
+function toThreadSummary(thread: Record<string, unknown>, pinned = false): ConversationThreadSummary {
   return {
     id: requireString(thread.id, 'thread.id'),
     sessionId: optionalString(thread.sessionId) ?? requireString(thread.id, 'thread.id'),
@@ -536,6 +588,7 @@ function toThreadSummary(thread: Record<string, unknown>): ConversationThreadSum
     forkedFromId: optionalString(thread.forkedFromId),
     parentThreadId: optionalString(thread.parentThreadId),
     cliVersion: optionalString(thread.cliVersion) ?? '',
+    pinned,
   }
 }
 
@@ -549,8 +602,7 @@ function upsertThread(
   threads: ConversationThreadSummary[],
   thread: ConversationThreadSummary,
 ): ConversationThreadSummary[] {
-  return [thread, ...threads.filter(({ id }) => id !== thread.id)]
-    .sort((left, right) => right.updatedAt - left.updatedAt)
+  return sortThreads([thread, ...threads.filter(({ id }) => id !== thread.id)])
 }
 
 function mergeThreadPage(
@@ -559,7 +611,18 @@ function mergeThreadPage(
 ): ConversationThreadSummary[] {
   const byId = new Map(current.map((thread) => [thread.id, thread]))
   for (const thread of page) byId.set(thread.id, thread)
-  return [...byId.values()].sort((left, right) => right.updatedAt - left.updatedAt)
+  return sortThreads([...byId.values()])
+}
+
+function sortThreads(threads: ConversationThreadSummary[]): ConversationThreadSummary[] {
+  return [...threads].sort((left, right) => Number(right.pinned) - Number(left.pinned)
+    || right.updatedAt - left.updatedAt)
+}
+
+function matchesThreadSearch(thread: ConversationThreadSummary, searchTerm: string): boolean {
+  if (!searchTerm) return true
+  const haystack = `${thread.name ?? ''} ${thread.preview}`.toLocaleLowerCase()
+  return haystack.includes(searchTerm.toLocaleLowerCase())
 }
 
 function turnKey(threadId: string, turnId: string): string {

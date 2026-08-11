@@ -13,11 +13,11 @@
 | 桌面基础 | 深色/浅色/跟随系统 | 已测试 | system/light/dark 偏好、matchMedia 实时变化、重载恢复和深浅 E2E |
 | 导航 | 项目、任务、计划任务、安全、设置导航 | 已测试 | 项目/任务、计划任务（含未读徽标）、五页安全工作台与四页设置工作台均经 Electron 回归 |
 | 项目 | 打开真实本地目录 | 已实现 | 系统目录对话框、realpath 校验、SQLite 写入 |
-| 项目 | 最近项目和固定项目 | 部分实现 | 最近项目恢复/去重已测试；固定待开发 |
+| 项目 | 最近项目和固定项目 | 已测试 | 最近项目恢复/去重、SQLite 固定、固定优先排序和 Renderer 重载恢复均通过自动测试与 Electron E2E |
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 已测试 | 默认不信任、SQLite 持久化、外部技能根目录信任门；单元与 Electron UI 通过 |
 | 项目 | 项目指令 AGENTS.md | 已测试 | 安全预览 + app-server 原生解析；真实 turn 按临时仓库指令返回 `ASTER_INSTRUCTIONS_OK` |
-| 对话 | 新建、读取、继续、重命名、固定、归档 | 部分实现 | 新建/list/resume/read/继续、重命名及活动/归档双视图已测试；仅任务固定待开发 |
+| 对话 | 新建、读取、继续、重命名、固定、归档 | 已测试 | 真实 app-server 生命周期；重命名、活动/归档双视图、SQLite 固定与首屏补读、重载恢复均通过自动测试和 Electron E2E |
 | 对话 | 删除任务 | 已测试 | 明确二次确认、活动 turn/挂起审批失败关闭、SQLite 关联清理和删除后列表重同步；官方 app-server 集成与 Electron E2E 通过 |
 | 对话 | 对话搜索和分页 | 已测试 | `thread/list` cwd/searchTerm/opaque cursor、游标失效保护、分页合并和侧栏搜索/加载更多均通过自动测试 |
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |
@@ -100,6 +100,6 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 28 个测试文件 118 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 thread 生命周期集成、离线 Electron 生命周期、目录包和挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 28 个测试文件 121 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 thread 生命周期集成、离线 Electron 生命周期/固定恢复、目录包和挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |

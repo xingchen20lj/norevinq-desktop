@@ -1,4 +1,4 @@
-import { _electron as electron, expect, test } from '@playwright/test'
+import { _electron as electron, expect, test, type Locator } from '@playwright/test'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -25,18 +25,31 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   })
   try {
     const window = await application.firstWindow()
+    const taskRow = (name: string): Locator =>
+      window.locator('.thread-row').filter({ hasText: name })
     await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
-    await expect(window.getByRole('button', { name: /Lifecycle primary/ })).toBeVisible()
+    await window.getByRole('button', { name: `固定项目 ${project.name}` }).click()
+    await expect(window.getByRole('button', { name: `取消固定项目 ${project.name}` })).toBeVisible()
+    await expect(taskRow('Lifecycle primary')).toBeVisible()
     await window.getByRole('button', { name: '加载更多' }).click()
-    await expect(window.getByRole('button', { name: /Lifecycle secondary/ })).toBeVisible()
+    await expect(taskRow('Lifecycle secondary')).toBeVisible()
+    await window.getByRole('button', { name: '固定任务 Lifecycle secondary' }).click()
+    await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
+
+    await window.reload()
+    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.getByRole('button', { name: `取消固定项目 ${project.name}` })).toBeVisible()
+    await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
+    await window.getByRole('button', { name: '取消固定任务 Lifecycle secondary' }).click()
+    await expect(window.locator('.thread-row').first()).toContainText('Lifecycle primary')
 
     await window.getByLabel('搜索任务').fill('secondary')
     await window.getByLabel('搜索任务').press('Enter')
-    await expect(window.getByRole('button', { name: /Lifecycle secondary/ })).toBeVisible()
-    await expect(window.getByRole('button', { name: /Lifecycle primary/ })).toHaveCount(0)
+    await expect(taskRow('Lifecycle secondary')).toBeVisible()
+    await expect(taskRow('Lifecycle primary')).toHaveCount(0)
     await window.getByLabel('搜索任务').fill('')
     await window.getByLabel('搜索任务').press('Enter')
-    await window.getByRole('button', { name: /Lifecycle primary/ }).click()
+    await taskRow('Lifecycle primary').click()
 
     await window.getByRole('button', { name: '重命名任务' }).click()
     const rename = window.getByRole('dialog', { name: '重命名任务' })
@@ -52,15 +65,15 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await expect(window.locator('.topbar-title')).toContainText(project.name)
 
     await window.getByTitle('显示已归档任务').click()
-    await window.getByRole('button', { name: /Renamed primary fork/ }).click()
+    await taskRow('Renamed primary fork').click()
     await window.getByRole('button', { name: '恢复任务' }).click()
     await window.getByTitle('显示活动任务').click()
-    await window.getByRole('button', { name: /Renamed primary fork/ }).click()
+    await taskRow('Renamed primary fork').click()
 
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByRole('button', { name: '永久删除任务' }).click()
-    await expect(window.getByRole('button', { name: /Renamed primary fork/ })).toHaveCount(0)
-    await expect(window.getByRole('button', { name: /Renamed primary/ })).toBeVisible()
+    await expect(taskRow('Renamed primary fork')).toHaveCount(0)
+    await expect(taskRow('Renamed primary')).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-conversation-lifecycle.png' })
 
     const requests = readFileSync(join(codexHome, 'fake-lifecycle-requests.jsonl'), 'utf8')

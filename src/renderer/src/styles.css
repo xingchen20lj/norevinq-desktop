@@ -58,6 +58,12 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .nav-heading { display: flex; align-items: center; height: 29px; padding-left: 9px; color: var(--subtle); font-size: 10.5px; font-weight: 650; text-transform: uppercase; letter-spacing: .08em; }
 .nav-heading .icon-button { width: 25px; height: 25px; margin-left: auto; }
 .empty-project, .project-row, .secondary-nav { width: 100%; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
+.project-entry-row, .thread-entry-row { display: flex; align-items: center; min-width: 0; }
+.project-row, .thread-row { flex: 1; min-width: 0; }
+.sidebar-pin { display: grid; place-items: center; flex: 0 0 22px; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 5px; color: var(--subtle); background: transparent; cursor: pointer; opacity: 0; }
+.project-entry-row:hover .sidebar-pin, .thread-entry-row:hover .sidebar-pin, .sidebar-pin:focus-visible, .sidebar-pin.pinned { opacity: 1; }
+.sidebar-pin:hover, .sidebar-pin.pinned { color: var(--accent); background: var(--surface-hover); }
+.sidebar-pin:disabled { cursor: default; opacity: .4; }
 .empty-project, .project-row { display: flex; align-items: center; gap: 8px; min-height: 32px; padding: 0 9px; text-align: left; font-size: 12px; }
 .project-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .project-chevron { margin-left: auto; opacity: 0; }
@@ -93,7 +99,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .sidebar-footer { display: flex; align-items: center; justify-content: space-between; height: 35px; padding: 0 5px 0 9px; color: var(--subtle); font-size: 10.5px; }
 .sidebar-collapsed .sidebar { padding-right: 7px; padding-left: 7px; }
 .sidebar-collapsed .brand-row { justify-content: center; padding: 0; }
-.sidebar-collapsed .brand-row > span, .sidebar-collapsed .sidebar-search, .sidebar-collapsed .new-task-label, .sidebar-collapsed .shortcut, .sidebar-collapsed .nav-heading > span, .sidebar-collapsed .project-row > span, .sidebar-collapsed .project-chevron, .sidebar-collapsed .thread-list, .sidebar-collapsed .secondary-nav > span, .sidebar-collapsed .secondary-nav > b, .sidebar-collapsed .sidebar-footer > span { display: none; }
+.sidebar-collapsed .brand-row > span, .sidebar-collapsed .sidebar-search, .sidebar-collapsed .new-task-label, .sidebar-collapsed .shortcut, .sidebar-collapsed .nav-heading > span, .sidebar-collapsed .project-row > span, .sidebar-collapsed .project-chevron, .sidebar-collapsed .sidebar-pin, .sidebar-collapsed .thread-list, .sidebar-collapsed .secondary-nav > span, .sidebar-collapsed .secondary-nav > b, .sidebar-collapsed .sidebar-footer > span { display: none; }
 .sidebar-collapsed .new-task-button, .sidebar-collapsed .project-row, .sidebar-collapsed .empty-project, .sidebar-collapsed .secondary-nav { justify-content: center; padding: 0; }
 .sidebar-collapsed .nav-heading { justify-content: center; padding: 0; }
 .sidebar-collapsed .nav-heading .icon-button { margin: 0; }

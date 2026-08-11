@@ -15,6 +15,7 @@ import type {
   LoadProjectConversationsInput,
   RenameConversationInput,
   ResolveApprovalInput,
+  SetConversationPinnedInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -68,6 +69,7 @@ import {
 const removeProjectSchema = z.object({
   projectId: z.uuid(),
 })
+const projectPinnedSchema = removeProjectSchema.extend({ pinned: z.boolean() })
 
 type AuthorizedIpcHandler = (event: IpcMainInvokeEvent, ...args: unknown[]) => unknown
 
@@ -101,6 +103,7 @@ export type AgentController = {
   deleteThread: (threadId: string) => Promise<ConversationSnapshot>
   forkThread: (input: ForkConversationInput) => Promise<ConversationSnapshot>
   compactThread: (threadId: string) => Promise<ConversationSnapshot>
+  setThreadPinned: (input: SetConversationPinnedInput) => ConversationSnapshot
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>
@@ -287,6 +290,11 @@ export function registerIpc(
     const parsed = removeProjectSchema.parse(input)
     database.removeProject(parsed.projectId)
   })
+  ipcMain.handle(IPC_CHANNELS.projectPinnedSet, (_event, input: unknown) => {
+    const parsed = projectPinnedSchema.parse(input)
+    database.setProjectPinned(parsed.projectId, parsed.pinned)
+    return database.listProjects()
+  })
 
   ipcMain.handle(IPC_CHANNELS.runtimeStatus, (event) => {
     webContents.add(event.sender)
@@ -316,6 +324,8 @@ export function registerIpc(
     agent.forkThread(forkThreadSchema.parse(input) as ForkConversationInput))
   ipcMain.handle(IPC_CHANNELS.conversationCompact, (_event, input: unknown) =>
     agent.compactThread(threadInputSchema.parse(input).threadId))
+  ipcMain.handle(IPC_CHANNELS.conversationPinnedSet, (_event, input: unknown) =>
+    agent.setThreadPinned(threadPinnedSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.conversationStart, (_event, input: unknown) =>
     agent.startConversation(startConversationSchema.parse(input) as StartConversationInput))
   ipcMain.handle(IPC_CHANNELS.conversationTurnStart, (_event, input: unknown) =>
@@ -648,6 +658,7 @@ const conversationListSchema = z.object({
 })
 const renameThreadSchema = threadInputSchema.extend({ name: z.string().trim().min(1).max(120) })
 const forkThreadSchema = threadInputSchema.extend({ lastTurnId: z.string().min(1).max(200).optional() })
+const threadPinnedSchema = threadInputSchema.extend({ pinned: z.boolean() })
 const promptSchema = z.string().trim().min(1).max(100_000)
 const startConversationSchema = z.object({
   projectId: z.uuid(),

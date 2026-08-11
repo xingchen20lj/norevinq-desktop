@@ -158,6 +158,40 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('persists pinned tasks, sorts them first, and hydrates pins missing from the first server page', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    runtime.threadListResponses.push({
+      data: [protocolThread([], 'thread-1', 30), protocolThread([], 'thread-2', 20)],
+      nextCursor: null,
+      backwardsCursor: null,
+    })
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    const pinned = service.setThreadPinned({ threadId: 'thread-2', pinned: true })
+    expect(pinned.threads.map(({ id }) => id)).toEqual(['thread-2', 'thread-1'])
+    expect(pinned.threads[0]?.pinned).toBe(true)
+    service.dispose()
+
+    const restoredRuntime = new FakeRuntime()
+    restoredRuntime.threadListResponses.push({
+      data: [protocolThread([], 'thread-1', 30)],
+      nextCursor: null,
+      backwardsCursor: null,
+    })
+    const restored = new AgentService(restoredRuntime, database)
+    const snapshot = await restored.loadProject({ projectId })
+    expect(snapshot.threads.map(({ id }) => id)).toEqual(['thread-2', 'thread-1'])
+    expect(snapshot.threads[0]).toMatchObject({ id: 'thread-2', pinned: true })
+    expect(restoredRuntime.requests).toContainEqual(expect.objectContaining({
+      method: 'thread/read',
+      params: { includeTurns: false, threadId: 'thread-2' },
+    }))
+
+    restored.dispose()
+    database.close()
+  })
+
   it('renames, compacts, forks, archives, restores, and permanently deletes protocol threads', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -251,7 +285,14 @@ class FakeRuntime {
 
   request<T extends JsonValue = JsonValue>(method: string, params?: JsonValue): Promise<T> {
     this.requests.push({ method, params })
-    const thread = protocolThread(method === 'thread/resume' ? [turn('turn-old', 'completed')] : [])
+    const parameters = params && typeof params === 'object' && !Array.isArray(params)
+      ? params as Record<string, JsonValue>
+      : {}
+    const requestedThreadId = typeof parameters.threadId === 'string' ? parameters.threadId : 'thread-1'
+    const thread = protocolThread(
+      method === 'thread/resume' ? [turn('turn-old', 'completed')] : [],
+      requestedThreadId,
+    )
     if (method === 'thread/list') {
       const response = this.threadListResponses.shift()
         ?? { data: [thread], nextCursor: null, backwardsCursor: null }
@@ -259,6 +300,7 @@ class FakeRuntime {
     }
     const responses: Record<string, JsonValue> = {
       'thread/resume': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
+      'thread/read': { thread },
       'thread/start': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
       'thread/name/set': {},
       'thread/archive': {},

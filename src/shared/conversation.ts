@@ -15,6 +15,7 @@ export type ConversationThreadSummary = {
   forkedFromId: string | null
   parentThreadId: string | null
   cliVersion: string
+  pinned: boolean
 }
 
 export type ApprovalKind = 'command' | 'fileChange'
@@ -79,6 +80,10 @@ export type RenameConversationInput = SelectConversationInput & {
 
 export type ForkConversationInput = SelectConversationInput & {
   lastTurnId?: string
+}
+
+export type SetConversationPinnedInput = SelectConversationInput & {
+  pinned: boolean
 }
 
 export type SteerTurnInput = {

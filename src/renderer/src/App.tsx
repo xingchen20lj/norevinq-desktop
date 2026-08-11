@@ -22,6 +22,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Pencil,
+  Pin,
   Plus,
   Search,
   Settings,
@@ -75,6 +76,7 @@ export function App(): React.JSX.Element {
   const [threadSearch, setThreadSearch] = useState('')
   const [showArchived, setShowArchived] = useState(false)
   const [threadActionBusy, setThreadActionBusy] = useState(false)
+  const [projectPinBusy, setProjectPinBusy] = useState<string | null>(null)
   const [renameOpen, setRenameOpen] = useState(false)
   const [renameDraft, setRenameDraft] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -287,7 +289,7 @@ export function App(): React.JSX.Element {
       setNewTask(true)
       setBootstrap((current) => current && ({
         ...current,
-        projects: [project, ...current.projects.filter(({ id }) => id !== project.id)],
+        projects: sortProjects([project, ...current.projects.filter(({ id }) => id !== project.id)]),
       }))
     } catch (reason) {
       setError(toErrorMessage(reason))
@@ -341,6 +343,26 @@ export function App(): React.JSX.Element {
     } finally {
       setThreadActionBusy(false)
     }
+  }
+
+  async function toggleProjectPinned(project: ProjectSummary): Promise<void> {
+    setProjectPinBusy(project.id)
+    setError(null)
+    try {
+      const nextProjects = await window.aster.setProjectPinned({ projectId: project.id, pinned: !project.pinned })
+      setBootstrap((current) => current ? { ...current, projects: nextProjects } : current)
+      setSelectedProject((current) => current?.id === project.id
+        ? nextProjects.find(({ id }) => id === project.id) ?? current
+        : current)
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+    } finally {
+      setProjectPinBusy(null)
+    }
+  }
+
+  async function toggleThreadPinned(threadId: string, pinned: boolean): Promise<void> {
+    await runThreadAction(() => window.aster.setConversationPinned({ threadId, pinned: !pinned }))
   }
 
   function renameSelectedThread(): void {
@@ -530,13 +552,21 @@ export function App(): React.JSX.Element {
             </button>
           ) : projects.map((project) => (
             <div key={project.id}>
-              <button
-                className={`project-row ${selectedProject?.id === project.id ? 'selected' : ''}`}
-                onClick={() => { setSelectedProject(project); setNewTask(true) }}
-                title={project.path}
-              >
-                <FolderCode size={15} /><span>{project.name}</span><ChevronRight size={13} className="project-chevron" />
-              </button>
+              <div className="project-entry-row">
+                <button
+                  className={`project-row ${selectedProject?.id === project.id ? 'selected' : ''}`}
+                  onClick={() => { setSelectedProject(project); setNewTask(true) }}
+                  title={project.path}
+                >
+                  <FolderCode size={15} /><span>{project.name}</span><ChevronRight size={13} className="project-chevron" />
+                </button>
+                <button
+                  className={`sidebar-pin ${project.pinned ? 'pinned' : ''}`}
+                  aria-label={`${project.pinned ? '取消固定项目' : '固定项目'} ${project.name}`}
+                  disabled={projectPinBusy !== null}
+                  onClick={() => void toggleProjectPinned(project)}
+                ><Pin size={11} fill={project.pinned ? 'currentColor' : 'none'} /></button>
+              </div>
               {selectedProject?.id === project.id && conversations?.projectId === project.id && (
                 <div className="thread-list" aria-label={`${project.name} 任务`}>
                   <div className="thread-filter">
@@ -552,15 +582,22 @@ export function App(): React.JSX.Element {
                     </button>
                   </div>
                   {conversations.threads.map((thread) => (
-                    <button
-                      className={`thread-row ${!newTask && conversations.selectedThreadId === thread.id ? 'selected' : ''}`}
-                      key={thread.id}
-                      onClick={() => void selectThread(thread.id)}
-                      title={thread.preview}
-                    >
-                      <MessageSquare size={12} /><span>{(thread.name ?? thread.preview) || '未命名任务'}</span>
-                      {thread.status === 'active' && <span className="active-indicator" />}
-                    </button>
+                    <div className="thread-entry-row" key={thread.id}>
+                      <button
+                        className={`thread-row ${!newTask && conversations.selectedThreadId === thread.id ? 'selected' : ''}`}
+                        onClick={() => void selectThread(thread.id)}
+                        title={thread.preview}
+                      >
+                        <MessageSquare size={12} /><span>{(thread.name ?? thread.preview) || '未命名任务'}</span>
+                        {thread.status === 'active' && <span className="active-indicator" />}
+                      </button>
+                      <button
+                        className={`sidebar-pin ${thread.pinned ? 'pinned' : ''}`}
+                        aria-label={`${thread.pinned ? '取消固定任务' : '固定任务'} ${(thread.name ?? thread.preview) || '未命名任务'}`}
+                        disabled={threadActionBusy}
+                        onClick={() => void toggleThreadPinned(thread.id, thread.pinned)}
+                      ><Pin size={10} fill={thread.pinned ? 'currentColor' : 'none'} /></button>
+                    </div>
                   ))}
                   {conversations.threads.length === 0 && <div className="thread-empty">{showArchived ? '没有已归档任务' : '没有匹配任务'}</div>}
                   {conversations.nextCursor && <button className="thread-load-more" onClick={() => {
@@ -1251,6 +1288,11 @@ function toErrorMessage(reason: unknown): string {
   if (reason instanceof Error) return reason.message
   if (typeof reason === 'string' && reason) return reason
   return '发生未知错误。'
+}
+
+function sortProjects(projects: ProjectSummary[]): ProjectSummary[] {
+  return [...projects].sort((left, right) => Number(right.pinned) - Number(left.pinned)
+    || right.lastOpenedAt.localeCompare(left.lastOpenedAt))
 }
 
 function runtimeLabel(runtime: CodexRuntimeSnapshot | null): string {

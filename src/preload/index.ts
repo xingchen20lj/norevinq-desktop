@@ -1,5 +1,10 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { IPC_CHANNELS, type AsterDesktopApi, type RemoveProjectInput } from '../shared/contracts.js'
+import {
+  IPC_CHANNELS,
+  type AsterDesktopApi,
+  type RemoveProjectInput,
+  type SetProjectPinnedInput,
+} from '../shared/contracts.js'
 import type {
   ConversationSnapshot,
   ConversationSubscription,
@@ -9,6 +14,7 @@ import type {
   RenameConversationInput,
   ResolveApprovalInput,
   SelectConversationInput,
+  SetConversationPinnedInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -62,6 +68,7 @@ const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
   selectProject: () => ipcRenderer.invoke(IPC_CHANNELS.selectProject),
   removeProject: (input: RemoveProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.removeProject, input),
+  setProjectPinned: (input: SetProjectPinnedInput) => ipcRenderer.invoke(IPC_CHANNELS.projectPinnedSet, input),
   getRuntimeStatus: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeStatus),
   restartRuntime: () => ipcRenderer.invoke(IPC_CHANNELS.runtimeRestart),
   onRuntimeStatus: (subscription: RuntimeSubscription) => {
@@ -85,6 +92,8 @@ const api: AsterDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.conversationFork, input),
   compactConversation: (input: SelectConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationCompact, input),
+  setConversationPinned: (input: SetConversationPinnedInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationPinnedSet, input),
   startConversation: (input: StartConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationStart, input),
   startTurn: (input: StartTurnInput) => ipcRenderer.invoke(IPC_CHANNELS.conversationTurnStart, input),

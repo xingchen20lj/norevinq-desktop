@@ -8,6 +8,7 @@ import type {
   RenameConversationInput,
   ResolveApprovalInput,
   SelectConversationInput,
+  SetConversationPinnedInput,
   StartConversationInput,
   StartTurnInput,
   SteerTurnInput,
@@ -84,6 +85,7 @@ export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
   selectProject: 'project:select',
   removeProject: 'project:remove',
+  projectPinnedSet: 'project:pinned-set',
   runtimeStatus: 'runtime:status',
   runtimeRestart: 'runtime:restart',
   runtimeStatusChanged: 'runtime:status-changed',
@@ -95,6 +97,7 @@ export const IPC_CHANNELS = {
   conversationDelete: 'conversation:delete',
   conversationFork: 'conversation:fork',
   conversationCompact: 'conversation:compact',
+  conversationPinnedSet: 'conversation:pinned-set',
   conversationStart: 'conversation:start',
   conversationTurnStart: 'conversation:turn-start',
   conversationSteer: 'conversation:steer',
@@ -178,6 +181,7 @@ export type ProjectSummary = {
   name: string
   path: string
   trusted: boolean
+  pinned: boolean
   lastOpenedAt: string
 }
 
@@ -193,10 +197,15 @@ export type RemoveProjectInput = {
   projectId: string
 }
 
+export type SetProjectPinnedInput = RemoveProjectInput & {
+  pinned: boolean
+}
+
 export type AsterDesktopApi = {
   getBootstrapState: () => Promise<BootstrapState>
   selectProject: () => Promise<ProjectSummary | null>
   removeProject: (input: RemoveProjectInput) => Promise<void>
+  setProjectPinned: (input: SetProjectPinnedInput) => Promise<ProjectSummary[]>
   getRuntimeStatus: () => Promise<CodexRuntimeSnapshot>
   restartRuntime: () => Promise<CodexRuntimeSnapshot>
   onRuntimeStatus: (subscription: RuntimeSubscription) => () => void
@@ -208,6 +217,7 @@ export type AsterDesktopApi = {
   deleteConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
   forkConversation: (input: ForkConversationInput) => Promise<ConversationSnapshot>
   compactConversation: (input: SelectConversationInput) => Promise<ConversationSnapshot>
+  setConversationPinned: (input: SetConversationPinnedInput) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>

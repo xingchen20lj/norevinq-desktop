@@ -12,8 +12,11 @@ type ProjectRow = {
   name: string
   path: string
   trusted: number
+  pinned: number
   last_opened_at: string
 }
+
+const MAX_PINNED_THREADS_PER_PROJECT = 20
 
 type WorktreeRow = {
   id: string
@@ -54,7 +57,7 @@ export class StateDatabase {
 
   listProjects(): ProjectSummary[] {
     const rows = this.#database
-      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects ORDER BY last_opened_at DESC LIMIT 500')
+      .prepare('SELECT id, name, path, trusted, pinned, last_opened_at FROM projects ORDER BY pinned DESC, last_opened_at DESC LIMIT 500')
       .all() as ProjectRow[]
 
     return rows.map(toProjectSummary)
@@ -62,7 +65,7 @@ export class StateDatabase {
 
   getProject(projectId: string): ProjectSummary | null {
     const row = this.#database
-      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects WHERE id = ?')
+      .prepare('SELECT id, name, path, trusted, pinned, last_opened_at FROM projects WHERE id = ?')
       .get(projectId) as ProjectRow | undefined
     return row ? toProjectSummary(row) : null
   }
@@ -75,7 +78,7 @@ export class StateDatabase {
 
     const now = new Date().toISOString()
     const existing = this.#database
-      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects WHERE path = ?')
+      .prepare('SELECT id, name, path, trusted, pinned, last_opened_at FROM projects WHERE path = ?')
       .get(canonicalPath) as ProjectRow | undefined
 
     if (existing) {
@@ -88,16 +91,26 @@ export class StateDatabase {
       name: basename(canonicalPath),
       path: canonicalPath,
       trusted: 0,
+      pinned: 0,
       last_opened_at: now,
     }
     this.#database
-      .prepare('INSERT INTO projects (id, name, path, trusted, last_opened_at) VALUES (?, ?, ?, ?, ?)')
-      .run(project.id, project.name, project.path, project.trusted, project.last_opened_at)
+      .prepare('INSERT INTO projects (id, name, path, trusted, pinned, last_opened_at) VALUES (?, ?, ?, ?, ?, ?)')
+      .run(project.id, project.name, project.path, project.trusted, project.pinned, project.last_opened_at)
     return toProjectSummary(project)
   }
 
   removeProject(projectId: string): void {
     this.#database.prepare('DELETE FROM projects WHERE id = ?').run(projectId)
+  }
+
+  setProjectPinned(projectId: string, pinned: boolean): ProjectSummary {
+    const result = this.#database.prepare('UPDATE projects SET pinned = ? WHERE id = ?')
+      .run(pinned ? 1 : 0, projectId)
+    if (result.changes !== 1) throw new Error('Project not found.')
+    const project = this.getProject(projectId)
+    if (!project) throw new Error('Project not found.')
+    return project
   }
 
   getAppSetting(key: string): unknown {
@@ -128,27 +141,64 @@ export class StateDatabase {
     return project
   }
 
-  associateThread(projectId: string, threadId: string): void {
+  associateThread(projectId: string, threadId: string, archived?: boolean): void {
+    const archivedValue = archived === undefined ? null : archived ? 1 : 0
     this.#database
       .prepare(`
-        INSERT INTO project_threads (project_id, thread_id, last_opened_at)
-        VALUES (?, ?, ?)
+        INSERT INTO project_threads (project_id, thread_id, last_opened_at, pinned, archived)
+        VALUES (?, ?, ?, 0, COALESCE(?, 0))
         ON CONFLICT(thread_id) DO UPDATE SET
           project_id = excluded.project_id,
-          last_opened_at = excluded.last_opened_at
+          last_opened_at = excluded.last_opened_at,
+          archived = CASE WHEN ? IS NULL THEN project_threads.archived ELSE ? END
       `)
-      .run(projectId, threadId, new Date().toISOString())
+      .run(projectId, threadId, new Date().toISOString(), archivedValue, archivedValue, archivedValue)
   }
 
   listProjectThreadIds(projectId: string): string[] {
     const rows = this.#database
-      .prepare('SELECT thread_id FROM project_threads WHERE project_id = ? ORDER BY last_opened_at DESC')
+      .prepare('SELECT thread_id FROM project_threads WHERE project_id = ? ORDER BY pinned DESC, last_opened_at DESC')
       .all(projectId) as { thread_id: string }[]
     return rows.map(({ thread_id }) => thread_id)
   }
 
   removeThreadAssociation(threadId: string): void {
     this.#database.prepare('DELETE FROM project_threads WHERE thread_id = ?').run(threadId)
+  }
+
+  setThreadPinned(projectId: string, threadId: string, pinned: boolean): void {
+    if (pinned && !this.isThreadPinned(threadId)) {
+      const row = this.#database.prepare(`
+        SELECT COUNT(*) AS count FROM project_threads WHERE project_id = ? AND pinned = 1
+      `).get(projectId) as { count: number }
+      if (row.count >= MAX_PINNED_THREADS_PER_PROJECT) {
+        throw new Error(`A project can pin at most ${String(MAX_PINNED_THREADS_PER_PROJECT)} conversations.`)
+      }
+    }
+    const result = this.#database.prepare(`
+      UPDATE project_threads SET pinned = ? WHERE project_id = ? AND thread_id = ?
+    `).run(pinned ? 1 : 0, projectId, threadId)
+    if (result.changes !== 1) throw new Error('Conversation association not found.')
+  }
+
+  isThreadPinned(threadId: string): boolean {
+    const row = this.#database.prepare('SELECT pinned FROM project_threads WHERE thread_id = ?')
+      .get(threadId) as { pinned: number } | undefined
+    return row?.pinned === 1
+  }
+
+  listPinnedProjectThreadIds(projectId: string, archived: boolean): string[] {
+    const rows = this.#database.prepare(`
+      SELECT thread_id FROM project_threads
+      WHERE project_id = ? AND pinned = 1 AND archived = ?
+      ORDER BY last_opened_at DESC LIMIT ?
+    `).all(projectId, archived ? 1 : 0, MAX_PINNED_THREADS_PER_PROJECT) as { thread_id: string }[]
+    return rows.map(({ thread_id }) => thread_id)
+  }
+
+  setThreadArchived(threadId: string, archived: boolean): void {
+    this.#database.prepare('UPDATE project_threads SET archived = ? WHERE thread_id = ?')
+      .run(archived ? 1 : 0, threadId)
   }
 
   insertManagedWorktree(worktree: Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>): void {
@@ -431,6 +481,20 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 8) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE projects ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1));
+        ALTER TABLE project_threads ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0 CHECK (pinned IN (0, 1));
+        ALTER TABLE project_threads ADD COLUMN archived INTEGER NOT NULL DEFAULT 0 CHECK (archived IN (0, 1));
+        CREATE INDEX IF NOT EXISTS projects_pinned_opened_idx
+          ON projects(pinned DESC, last_opened_at DESC);
+        CREATE INDEX IF NOT EXISTS project_threads_pinned_idx
+          ON project_threads(project_id, archived, pinned DESC, last_opened_at DESC);
+        PRAGMA user_version = 8;
+        COMMIT;
+      `)
+    }
   }
 }
 
@@ -472,6 +536,7 @@ function toProjectSummary(row: ProjectRow): ProjectSummary {
     name: row.name,
     path: row.path,
     trusted: row.trusted === 1,
+    pinned: row.pinned === 1,
     lastOpenedAt: row.last_opened_at,
   }
 }
