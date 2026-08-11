@@ -130,11 +130,26 @@ function parseRemotes(output: string): GitRemote[] {
     const match = /^(\S+)\s+(\S+)\s+\((fetch|push)\)$/.exec(line)
     if (!match?.[1] || !match[2] || !match[3]) continue
     const current = remotes.get(match[1]) ?? { name: match[1], fetchUrl: null, pushUrl: null }
-    if (match[3] === 'fetch') current.fetchUrl = match[2]
-    else current.pushUrl = match[2]
+    const url = sanitizeRemoteUrl(match[2])
+    if (match[3] === 'fetch') current.fetchUrl = url
+    else current.pushUrl = url
     remotes.set(match[1], current)
   }
   return [...remotes.values()]
+}
+
+function sanitizeRemoteUrl(value: string): string {
+  if (!value.includes('://')) return value
+  try {
+    const url = new URL(value)
+    url.username = ''
+    url.password = ''
+    url.search = ''
+    url.hash = ''
+    return url.toString()
+  } catch {
+    return '[REDACTED INVALID REMOTE URL]'
+  }
 }
 
 function emptySnapshot(projectId: string): GitRepositorySnapshot {

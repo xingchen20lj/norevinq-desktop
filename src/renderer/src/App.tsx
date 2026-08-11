@@ -15,6 +15,7 @@ import {
   GitBranch,
   GitCommitHorizontal,
   GitFork,
+  GitPullRequest,
   Globe2,
   LoaderCircle,
   MessageSquare,
@@ -49,7 +50,7 @@ import type {
 } from '../../shared/conversation'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
-import type { GitRepositorySnapshot } from '../../shared/git'
+import type { GitHubRepositoryStatus, GitRepositorySnapshot } from '../../shared/git'
 import type { ManagedWorktree } from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 import type { TerminalEvent, TerminalState } from '../../shared/terminal'
@@ -970,8 +971,28 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
   const [busy, setBusy] = useState(false)
   const [message, setMessage] = useState('')
   const [diff, setDiff] = useState<DiffSnapshot | null>(null)
+  const [github, setGitHub] = useState<GitHubRepositoryStatus | null>(null)
+  const [githubTitle, setGitHubTitle] = useState('')
+  const [githubBody, setGitHubBody] = useState('')
+  const [githubBase, setGitHubBase] = useState('')
+  const [githubDraft, setGitHubDraft] = useState(true)
+  const [githubPushRemote, setGitHubPushRemote] = useState('')
+  const [githubBaseRemote, setGitHubBaseRemote] = useState('')
+  const [githubMessage, setGitHubMessage] = useState<string | null>(null)
   const staged = snapshot?.files.filter(({ indexStatus }) => indexStatus !== '.' && indexStatus !== '?') ?? []
   const unstaged = snapshot?.files.filter(({ worktreeStatus, kind }) => worktreeStatus !== '.' || kind === 'untracked') ?? []
+  const existingPullRequest = github?.existingPullRequest ?? null
+
+  useEffect(() => {
+    setGitHub(null)
+    setGitHubTitle('')
+    setGitHubBody('')
+    setGitHubBase('')
+    setGitHubDraft(true)
+    setGitHubPushRemote('')
+    setGitHubBaseRemote('')
+    setGitHubMessage(null)
+  }, [project.id, snapshot?.branch])
 
   async function act(action: () => Promise<GitRepositorySnapshot>): Promise<void> {
     setBusy(true)
@@ -987,6 +1008,56 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
     try { setDiff(await window.aster.getDiff({ projectId: project.id, mode })) }
     catch (reason) { onError(toErrorMessage(reason)) }
     finally { setBusy(false) }
+  }
+
+  async function checkGitHub(pushRemote = githubPushRemote, baseRemote = githubBaseRemote): Promise<void> {
+    setBusy(true)
+    onError(null)
+    setGitHubMessage(null)
+    try {
+      const next = await window.aster.getGitHubStatus({
+        projectId: project.id,
+        ...(pushRemote ? { pushRemote } : {}),
+        ...(baseRemote ? { baseRemote } : {}),
+      })
+      setGitHub(next)
+      setGitHubPushRemote(next.pushRemote ?? pushRemote)
+      setGitHubBaseRemote(next.baseRemote ?? baseRemote)
+      setGitHubBase(next.defaultBranch ?? '')
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function createPullRequest(): Promise<void> {
+    const branch = github?.branch
+    if (!branch || !githubTitle.trim()) return
+    const warning = `将把 ${branch} 推送到 ${githubPushRemote}，并在 ${github.baseRepository ?? githubBaseRemote} 创建 ${githubDraft ? 'Draft ' : ''}Pull Request。继续吗？`
+    if (!window.confirm(warning)) return
+    setBusy(true)
+    onError(null)
+    setGitHubMessage(null)
+    try {
+      const result = await window.aster.createGitHubPullRequest({
+        projectId: project.id,
+        title: githubTitle.trim(),
+        body: githubBody,
+        baseBranch: githubBase,
+        draft: githubDraft,
+        confirmed: true,
+        pushRemote: githubPushRemote,
+        baseRemote: githubBaseRemote,
+      })
+      setGitHub(result.status)
+      setGitHubMessage(result.created ? `已创建 PR #${String(result.pullRequest.number)}` : `PR #${String(result.pullRequest.number)} 已存在`)
+      update(await window.aster.getGitStatus({ projectId: project.id }))
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+    } finally {
+      setBusy(false)
+    }
   }
 
   return <aside className={`git-panel ${diff ? 'diff-panel' : ''}`} aria-label="Git 工作区">
@@ -1020,6 +1091,39 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
           setUpstream: snapshot.upstream === null,
         }))
       }}><Upload size={14} />推送当前分支</button>
+      <section className="github-pr-box" aria-label="GitHub Pull Request">
+        <div className="github-pr-heading"><span><GitPullRequest size={14} />GitHub Pull Request</span><button disabled={busy} onClick={() => void checkGitHub()}>{github ? '重新检查' : '检查 GitHub'}</button></div>
+        {!github && <p>通过已安装的 GitHub CLI 检查登录和远端；创建前会再次确认并显式推送当前分支。</p>}
+        {github && <>
+          <div className="github-pr-meta"><span>{github.available ? `gh ${github.version ?? ''}` : 'gh 不可用'}</span><span>{github.authenticated ? `已登录 ${github.host ?? ''}` : '未登录'}</span></div>
+          {snapshot.remotes.length > 0 && <div className="github-remotes">
+            <label>推送远端<select aria-label="PR 推送远端" value={githubPushRemote} onChange={(event) => {
+              const value = event.target.value
+              setGitHubPushRemote(value)
+              void checkGitHub(value, githubBaseRemote)
+            }}>{snapshot.remotes.map((remote) => <option value={remote.name} key={`push:${remote.name}`}>{remote.name}</option>)}</select></label>
+            <label>目标远端<select aria-label="PR 目标远端" value={githubBaseRemote} onChange={(event) => {
+              const value = event.target.value
+              setGitHubBaseRemote(value)
+              void checkGitHub(githubPushRemote, value)
+            }}>{snapshot.remotes.map((remote) => <option value={remote.name} key={`base:${remote.name}`}>{remote.name}</option>)}</select></label>
+          </div>}
+          {github.error && <p className="danger-text">{github.error}</p>}
+          {existingPullRequest ? <div className="github-existing-pr">
+            <strong>#{existingPullRequest.number} · {existingPullRequest.title}</strong>
+            <span>{existingPullRequest.draft ? 'Draft' : existingPullRequest.state} · {existingPullRequest.headBranch} → {existingPullRequest.baseBranch}</span>
+            <button onClick={() => window.open(existingPullRequest.url, '_blank')}>在 GitHub 打开</button>
+          </div> : github.authenticated && !github.error && <div className="github-pr-form">
+            <label>标题<input aria-label="Pull Request 标题" maxLength={256} value={githubTitle} onChange={(event) => setGitHubTitle(event.target.value)} placeholder="简要说明本次变更" /></label>
+            <label>目标分支<input aria-label="Pull Request 目标分支" maxLength={255} value={githubBase} onChange={(event) => setGitHubBase(event.target.value)} /></label>
+            <label>说明<textarea aria-label="Pull Request 说明" maxLength={65_536} rows={5} value={githubBody} onChange={(event) => setGitHubBody(event.target.value)} placeholder="变更、测试与注意事项" /></label>
+            <label className="github-draft"><input type="checkbox" checked={githubDraft} onChange={(event) => setGitHubDraft(event.target.checked)} />先创建为 Draft</label>
+            {github.dirtyFileCount > 0 && <p className="github-warning">当前还有 {github.dirtyFileCount} 个未提交文件，不会包含在 PR 中。</p>}
+            <button className="github-create-button" disabled={busy || !githubTitle.trim() || !githubBase || !githubPushRemote || !githubBaseRemote} onClick={() => void createPullRequest()}><GitPullRequest size={14} />推送并创建 {githubDraft ? 'Draft ' : ''}PR</button>
+          </div>}
+          {githubMessage && <p className="github-success">{githubMessage}</p>}
+        </>}
+      </section>
     </>}
   </aside>
 }

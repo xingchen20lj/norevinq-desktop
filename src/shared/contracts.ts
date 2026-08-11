@@ -17,6 +17,10 @@ import type {
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from './providers.js'
 import type {
   GitCommitInput,
+  CreateGitHubPullRequestInput,
+  CreateGitHubPullRequestResult,
+  GitHubRepositoryStatus,
+  GitHubStatusInput,
   GitPathsInput,
   GitProjectInput,
   GitPushInput,
@@ -140,6 +144,8 @@ export const IPC_CHANNELS = {
   gitUnstage: 'git:unstage',
   gitCommit: 'git:commit',
   gitPush: 'git:push',
+  githubStatus: 'github:status',
+  githubPullRequestCreate: 'github:pull-request-create',
   worktreeList: 'worktree:list',
   worktreeCreate: 'worktree:create',
   worktreeLock: 'worktree:lock',
@@ -292,6 +298,8 @@ export type AsterDesktopApi = {
   unstageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
   commitGit: (input: GitCommitInput) => Promise<GitRepositorySnapshot>
   pushGit: (input: GitPushInput) => Promise<GitRepositorySnapshot>
+  getGitHubStatus: (input: GitHubStatusInput) => Promise<GitHubRepositoryStatus>
+  createGitHubPullRequest: (input: CreateGitHubPullRequestInput) => Promise<CreateGitHubPullRequestResult>
   listWorktrees: (input: ListWorktreesInput) => Promise<ManagedWorktree[]>
   createWorktree: (input: CreateWorktreeInput) => Promise<ManagedWorktree>
   lockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>

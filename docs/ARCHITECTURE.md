@@ -12,7 +12,7 @@ flowchart LR
   Preload --> Main["Electron 主进程"]
   Main --> Runtime["Codex app-server<br/>stdio JSONL"]
   Main --> PTY["PTY/命令服务"]
-  Main --> Git["Git 服务"]
+  Main --> Git["Git / GitHub CLI 服务"]
   Main --> DB["SQLite 状态库"]
   Main --> Keys["系统凭据保险库"]
   Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
@@ -34,7 +34,7 @@ flowchart LR
 - `src/main/account`：稳定 app-server 账户读取、API Key/ChatGPT 托管登录、官方域外链、用量和登录重启状态机；不持有可读 token 库。
 - `src/main/integrations`：MCP/技能/配置/项目指令适配器、反向交互挂起状态和有界领域模型。
 - `src/main/security/credentialStore.ts`：操作系统加密适配、仓库外 0600 原子凭据文件；不提供读取密钥的 IPC。
-- `src/main/git`：项目根绑定的无 shell Git runner、porcelain v2 NUL parser、超时/输出边界和变更操作。
+- `src/main/git`：项目根绑定的无 shell Git runner、porcelain v2 NUL parser、GitHub CLI 预检/PR 创建、超时/输出边界和变更操作。
 - `src/main/git/diffService.ts`：working/staged patch、untracked/二进制归一和 2/16 MiB 展示预算。
 - `src/main/worktree`：仓库外托管 worktree、数据库恢复、ownership 校验、锁定/删除和受限 include 复制。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
@@ -65,6 +65,7 @@ flowchart LR
 17. 文件预览只使用项目相对路径；任何符号链接组件和根目录逃逸都失败关闭，媒体 URL 不包含本地路径且短时过期。
 18. 内嵌浏览器不含 preload/Node/Aster IPC，只允许 loopback 顶级导航与子资源；所有设备权限、下载和弹窗默认拒绝。
 19. 窗口状态只由主进程写入内部 SQLite；恢复前必须验证数值、最小尺寸和当前显示器交集，损坏状态回退默认值。
+20. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
 
 ## 上游与公开资料
 

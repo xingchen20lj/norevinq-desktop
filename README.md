@@ -1,6 +1,6 @@
 # Aster Code
 
-Aster Code 是一款面向 macOS 和 Windows 的开源桌面智能编程客户端。它以 Codex app-server 作为本地智能体协议层，当前已完成 OpenAI/DeepSeek Responses、Git 工作树、差异审阅、终端、MCP、技能、计划任务和 Codex Security 的阶段性真实闭环。
+Aster Code 是一款面向 macOS 和 Windows 的开源桌面智能编程客户端。它以 Codex app-server 作为本地智能体协议层，当前已完成 OpenAI/DeepSeek Responses、Git 工作树与 GitHub Pull Request、差异审阅、终端、MCP、技能、计划任务和 Codex Security 的阶段性真实闭环。
 
 项目正在按无人值守工程计划持续开发。当前进度、下一步和阻塞见：
 
@@ -15,3 +15,5 @@ Aster Code 是一款面向 macOS 和 Windows 的开源桌面智能编程客户�
 > 当前已完成完整自动测试、安全加固和性能优化阶段，正在执行桌面打包、发布准备与最终功能一致性审计。功能状态只以自动测试、真实运行证据和功能一致性表为准。
 
 开发验证命令与在线测试边界见 [测试策略](docs/TESTING.md)。当前 Intel macOS 的无签名 DMG/ZIP 已完成真实构建、校验和挂载启动；签名、公证和 Windows 真机安装仍必须在持有相应凭据/系统的发布环境完成。
+
+GitHub Pull Request 功能需要本机安装并登录 `gh`；Aster 不读取 token，而通过 GitHub CLI 的系统凭据存储完成认证。完整安全边界和验证证据见 [Git 工作流](docs/GIT.md)。

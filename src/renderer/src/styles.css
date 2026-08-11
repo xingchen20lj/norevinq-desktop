@@ -499,6 +499,29 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .commit-box button { width: 100%; }
 .commit-box button:disabled, .push-button:disabled { opacity: .4; cursor: default; }
 .push-button { width: 100%; margin-top: 8px; border-radius: 8px; color: var(--muted); background: var(--surface-2); }
+.github-pr-box { margin-top: 15px; padding-top: 14px; border-top: 1px solid var(--border); }
+.github-pr-box p { margin: 8px 0; color: var(--muted); font-size: 9.5px; line-height: 1.5; }
+.github-pr-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.github-pr-heading span { display: flex; align-items: center; gap: 6px; color: var(--text); font-size: 10.5px; font-weight: 650; }
+.github-pr-heading button, .github-existing-pr button { border: 0; color: var(--accent-strong); background: transparent; font-size: 9.5px; cursor: pointer; }
+.github-pr-heading button:disabled { opacity: .45; cursor: default; }
+.github-pr-meta { display: flex; justify-content: space-between; gap: 8px; margin: 9px 0; color: var(--muted); font-size: 9px; }
+.github-remotes { display: grid; grid-template-columns: 1fr 1fr; gap: 7px; }
+.github-remotes label, .github-pr-form > label { display: grid; gap: 4px; color: var(--muted); font-size: 9px; }
+.github-remotes select, .github-pr-form input, .github-pr-form textarea { min-width: 0; width: 100%; border: 1px solid var(--border); border-radius: 6px; outline: 0; padding: 6px 7px; color: var(--text); background: var(--bg); font: inherit; }
+.github-remotes select:focus, .github-pr-form input:focus, .github-pr-form textarea:focus { border-color: var(--accent); }
+.github-pr-form { display: grid; gap: 8px; margin-top: 10px; }
+.github-pr-form textarea { resize: vertical; line-height: 1.45; }
+.github-pr-form .github-draft { display: flex; align-items: center; gap: 6px; }
+.github-pr-form .github-draft input { width: auto; }
+.github-pr-form .github-warning { margin: 0; color: #d89849; }
+.github-create-button { display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 32px; border: 0; border-radius: 7px; color: #fff; background: var(--accent); font-size: 10px; cursor: pointer; }
+.github-create-button:disabled { opacity: .4; cursor: default; }
+.github-existing-pr { display: grid; gap: 4px; margin-top: 10px; padding: 9px; border: 1px solid color-mix(in srgb, #57bd86 35%, var(--border)); border-radius: 7px; background: color-mix(in srgb, #57bd86 8%, var(--surface-2)); }
+.github-existing-pr strong { overflow: hidden; color: var(--text); font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.github-existing-pr span { color: var(--muted); font-size: 9px; }
+.github-existing-pr button { justify-self: start; padding: 0; }
+.github-pr-box .github-success { color: #57bd86; }
 .worktree-note { margin: 0 0 13px; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .worktree-create { display: flex; gap: 6px; margin-bottom: 13px; }
 .worktree-create input { min-width: 0; flex: 1; height: 32px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; outline: 0; color: var(--text); background: var(--bg); font-size: 10px; }

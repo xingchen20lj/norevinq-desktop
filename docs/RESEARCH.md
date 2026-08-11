@@ -69,6 +69,21 @@
 - [Codex 集成](https://api-docs.deepseek.com/quick_start/agent_integrations/codex/)
 - [DeepSeek 更新日志](https://api-docs.deepseek.com/updates/)
 
+## GitHub CLI Pull Request
+
+- 本机公开 GitHub CLI 为 2.97.0，已通过系统 keyring 登录；产品不读取、保存或显示 token。
+- `gh pr create` 在当前分支尚未完整推送时默认可能提示选择远端或创建 fork。Aster 先通过 Git 服务显式 push/set-upstream，并始终传入 `--repo`、`--base`、`--head`、`--title` 和 `--body-file -`，因此不依赖交互提示或隐式 push/fork。
+- `--body-file -` 是官方 stdin 入口，可避免 PR 描述出现在本机进程参数。官方明确说明 `--dry-run` 仍可能推送，因此不作为只读预检。
+- 预检采用 `gh auth status --hostname`、`gh repo view --json nameWithOwner,url,defaultBranchRef` 与 `gh pr list --state open --json ...`；创建成功后再次结构化读取 PR，并在主进程验证 HTTPS host、owner/repository 和数字编号路径。
+- fork 工作流把 push/head remote 与 base/upstream remote 分开；两者必须位于同一 GitHub host。同项目并发创建合并为单个在途操作，已有 open PR 时返回既有结果。
+
+来源：
+
+- [gh pr create](https://cli.github.com/manual/gh_pr_create)
+- [gh pr list](https://cli.github.com/manual/gh_pr_list)
+- [gh repo view](https://cli.github.com/manual/gh_repo_view)
+- [gh auth status](https://cli.github.com/manual/gh_auth_status)
+
 ## Codex Security
 
 - 当前稳定：`@openai/codex-security@0.1.8`，ESM，Node `^22.13 || ^24 || ^26`，扫描还要求 Python 3.10+。

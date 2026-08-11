@@ -25,7 +25,13 @@ import type {
 import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtime.js'
 import type { StateDatabase } from './state/database.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from '../shared/providers.js'
-import type { GitRepositorySnapshot } from '../shared/git.js'
+import type {
+  CreateGitHubPullRequestInput,
+  CreateGitHubPullRequestResult,
+  GitHubRepositoryStatus,
+  GitHubStatusInput,
+  GitRepositorySnapshot,
+} from '../shared/git.js'
 import type { ManagedWorktree } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, DiffMode, DiffSnapshot } from '../shared/diff.js'
 import type {
@@ -150,6 +156,11 @@ export type GitController = {
   push: (input: { projectId: string; remote?: string; branch?: string; setUpstream?: boolean }) => Promise<GitRepositorySnapshot>
 }
 
+export type GitHubController = {
+  getStatus: (input: GitHubStatusInput) => Promise<GitHubRepositoryStatus>
+  createPullRequest: (input: CreateGitHubPullRequestInput) => Promise<CreateGitHubPullRequestResult>
+}
+
 export type WorktreeController = {
   list: (projectId: string) => Promise<ManagedWorktree[]>
   create: (input: { projectId: string; baseRef?: string; branch?: string; copyIncludes?: boolean }) => Promise<ManagedWorktree>
@@ -256,6 +267,7 @@ export function registerIpc(
   providers: ProviderController,
   account: AccountController,
   git: GitController,
+  github: GitHubController,
   worktrees: WorktreeController,
   diffs: DiffController,
   terminals: TerminalController,
@@ -460,6 +472,27 @@ export function registerIpc(
     branch?: string
     setUpstream?: boolean
   }))
+  ipcMain.handle(IPC_CHANNELS.githubStatus, (_event, input: unknown) => {
+    const parsed = githubStatusSchema.parse(input)
+    return github.getStatus({
+      projectId: parsed.projectId,
+      ...(parsed.pushRemote === undefined ? {} : { pushRemote: parsed.pushRemote }),
+      ...(parsed.baseRemote === undefined ? {} : { baseRemote: parsed.baseRemote }),
+    })
+  })
+  ipcMain.handle(IPC_CHANNELS.githubPullRequestCreate, (_event, input: unknown) => {
+    const parsed = githubPullRequestCreateSchema.parse(input)
+    return github.createPullRequest({
+      projectId: parsed.projectId,
+      title: parsed.title,
+      body: parsed.body,
+      draft: parsed.draft,
+      confirmed: true,
+      ...(parsed.pushRemote === undefined ? {} : { pushRemote: parsed.pushRemote }),
+      ...(parsed.baseRemote === undefined ? {} : { baseRemote: parsed.baseRemote }),
+      ...(parsed.baseBranch === undefined ? {} : { baseBranch: parsed.baseBranch }),
+    })
+  })
   ipcMain.handle(IPC_CHANNELS.worktreeList, (_event, input: unknown) => {
     const parsed = projectInputSchema.parse(input)
     return worktrees.list(parsed.projectId)
@@ -816,6 +849,19 @@ const gitPushSchema = z.object({
   remote: gitRefSchema.optional(),
   branch: gitRefSchema.optional(),
   setUpstream: z.boolean().optional(),
+})
+const githubRemoteSchema = z.string().regex(/^[A-Za-z0-9._-]{1,100}$/)
+const githubStatusSchema = z.object({
+  projectId: z.uuid(),
+  pushRemote: githubRemoteSchema.optional(),
+  baseRemote: githubRemoteSchema.optional(),
+})
+const githubPullRequestCreateSchema = githubStatusSchema.extend({
+  title: z.string().trim().min(1).max(256),
+  body: z.string().max(65_536),
+  baseBranch: gitRefSchema.optional(),
+  draft: z.boolean(),
+  confirmed: z.literal(true),
 })
 const worktreeRefSchema = z.string().regex(/^[A-Za-z0-9._/@{}^~+-]{1,255}$/)
 const worktreeCreateSchema = z.object({

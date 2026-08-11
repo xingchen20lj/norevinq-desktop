@@ -16,6 +16,7 @@ import {
 import { ProviderService } from './providers/providerService.js'
 import { CredentialStore } from './security/credentialStore.js'
 import { GitService } from './git/gitService.js'
+import { GitHubService } from './git/githubService.js'
 import { WorktreeService } from './worktree/worktreeService.js'
 import { DiffService } from './git/diffService.js'
 import { TerminalService } from './terminal/terminalService.js'
@@ -49,6 +50,7 @@ let agentService: AgentService | null = null
 let providerService: ProviderService | null = null
 let accountService: AccountService | null = null
 let gitService: GitService | null = null
+let githubService: GitHubService | null = null
 let worktreeService: WorktreeService | null = null
 let diffService: DiffService | null = null
 let terminalService: TerminalService | null = null
@@ -235,6 +237,7 @@ if (!gotLock) {
     providerService = new ProviderService(runtime, credentialStore, environmentDeepSeekKey)
     accountService = new AccountService(runtime, { openExternal: (url) => shell.openExternal(url) })
     gitService = new GitService(database)
+    githubService = new GitHubService(database, gitService)
     const createdWorktreeService = new WorktreeService(database, join(userData, 'worktrees'))
     worktreeService = createdWorktreeService
     diffService = new DiffService(database, gitService)
@@ -261,6 +264,7 @@ if (!gotLock) {
       providerService,
       accountService,
       gitService,
+      githubService,
       worktreeService,
       diffService,
       terminalService,
@@ -309,6 +313,7 @@ app.on('before-quit', () => {
   accountService?.dispose()
   accountService = null
   gitService = null
+  githubService = null
   worktreeService = null
   diffService = null
   terminalService?.dispose()

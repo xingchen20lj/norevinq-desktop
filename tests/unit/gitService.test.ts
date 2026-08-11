@@ -64,6 +64,26 @@ describe('GitService', () => {
     await expect(service.stage({ projectId: project.id, paths: ['../escape'] })).rejects.toThrow('escapes')
     database.close()
   })
+
+  it('removes embedded credentials and query data from remote URLs before returning renderer state', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-git-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+    await service.initialize({ projectId: project.id })
+    runGit(projectPath, ['remote', 'add', 'origin', 'https://user:ghp_secret_value@github.com/owner/repository.git?token=also-secret#fragment'])
+
+    const status = await service.getStatus({ projectId: project.id })
+    expect(status.remotes).toEqual([{
+      name: 'origin',
+      fetchUrl: 'https://github.com/owner/repository.git',
+      pushUrl: 'https://github.com/owner/repository.git',
+    }])
+    expect(JSON.stringify(status)).not.toContain('secret')
+    database.close()
+  })
 })
 
 function runGit(cwd: string, args: string[]): void {

@@ -40,6 +40,12 @@
 
 app-server 过去继承 Electron 的整个 `process.env`，可能无意携带 CI、Git 或其他服务密钥。现在只传递跨平台系统运行、区域、代理/证书、Codex/OpenAI 认证变量和显式 provider 环境。定向测试证明未授权的 `GITHUB_TOKEN`/任意秘密不会进入子进程；真实 app-server 仍完成 initialize/model-list 并达到 ready。
 
+### 防御性：GitHub CLI 外部写入与环境隔离
+
+PR 工作流不允许 Renderer 提交 cwd、命令或 URL；主进程从 SQLite 与 Git 状态重建项目、head/base 远端和分支。创建前二次确认并显式 push，正文通过 `--body-file -` 走 stdin；完成后只接受同一 HTTPS GitHub host、owner/repository 和数字 PR 路径的结构化回读。`gh` 只继承系统运行、代理/证书、SSH agent 与 GitHub 专属认证变量，1 MiB 输出和超时均失败关闭。Electron 替身记录证明任意、DeepSeek 和 OpenAI 密钥均未进入 `gh`。
+
+Git 状态历史上会原样返回 `git remote -v` URL；若旧仓库把 token 放在 HTTPS userinfo 或 query，可能进入 Renderer 快照。当前在主进程统一清除 username/password/query/fragment，解析失败的 scheme URL直接替换为脱敏占位；定向真实仓库测试证明快照不含测试凭据。
+
 ### 防御性：notice 生成器信任 PATH 和最终符号链接
 
 该脚本只在受信任的 Aster 源码构建中使用，因此独立攻击路径被判定为非报告项；仍完成前瞻加固：子进程通过当前 pinned pnpm 暴露的绝对 `npm_execpath` 运行，不再二次搜索项目 `PATH`；生成目标必须是普通文件并通过同目录临时文件替换，拒绝符号链接；homepage 只允许 HTTP(S)。自动测试确认外部 symlink victim 内容保持不变。

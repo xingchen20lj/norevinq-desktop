@@ -8,8 +8,9 @@
 
 ## 当前任务
 
-- 完成 OpenAI API Key、ChatGPT 浏览器/设备码登录、桌面实测、文档与提交。
-- 继续逐项审计功能一致性表，下一项处理 GitHub PR 创建或工作树 Handoff。
+- 完成 GitHub CLI 认证/远端预检、显式推送、幂等 Pull Request 创建、桌面实测、文档与提交。
+- 创建用户授权的首个私有 GitHub 远端并推送已验证的 `main` 历史。
+- 继续逐项审计功能一致性表，下一项处理工作树 Handoff。
 
 ## 已完成任务
 
@@ -189,11 +190,19 @@
 - 直接启动随应用固定的官方 Codex 0.147.0，在隔离 `CODEX_HOME` 中真实完成假测试 Key 的 login/read/logout、浏览器登录 start/cancel；设备码在线取得官方 URL/代码并立即 cancel，未调用模型或污染用户凭据。
 - 设置页完成账户状态、API Key、浏览器/设备码、取消/重开、退出、令牌刷新和 ChatGPT 用量窗口；离线 Electron E2E 验证 API Key 登录/退出及替身日志脱敏，1320×840 浅色截图无溢出。
 - 认证阶段 `verify:ci`：33 个测试文件 152 项、覆盖率 80.48/69.11/84.96/87.22、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过。
+- 建立独立 GitHub 领域服务：从数据库项目根读取 Git 状态，解析 HTTPS/SSH GitHub 或 Enterprise 远端，分别建模 fork head 与 upstream base，并通过 `gh auth status`/`repo view`/`pr list --json` 完成只读预检。
+- PR 创建必须由 UI 二次确认；主进程先用现有 Git 服务显式 push/set-upstream，再以完整 `--repo/--base/--head/--title/--body-file -` 无提示参数创建，正文只走 stdin，不出现在进程参数。
+- 创建后不信任 `gh pr create` 文本输出，而重新读取结构化 PR 并校验 HTTPS host、owner/repository、编号和分支；同项目并发操作合并，重复调用返回既有 PR，不重复创建。
+- `gh` 子进程环境收紧到系统、代理/证书和 GitHub 认证白名单；DeepSeek/OpenAI/任意环境密钥不会继承，CLI 输出限 1 MiB，普通操作 30 秒、创建 120 秒且错误脱敏。
+- Git remote 快照在进入共享领域层前清除 URL userinfo、query 与 fragment；旧仓库即使把 token 写入远端 URL也不会向 Renderer 暴露。
+- 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
+- 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
+- GitHub PR 阶段最终 `verify:ci`：34 个测试文件 158 项、覆盖率 80.62/69.20/85.37/87.50、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
 
 ## 下一任务
 
-1. 评估并实现 GitHub PR 创建的公开 CLI 闭环。
-2. 随后处理工作树 Handoff 与剩余部分实现项。
+1. 创建私有 GitHub 仓库 `xingchen20lj/aster-code-desktop` 并首次推送已验证 `main` 历史。
+2. 处理工作树 Handoff 与剩余部分实现项。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -207,6 +216,7 @@
 - Codex：正式运行协议只使用 app-server stdio，不解析 TUI 文本。
 - DeepSeek：优先通过 Codex 自定义 Responses provider 形成完整智能体闭环；同时保留独立能力探测与直接连接诊断层，不静默假设模型能力。
 - Git：所有命令使用参数数组且限制 cwd；工作树使用 detached HEAD 起步，并保存可恢复快照元数据。
+- GitHub：CLI 只在主进程运行；head/base 远端由登记仓库状态重建，PR 描述走 stdin，显式 push 和用户确认后才允许外部写入，创建结果必须结构化回读验证且保持幂等。
 - 安全扫描输出必须位于被扫描工作树之外，并使用私有权限目录。
 - Codex Security 只接受 completed + sealed SDK 结果；cost limit、中断和 contract 失败保留失败状态，不展示部分 finding。
 - Security validate/patch/false-positive/export 使用官方 CLI 参数数组；patch 必须显式确认，renderer 不能提交路径或命令。
@@ -223,7 +233,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 33 个测试文件 152 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户生命周期、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 34 个测试文件 158 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
