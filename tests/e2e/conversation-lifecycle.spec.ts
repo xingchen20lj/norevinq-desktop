@@ -48,6 +48,16 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
       app.emit('second-instance', { preventDefault: () => undefined }, [url], '', {})
     }, `aster-code://thread/${secondaryThreadId}?project=${project.id}`)
     await expect(window.locator('.topbar-title')).toContainText('Lifecycle secondary')
+    const permissionPanel = window.getByRole('region', { name: '待审批操作' })
+    await expect(permissionPanel).toContainText('授予额外权限？')
+    await expect(permissionPanel).toContainText('网络访问')
+    await expect(permissionPanel).toContainText('generated/**')
+    await window.screenshot({ path: 'test-results/aster-permission-approval.png' })
+    const readPermission = permissionPanel.locator('label').filter({ hasText: '读取' }).getByRole('checkbox')
+    await readPermission.uncheck()
+    await expect(readPermission).not.toBeChecked()
+    await permissionPanel.getByRole('button', { name: '本次会话允许' }).click()
+    await expect(permissionPanel).toHaveCount(0)
 
     await window.getByLabel('搜索任务').fill('secondary')
     await window.getByLabel('搜索任务').press('Enter')
@@ -113,6 +123,17 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     ]))
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.cursor === 'page-2')).toBe(true)
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.searchTerm === 'secondary')).toBe(true)
+    expect(requests.find(({ method }) => method === 'client/permission-response')?.params).toEqual({
+      permissions: {
+        network: { enabled: true },
+        fileSystem: {
+          read: null,
+          write: null,
+          entries: [{ path: { type: 'glob_pattern', pattern: `${projectPath}/generated/**` }, access: 'write' }],
+        },
+      },
+      scope: 'session',
+    })
   } finally {
     await application.close()
     rmSync(profile, { force: true, recursive: true })

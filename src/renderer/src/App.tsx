@@ -42,6 +42,7 @@ import type { AgentActivity, AgentActivityState } from '../../shared/agent'
 import type { BootstrapState, DeepLinkTarget, ProjectSummary } from '../../shared/contracts'
 import type {
   ConversationSnapshot,
+  ApprovalDecision,
   PendingApproval,
   ThreadGoal,
   ThreadGoalStatus,
@@ -1347,15 +1348,36 @@ function IntegrationRequestPanel({ request, onError }: {
 }
 
 function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onError: (message: string) => void }): React.JSX.Element {
-  async function decide(decision: 'accept' | 'acceptForSession' | 'decline'): Promise<void> {
-    try { await window.aster.resolveApproval({ requestId: approval.requestId, decision }) }
+  const [selectedPermissions, setSelectedPermissions] = useState(() =>
+    new Set(approval.permissions.map(({ id }) => id)))
+  async function decide(decision: ApprovalDecision): Promise<void> {
+    try {
+      await window.aster.resolveApproval({
+        requestId: approval.requestId,
+        decision,
+        ...(approval.kind === 'permissions' ? { grantedPermissionIds: [...selectedPermissions] } : {}),
+      })
+    }
     catch (reason) { onError(toErrorMessage(reason)) }
   }
   return <section className="approval-panel" aria-label="待审批操作">
-    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : '允许修改文件？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Codex 请求继续执行受保护操作。'}</p></div>
+    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Codex 请求继续执行受保护操作。'}</p>
+      {approval.kind === 'permissions' && <div className="permission-request-list">{approval.permissions.map((permission) => <label key={permission.id}>
+        <input type="checkbox" checked={selectedPermissions.has(permission.id)} onChange={(event) => {
+          const checked = event.currentTarget.checked
+          setSelectedPermissions((current) => {
+          const next = new Set(current)
+          if (checked) next.add(permission.id)
+          else next.delete(permission.id)
+          return next
+          })
+        }} />
+        <span><b>{permission.access === 'network' ? '网络' : permission.access === 'read' ? '读取' : permission.access === 'write' ? '写入' : '拒绝规则'}</b><code title={permission.target}>{permission.target}</code></span>
+      </label>)}</div>}
+    </div>
     <button onClick={() => void decide('decline')}><X size={14} />拒绝</button>
-    <button onClick={() => void decide('acceptForSession')}>本次会话允许</button>
-    <button className="approve" onClick={() => void decide('accept')}><Check size={14} />允许</button>
+    <button onClick={() => void decide('acceptForSession')} disabled={approval.kind === 'permissions' && selectedPermissions.size === 0}>本次会话允许</button>
+    <button className="approve" onClick={() => void decide('accept')} disabled={approval.kind === 'permissions' && selectedPermissions.size === 0}><Check size={14} />{approval.kind === 'permissions' ? '本回合允许' : '允许'}</button>
   </section>
 }
 

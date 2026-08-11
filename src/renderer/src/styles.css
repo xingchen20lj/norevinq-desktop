@@ -189,6 +189,11 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .approval-panel p { overflow: hidden; margin: 4px 0 0; color: var(--muted); font: 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; text-overflow: ellipsis; white-space: nowrap; }
 .approval-panel button { display: flex; flex: none; align-items: center; gap: 4px; height: 29px; padding: 0 9px; border: 1px solid var(--border); border-radius: 7px; color: var(--muted); background: var(--surface-2); font-size: 10.5px; cursor: pointer; }
 .approval-panel button.approve { border-color: transparent; color: #fff; background: var(--accent); }
+.permission-request-list { display: grid; max-height: 150px; margin-top: 8px; padding: 7px; overflow: auto; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); gap: 5px; }
+.permission-request-list label { display: flex; min-width: 0; align-items: center; gap: 7px; color: var(--muted); font-size: 10.5px; }
+.permission-request-list label > span { display: flex; min-width: 0; align-items: center; gap: 7px; }
+.permission-request-list b { min-width: 34px; color: var(--text); font-size: 10px; }
+.permission-request-list code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(4, 6, 9, .58); backdrop-filter: blur(5px); }
 .workbench-loading { position: absolute; z-index: 18; inset: 45px 0 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); background: color-mix(in srgb, var(--bg) 92%, transparent); font-size: 10px; }

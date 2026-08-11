@@ -18,8 +18,16 @@ export type ConversationThreadSummary = {
   pinned: boolean
 }
 
-export type ApprovalKind = 'command' | 'fileChange'
+export type ApprovalKind = 'command' | 'fileChange' | 'permissions'
 export type ApprovalDecision = 'accept' | 'acceptForSession' | 'decline' | 'cancel'
+
+export type RequestedPermission = {
+  id: string
+  kind: 'network' | 'fileSystem'
+  access: 'network' | 'read' | 'write' | 'deny'
+  target: string
+  targetKind: 'network' | 'path' | 'glob' | 'special'
+}
 
 export type PendingApproval = {
   requestId: string
@@ -32,6 +40,8 @@ export type PendingApproval = {
   command: string | null
   cwd: string | null
   grantRoot: string | null
+  environmentId: string | null
+  permissions: RequestedPermission[]
 }
 
 export type ThreadGoalStatus = 'active' | 'paused' | 'blocked' | 'usageLimited' | 'budgetLimited' | 'complete'
@@ -120,6 +130,7 @@ export type InterruptTurnInput = {
 export type ResolveApprovalInput = {
   requestId: string
   decision: ApprovalDecision
+  grantedPermissionIds?: string[]
 }
 
 export type ConversationSubscription = (snapshot: ConversationSnapshot) => void

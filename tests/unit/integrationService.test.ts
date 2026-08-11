@@ -98,6 +98,9 @@ class FakeRuntime {
       }
     }
     if (method === 'configRequirements/read') return { requirements: { allowedSandboxModes: ['workspace-write'] } }
+    if (method === 'permissionProfile/list') {
+      return { data: [{ id: ':workspace', description: 'Workspace read/write', allowed: true }], nextCursor: null }
+    }
     if (method === 'mcpServer/resource/read') {
       return { contents: [{ uri: 'docs://readme', mimeType: 'text/plain', text: 'RESOURCE_OK' }] }
     }

@@ -11,6 +11,8 @@
 - 官方没有独立协议 semver。客户端必须组合 `codex --version`、initialize 返回的 `userAgent`、同一二进制生成的 stable TypeScript/JSON Schema 与兼容测试判断支持范围。
 - 新实现只采用 v2。渲染器不导入上游原始类型，而消费内部领域事件。
 - 审批是 app-server 发给客户端的带 id 请求，客户端必须使用 request id 和 thread/turn/item 上下文关联后返回结果。
+- 0.147.0 稳定协议提供 `permissionProfile/list` 与 `item/permissions/requestApproval`。请求可包含网络开关、文件系统读写根和 path/glob/special 条目；响应必须回传原请求权限的子集及 `turn` 或 `session` scope，省略项即拒绝。
+- 权限 profile 是服务器/组织策略目录，不足以代替逐请求审批。客户端不得允许 Renderer 自行构造授权路径；应把请求映射为不透明选项 ID，并在可信主进程按原始请求重建响应。
 - 运行中 app-server 崩溃不能盲目重放 turn，避免重复执行副作用；活动 turn 标记失败并允许显式恢复，空闲连接才自动重建订阅。
 
 来源：

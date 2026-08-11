@@ -298,6 +298,11 @@ function ConfigTab({ project, snapshot, busy, run }: {
     </div>
     <h4>项目指令</h4>
     {snapshot?.instructions.length ? snapshot.instructions.map((instruction) => <details className="config-layer" key={instruction.path}><summary><FileText size={12} />{instruction.path}<span>{instruction.bytes} bytes</span></summary><pre>{instruction.preview}</pre></details>) : <p className="integration-empty">项目根目录没有 AGENTS.md 或 AGENTS.override.md；Codex 仍会按其层级规则寻找指令。</p>}
+    <h4>权限配置</h4>
+    {snapshot?.permissionProfiles.length ? <div className="skill-list permission-profile-list">{snapshot.permissionProfiles.map((profile) => <article key={profile.id}>
+      <div><strong>{profile.id}</strong><span>{profile.allowed ? '允许选择' : '被管理要求禁用'}</span></div>
+      <p>{profile.description ?? '没有提供说明。'}</p>
+    </article>)}</div> : <p className="integration-empty">app-server 没有报告可用权限 profile。</p>}
     <h4>配置层</h4>
     {config?.layers.map((layer) => <details className="config-layer" key={`${layer.kind}:${layer.label}:${layer.version}`}><summary><Layers3 size={12} />{layer.kind}<span title={layer.label}>{layer.label}</span></summary><pre>{formatJson(layer.config)}</pre>{layer.disabledReason && <p>{layer.disabledReason}</p>}</details>)}
     <h4>托管要求</h4>

@@ -10,6 +10,7 @@ import type {
   InterruptTurnInput,
   LoadProjectConversationsInput,
   PendingApproval,
+  RequestedPermission,
   RenameConversationInput,
   ResolveApprovalInput,
   SetConversationPinnedInput,
@@ -35,7 +36,22 @@ type RuntimePort = {
 
 type ApprovalResolver = {
   resolve: (result: JsonValue) => void
+  resultFor: (input: ResolveApprovalInput) => JsonValue
+  cancelResult: JsonValue
 }
+
+type PermissionOption = RequestedPermission & {
+  section: 'network' | 'legacyRead' | 'legacyWrite' | 'entry'
+  raw: JsonValue
+}
+
+type ParsedPermissionRequest = {
+  options: PermissionOption[]
+  globScanMaxDepth: number | null
+}
+
+const MAX_PERMISSION_OPTIONS = 64
+const MAX_PERMISSION_TEXT = 4_096
 
 export class AgentService {
   readonly #runtime: RuntimePort
@@ -69,6 +85,10 @@ export class AgentService {
       runtime.registerRequestHandler(
         'item/fileChange/requestApproval',
         (params, context) => this.#requestApproval('fileChange', params, context.id),
+      ),
+      runtime.registerRequestHandler(
+        'item/permissions/requestApproval',
+        (params, context) => this.#requestPermissionsApproval(params, context.id),
       ),
     ]
   }
@@ -372,7 +392,7 @@ export class AgentService {
   resolveApproval(input: ResolveApprovalInput): ConversationSnapshot {
     const resolver = this.#approvalResolvers.get(input.requestId)
     if (!resolver) throw new Error('The approval request is no longer pending.')
-    resolver.resolve({ decision: input.decision })
+    resolver.resolve(resolver.resultFor(input))
     this.#approvalResolvers.delete(input.requestId)
     this.#update({ approvals: this.#snapshot.approvals.filter(({ requestId }) => requestId !== input.requestId) })
     return this.#snapshot
@@ -380,7 +400,7 @@ export class AgentService {
 
   dispose(): void {
     for (const dispose of this.#disposeRuntime.splice(0)) dispose()
-    for (const resolver of this.#approvalResolvers.values()) resolver.resolve({ decision: 'cancel' })
+    for (const resolver of this.#approvalResolvers.values()) resolver.resolve(resolver.cancelResult)
     this.#approvalResolvers.clear()
     for (const turnKey of this.#activeTurns) {
       this.#runtime.markTurnCompleted()
@@ -555,9 +575,53 @@ export class AgentService {
       command: optionalString(params.command),
       cwd: optionalString(params.cwd),
       grantRoot: optionalString(params.grantRoot),
+      environmentId: optionalString(params.environmentId),
+      permissions: [],
     }
     return new Promise<JsonValue>((resolve) => {
-      this.#approvalResolvers.set(requestId, { resolve })
+      this.#approvalResolvers.set(requestId, {
+        resolve,
+        resultFor: ({ decision }) => ({ decision }),
+        cancelResult: { decision: 'cancel' },
+      })
+      this.#update({ approvals: [...this.#snapshot.approvals, approval] })
+    })
+  }
+
+  #requestPermissionsApproval(
+    rawParams: JsonValue | undefined,
+    requestIdValue: number | string,
+  ): Promise<JsonValue> {
+    const params = asRecord(rawParams)
+    const requestId = String(requestIdValue)
+    const parsed = parsePermissionRequest(params.permissions)
+    if (parsed.options.length === 0) return Promise.resolve({ permissions: {}, scope: 'turn' })
+    const approval: PendingApproval = {
+      requestId,
+      kind: 'permissions',
+      threadId: requireString(params.threadId, 'approval.threadId'),
+      turnId: requireString(params.turnId, 'approval.turnId'),
+      itemId: requireString(params.itemId, 'approval.itemId'),
+      startedAtMs: typeof params.startedAtMs === 'number' ? params.startedAtMs : Date.now(),
+      reason: boundedOptionalString(params.reason),
+      command: null,
+      cwd: boundedOptionalString(params.cwd),
+      grantRoot: null,
+      environmentId: boundedOptionalString(params.environmentId),
+      permissions: parsed.options.map(({ id, kind, access, target, targetKind }) => ({
+        id,
+        kind,
+        access,
+        target,
+        targetKind,
+      })),
+    }
+    return new Promise<JsonValue>((resolve) => {
+      this.#approvalResolvers.set(requestId, {
+        resolve,
+        resultFor: (input) => permissionApprovalResult(input, parsed),
+        cancelResult: { permissions: {}, scope: 'turn' },
+      })
       this.#update({ approvals: [...this.#snapshot.approvals, approval] })
     })
   }
@@ -777,6 +841,162 @@ function requireString(value: unknown, label: string): string {
 
 function optionalString(value: unknown): string | null {
   return typeof value === 'string' ? value : null
+}
+
+function boundedOptionalString(value: unknown): string | null {
+  return typeof value === 'string' ? value.slice(0, MAX_PERMISSION_TEXT) : null
+}
+
+function parsePermissionRequest(value: unknown): ParsedPermissionRequest {
+  const profile = asRecord(value)
+  const options: PermissionOption[] = []
+  const network = asOptionalRecord(profile.network)
+  if (network?.enabled === true) {
+    options.push({
+      id: 'network',
+      kind: 'network',
+      access: 'network',
+      target: '网络访问',
+      targetKind: 'network',
+      section: 'network',
+      raw: { enabled: true },
+    })
+  }
+
+  const fileSystem = asOptionalRecord(profile.fileSystem)
+  if (!fileSystem) return { options, globScanMaxDepth: null }
+  for (const target of boundedStringArray(fileSystem.read)) {
+    options.push(permissionPathOption(options.length, 'read', target, 'legacyRead', target))
+  }
+  for (const target of boundedStringArray(fileSystem.write)) {
+    options.push(permissionPathOption(options.length, 'write', target, 'legacyWrite', target))
+  }
+  for (const value of asArray(fileSystem.entries)) {
+    if (options.length >= MAX_PERMISSION_OPTIONS) break
+    const entry = asRecord(value)
+    const access = entry.access
+    if (access !== 'read' && access !== 'write' && access !== 'deny') continue
+    const parsedPath = parsePermissionPath(entry.path)
+    if (!parsedPath) continue
+    options.push({
+      id: `filesystem-${String(options.length)}`,
+      kind: 'fileSystem',
+      access,
+      target: parsedPath.target,
+      targetKind: parsedPath.targetKind,
+      section: 'entry',
+      raw: { access, path: parsedPath.raw },
+    })
+  }
+  const depth = fileSystem.globScanMaxDepth
+  return {
+    options: options.slice(0, MAX_PERMISSION_OPTIONS),
+    globScanMaxDepth: Number.isSafeInteger(depth) && typeof depth === 'number' && depth >= 0 ? depth : null,
+  }
+}
+
+function boundedStringArray(value: unknown): string[] {
+  return asArray(value)
+    .filter((item): item is string => typeof item === 'string' && item.length > 0)
+    .slice(0, MAX_PERMISSION_OPTIONS)
+    .map((item) => item.slice(0, MAX_PERMISSION_TEXT))
+}
+
+function permissionPathOption(
+  index: number,
+  access: 'read' | 'write',
+  target: string,
+  section: 'legacyRead' | 'legacyWrite',
+  raw: string,
+): PermissionOption {
+  return {
+    id: `filesystem-${String(index)}`,
+    kind: 'fileSystem',
+    access,
+    target,
+    targetKind: 'path',
+    section,
+    raw,
+  }
+}
+
+function parsePermissionPath(value: unknown): {
+  target: string
+  targetKind: RequestedPermission['targetKind']
+  raw: JsonValue
+} | null {
+  const path = asOptionalRecord(value)
+  if (!path) return null
+  if (path.type === 'path' && typeof path.path === 'string' && path.path) {
+    const target = path.path.slice(0, MAX_PERMISSION_TEXT)
+    return { target, targetKind: 'path', raw: { type: 'path', path: target } }
+  }
+  if (path.type === 'glob_pattern' && typeof path.pattern === 'string' && path.pattern) {
+    const target = path.pattern.slice(0, MAX_PERMISSION_TEXT)
+    return { target, targetKind: 'glob', raw: { type: 'glob_pattern', pattern: target } }
+  }
+  if (path.type !== 'special') return null
+  const special = asOptionalRecord(path.value)
+  if (!special || typeof special.kind !== 'string') return null
+  const kind = special.kind.slice(0, 64)
+  const subpath = typeof special.subpath === 'string' ? special.subpath.slice(0, MAX_PERMISSION_TEXT) : null
+  if (kind === 'root' || kind === 'minimal' || kind === 'tmpdir' || kind === 'slash_tmp') {
+    return { target: kind, targetKind: 'special', raw: { type: 'special', value: { kind } } }
+  }
+  if (kind === 'project_roots') {
+    return {
+      target: subpath ? `project_roots/${subpath}` : 'project_roots',
+      targetKind: 'special',
+      raw: { type: 'special', value: { kind, subpath } },
+    }
+  }
+  if (kind === 'unknown' && typeof special.path === 'string') {
+    const unknownPath = special.path.slice(0, MAX_PERMISSION_TEXT)
+    return {
+      target: subpath ? `${unknownPath}/${subpath}` : unknownPath,
+      targetKind: 'special',
+      raw: { type: 'special', value: { kind, path: unknownPath, subpath } },
+    }
+  }
+  return null
+}
+
+function permissionApprovalResult(
+  input: ResolveApprovalInput,
+  request: ParsedPermissionRequest,
+): JsonValue {
+  if (input.decision === 'decline' || input.decision === 'cancel') {
+    return { permissions: {}, scope: 'turn' }
+  }
+  const available = new Map(request.options.map((option) => [option.id, option]))
+  const requestedIds = input.grantedPermissionIds ?? request.options.map(({ id }) => id)
+  const selectedIds = [...new Set(requestedIds)]
+  if (selectedIds.length > MAX_PERMISSION_OPTIONS) throw new Error('Too many permission grants were selected.')
+  for (const id of selectedIds) {
+    if (!available.has(id)) throw new Error('A selected permission is no longer part of this request.')
+  }
+  const selected = selectedIds.map((id) => available.get(id)).filter((value): value is PermissionOption => Boolean(value))
+  const permissions: Record<string, JsonValue> = {}
+  if (selected.some(({ section }) => section === 'network')) permissions.network = { enabled: true }
+  const fileSystemOptions = selected.filter(({ kind }) => kind === 'fileSystem')
+  if (fileSystemOptions.length > 0) {
+    const read = fileSystemOptions.filter(({ section }) => section === 'legacyRead').map(({ raw }) => raw)
+    const write = fileSystemOptions.filter(({ section }) => section === 'legacyWrite').map(({ raw }) => raw)
+    const entries = fileSystemOptions.filter(({ section }) => section === 'entry').map(({ raw }) => raw)
+    const fileSystem: Record<string, JsonValue> = {
+      read: read.length > 0 ? read : null,
+      write: write.length > 0 ? write : null,
+    }
+    if (entries.length > 0) fileSystem.entries = entries
+    if (entries.length > 0 && request.globScanMaxDepth !== null) {
+      fileSystem.globScanMaxDepth = request.globScanMaxDepth
+    }
+    permissions.fileSystem = fileSystem
+  }
+  return {
+    permissions,
+    scope: input.decision === 'acceptForSession' ? 'session' : 'turn',
+  }
 }
 
 function optionalNumber(value: unknown): number | null {

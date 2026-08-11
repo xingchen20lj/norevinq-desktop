@@ -97,6 +97,12 @@ export type ProjectInstructionSummary = {
   truncated: boolean
 }
 
+export type PermissionProfileSummary = {
+  id: string
+  description: string | null
+  allowed: boolean
+}
+
 export type PendingIntegrationRequest =
   | {
     id: string
@@ -137,6 +143,7 @@ export type IntegrationSnapshot = {
   extraSkillRoots: string[]
   config: EffectiveConfigSummary | null
   instructions: ProjectInstructionSummary[]
+  permissionProfiles: PermissionProfileSummary[]
   pendingRequests: PendingIntegrationRequest[]
   lastOAuthCompletion: { name: string; success: boolean; error: string | null } | null
   error: string | null

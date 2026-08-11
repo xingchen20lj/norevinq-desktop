@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })))
 })
 
-test('official Codex app-server performs thread naming, search, fork, archive, restore, and delete', async () => {
+test('official Codex app-server exposes permission profiles and performs the thread lifecycle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'aster-codex-lifecycle-'))
   temporaryRoots.push(root)
   const codexHome = join(root, 'codex-home')
@@ -42,6 +42,13 @@ test('official Codex app-server performs thread naming, search, fork, archive, r
       capabilities: {},
     })
     await peer.notify('initialized')
+    const profiles = asRecord(await peer.request('permissionProfile/list', { cwd: projectPath, limit: 100 }))
+    const profileRows = asArray(profiles.data)
+    expect(profileRows.length).toBeGreaterThan(0)
+    expect(profileRows.every((value) => {
+      const profile = asRecord(value)
+      return typeof profile.id === 'string' && typeof profile.allowed === 'boolean'
+    })).toBe(true)
     const started = asRecord(await peer.request('thread/start', {
       approvalPolicy: 'never',
       cwd: projectPath,

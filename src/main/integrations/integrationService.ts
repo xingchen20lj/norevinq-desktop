@@ -13,6 +13,7 @@ import type {
   McpToolCallInput,
   McpToolCallResult,
   PendingIntegrationRequest,
+  PermissionProfileSummary,
   ResolveIntegrationRequestInput,
   SafeConfigKey,
   SkillLoadError,
@@ -115,11 +116,12 @@ export class IntegrationService {
     this.#update({ projectId, cwd: project.path, trusted: project.trusted, loading: true, error: null })
     try {
       await this.#runtime.start()
-      const [mcpServers, skillData, config, requirements] = await Promise.all([
+      const [mcpServers, skillData, config, requirements, permissionProfiles] = await Promise.all([
         this.#listMcpServers(threadId),
         this.#runtime.request('skills/list', { cwds: [project.path], forceReload }),
         this.#runtime.request('config/read', { cwd: project.path, includeLayers: true }),
         this.#runtime.request('configRequirements/read'),
+        this.#runtime.request('permissionProfile/list', { cwd: project.path, limit: 100 }),
       ])
       const { skills, errors } = parseSkills(skillData, project.path)
       this.#update({
@@ -129,6 +131,7 @@ export class IntegrationService {
         skillErrors: errors,
         config: parseConfig(config, requirements),
         instructions: discoverProjectInstructions(project.path),
+        permissionProfiles: parsePermissionProfiles(permissionProfiles),
         error: null,
       })
     } catch (error: unknown) {
@@ -456,10 +459,22 @@ function emptySnapshot(): IntegrationSnapshot {
     extraSkillRoots: [],
     config: null,
     instructions: [],
+    permissionProfiles: [],
     pendingRequests: [],
     lastOAuthCompletion: null,
     error: null,
   }
+}
+
+function parsePermissionProfiles(value: unknown): PermissionProfileSummary[] {
+  return asArray(asRecord(value).data).slice(0, 100).map((item) => {
+    const profile = asRecord(item)
+    return {
+      id: asString(profile.id, 'unknown').slice(0, 128),
+      description: typeof profile.description === 'string' ? profile.description.slice(0, 2_048) : null,
+      allowed: profile.allowed === true,
+    }
+  })
 }
 
 function parseMcpServer(value: unknown): McpServerSummary {

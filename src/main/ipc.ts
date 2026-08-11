@@ -400,8 +400,14 @@ export function registerIpc(
     agent.steerTurn(steerTurnSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.conversationInterrupt, (_event, input: unknown) =>
     agent.interruptTurn(interruptTurnSchema.parse(input)))
-  ipcMain.handle(IPC_CHANNELS.conversationApprovalResolve, (_event, input: unknown) =>
-    agent.resolveApproval(resolveApprovalSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.conversationApprovalResolve, (_event, input: unknown) => {
+    const parsed = resolveApprovalSchema.parse(input)
+    return agent.resolveApproval({
+      requestId: parsed.requestId,
+      decision: parsed.decision,
+      ...(parsed.grantedPermissionIds ? { grantedPermissionIds: parsed.grantedPermissionIds } : {}),
+    })
+  })
   ipcMain.handle(IPC_CHANNELS.providerDeepSeekSave, (_event, input: unknown) => {
     const parsed: SaveDeepSeekCredentialInput = saveDeepSeekCredentialSchema.parse(input)
     return providers.saveDeepSeekCredential(parsed.apiKey)
@@ -759,6 +765,7 @@ const interruptTurnSchema = z.object({
 const resolveApprovalSchema = z.object({
   requestId: z.string().min(1).max(200),
   decision: z.enum(['accept', 'acceptForSession', 'decline', 'cancel']),
+  grantedPermissionIds: z.array(z.string().regex(/^(?:network|filesystem-[0-9]{1,3})$/u)).max(64).optional(),
 })
 const saveDeepSeekCredentialSchema = z.object({ apiKey: z.string().trim().min(16).max(512) })
 const gitPathSchema = z.string().min(1).max(4_096).refine((value) => !value.includes('\0'))

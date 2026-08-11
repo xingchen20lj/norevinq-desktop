@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { appendFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 
 if (process.argv.includes('--version')) {
@@ -9,6 +9,7 @@ if (process.argv.includes('--version')) {
 }
 
 const cwd = process.cwd()
+const permissionRoot = process.env.CODEX_HOME ? resolve(process.env.CODEX_HOME, '..', 'project') : cwd
 const logPath = join(process.env.CODEX_HOME ?? cwd, 'fake-lifecycle-requests.jsonl')
 const primaryThreadId = '11111111-1111-7111-8111-111111111111'
 const secondaryThreadId = '22222222-2222-7222-8222-222222222222'
@@ -19,10 +20,15 @@ const threads = new Map([
 ])
 const archived = new Set()
 const goals = new Map()
+let permissionRequestSent = false
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue
   const message = JSON.parse(line)
+  if (message.id === 900 && typeof message.method !== 'string') {
+    appendFileSync(logPath, `${JSON.stringify({ method: 'client/permission-response', params: message.result ?? null })}\n`)
+    continue
+  }
   if (typeof message.method !== 'string') continue
   appendFileSync(logPath, `${JSON.stringify({ method: message.method, params: message.params ?? null })}\n`)
   if (!Object.hasOwn(message, 'id')) continue
@@ -37,7 +43,14 @@ function handle(method, params) {
   if (method === 'initialize') return { userAgent: 'fake-codex/0.147.0', platformFamily: process.platform, platformOs: process.platform }
   if (method === 'model/list') return { data: [{ id: 'fake-model', displayName: 'Fake Model', isDefault: true, defaultReasoningEffort: 'medium', supportedReasoningEfforts: ['medium'], inputModalities: ['text'] }] }
   if (method === 'thread/list') return listThreads(params)
-  if (method === 'thread/read' || method === 'thread/resume') return { thread: requireThread(params.threadId) }
+  if (method === 'thread/read' || method === 'thread/resume') {
+    const thread = requireThread(params.threadId)
+    if (method === 'thread/resume' && thread.id === secondaryThreadId && !permissionRequestSent) {
+      permissionRequestSent = true
+      queueMicrotask(() => requestPermission(thread.id))
+    }
+    return { thread }
+  }
   if (method === 'thread/goal/get') return { goal: goals.get(params.threadId) ?? null }
   if (method === 'thread/goal/set') {
     requireThread(params.threadId)
@@ -115,6 +128,30 @@ function listThreads(params) {
   if (search || wantsArchived || matches.length < 2) return { data: matches, nextCursor: null, backwardsCursor: null }
   if (params.cursor === 'page-2') return { data: matches.slice(1), nextCursor: null, backwardsCursor: 'back-2' }
   return { data: matches.slice(0, 1), nextCursor: 'page-2', backwardsCursor: null }
+}
+
+function requestPermission(threadId) {
+  process.stdout.write(`${JSON.stringify({
+    id: 900,
+    method: 'item/permissions/requestApproval',
+    params: {
+      threadId,
+      turnId: 'turn-permission',
+      itemId: 'permission-item',
+      environmentId: 'local',
+      startedAtMs: Date.now(),
+      cwd,
+      reason: 'Allow a scoped package operation',
+      permissions: {
+        network: { enabled: true },
+        fileSystem: {
+          read: [`${permissionRoot}/shared-read`],
+          write: null,
+          entries: [{ path: { type: 'glob_pattern', pattern: `${permissionRoot}/generated/**` }, access: 'write' }],
+        },
+      },
+    },
+  })}\n`)
 }
 
 function makeThread(id, name, updatedAt) {

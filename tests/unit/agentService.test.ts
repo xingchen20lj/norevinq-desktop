@@ -109,6 +109,94 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('grants only the selected network and path permission subset with explicit scope', async () => {
+    const { database } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    const response = runtime.requestFromServer('item/permissions/requestApproval', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'permission-1',
+      environmentId: 'local',
+      startedAtMs: 123,
+      cwd: '/project',
+      reason: 'Install and write generated output',
+      permissions: {
+        network: { enabled: true },
+        fileSystem: {
+          read: ['/shared/read'],
+          write: ['/shared/write'],
+          globScanMaxDepth: 4,
+          entries: [
+            { path: { type: 'glob_pattern', pattern: '/generated/**' }, access: 'write' },
+            { path: { type: 'special', value: { kind: 'tmpdir' } }, access: 'read' },
+          ],
+        },
+      },
+    }, { id: 45, method: 'item/permissions/requestApproval' })
+
+    const approval = service.getSnapshot().approvals[0]
+    expect(approval).toMatchObject({
+      requestId: '45',
+      kind: 'permissions',
+      environmentId: 'local',
+      permissions: [
+        { id: 'network', access: 'network', target: '网络访问' },
+        { access: 'read', target: '/shared/read' },
+        { access: 'write', target: '/shared/write' },
+        { access: 'write', target: '/generated/**', targetKind: 'glob' },
+        { access: 'read', target: 'tmpdir', targetKind: 'special' },
+      ],
+    })
+    const globId = approval?.permissions.find(({ target }) => target === '/generated/**')?.id
+    expect(() => service.resolveApproval({
+      requestId: '45',
+      decision: 'accept',
+      grantedPermissionIds: ['filesystem-999'],
+    })).toThrow('no longer part of this request')
+    expect(service.getSnapshot().approvals).toHaveLength(1)
+    service.resolveApproval({
+      requestId: '45',
+      decision: 'acceptForSession',
+      grantedPermissionIds: ['network', globId ?? 'missing'],
+    })
+    await expect(response).resolves.toEqual({
+      permissions: {
+        network: { enabled: true },
+        fileSystem: {
+          read: null,
+          write: null,
+          entries: [{ path: { type: 'glob_pattern', pattern: '/generated/**' }, access: 'write' }],
+          globScanMaxDepth: 4,
+        },
+      },
+      scope: 'session',
+    })
+    expect(service.getSnapshot().approvals).toEqual([])
+    service.dispose()
+    database.close()
+  })
+
+  it('returns an empty turn-scoped grant when a permission request is declined', async () => {
+    const { database } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    const response = runtime.requestFromServer('item/permissions/requestApproval', {
+      threadId: 'thread-1',
+      turnId: 'turn-1',
+      itemId: 'permission-2',
+      environmentId: null,
+      startedAtMs: 123,
+      cwd: '/project',
+      reason: 'Needs the network',
+      permissions: { network: { enabled: true }, fileSystem: null },
+    }, { id: 46, method: 'item/permissions/requestApproval' })
+    service.resolveApproval({ requestId: '46', decision: 'decline' })
+    await expect(response).resolves.toEqual({ permissions: {}, scope: 'turn' })
+    service.dispose()
+    database.close()
+  })
+
   it('lists, resumes, steers, and interrupts project conversations', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
