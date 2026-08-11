@@ -203,7 +203,7 @@
 - 第二次真实桌面测试已由 Aster 成功推送 `codex/github-pr-validation` 并创建 Draft PR #1，但创建后验证错误使用 `gh pr list --head owner:branch` 而未识别结果；改为纯分支过滤并严格匹配 `headRepositoryOwner.login`，避免重复创建和 fork 同名分支误认。
 - 第三次真实 Electron 回归通过 Aster 自身重新读取私有 GitHub Draft PR #1，精确验证仓库 `xingchen20lj/aster-code-desktop`、head `codex/github-pr-validation`、base `main`、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
 - 实际检查真实 PR 完成态截图：GitHub 登录、origin head/base、Draft 卡片和“在 GitHub 打开”在 1320×840 浅色界面无明显溢出或错位。
-- 首次 GitHub Actions 远端运行准确暴露跨平台 notices 漂移：pnpm 将 Codex 与 `@napi-rs/canvas` 原生 alias 报告为不同的 `darwin-*`/`win32-*` 名称或版本；生成器现规范化为相同上游组件，macOS/Windows 输出保持确定性。
+- 首次 GitHub Actions 远端运行准确暴露跨平台 notices 漂移：pnpm 将 Codex 与 `@napi-rs/canvas` 原生 alias 报告为不同的 `darwin-*`/`win32-*` 名称或版本，Windows checkout 还会物化 CRLF；生成器现规范化相同上游组件并以逻辑换行比较，macOS/Windows 输出保持确定性。
 - CI 的 feature branch `push` 与 `pull_request` 双触发已收敛为仅 `main` push + PR，单次 PR 更新不再重复执行两组矩阵并发送重复通知；本地完整 `verify:ci` 再次通过。
 
 ## 下一任务

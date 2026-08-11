@@ -53,7 +53,10 @@ const expected = `${lines.join('\n')}`
 
 if (checkOnly) {
   const current = await readFile(outputPath, 'utf8').catch(() => '')
-  if (current !== expected) {
+  // Git may materialize text files with CRLF on Windows runners. Notices are
+  // content-addressed at the logical text level, so line-ending conversion is
+  // not dependency drift.
+  if (current.replace(/\r\n?/gu, '\n') !== expected) {
     throw new Error('THIRD_PARTY_NOTICES.md is stale. Run pnpm notices:generate.')
   }
   console.log(`Third-party notices are current (${String(packages.length)} packages).`)
