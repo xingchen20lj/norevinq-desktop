@@ -21,7 +21,7 @@ const report = JSON.parse(stdout)
 const packages = Object.values(report)
   .flatMap((entries) => entries)
   .flatMap((entry) => entry.versions.map((version) => ({
-    name: entry.name,
+    name: normalizeName(entry.name),
     version: normalizeVersion(entry.name, version),
     license: entry.license,
     homepage: entry.homepage ?? '',
@@ -74,6 +74,15 @@ function normalizeVersion(name, version) {
   // macOS and Windows and still identify the exact upstream release.
   if (name !== '@openai/codex') return version
   return String(version).replace(/-(?:darwin|linux|win32)-(?:arm64|x64)$/u, '')
+}
+
+function normalizeName(name) {
+  // @napi-rs/canvas uses one native package name per OS/CPU. The generic
+  // package is already listed and carries the same version and MIT license.
+  // Reporting the wrapper keeps the notice complete without making it depend
+  // on the architecture that happened to run the generator.
+  if (/^@napi-rs\/canvas-(?:android|darwin|linux|win32)-/u.test(name)) return '@napi-rs/canvas'
+  return name
 }
 
 function formatProjectLink(value) {

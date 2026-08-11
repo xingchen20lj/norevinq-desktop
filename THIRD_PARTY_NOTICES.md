@@ -26,7 +26,6 @@ Run `pnpm notices:generate` after changing production dependencies. CI runs `pnp
 | @modelcontextprotocol/core | 2.0.0 | MIT | [link](https://modelcontextprotocol.io/) |
 | @modelcontextprotocol/server | 2.0.0 | MIT | [link](https://modelcontextprotocol.io/) |
 | @napi-rs/canvas | 1.0.3 | MIT | [link](https://github.com/Brooooooklyn/canvas#readme) |
-| @napi-rs/canvas-darwin-x64 | 1.0.3 | MIT | [link](https://github.com/Brooooooklyn/canvas#readme) |
 | @octokit/auth-token | 6.0.0 | MIT | [link](https://github.com/octokit/auth-token.js#readme) |
 | @octokit/core | 7.0.6 | MIT | [link](https://github.com/octokit/core.js#readme) |
 | @octokit/endpoint | 11.0.4 | MIT | [link](https://github.com/octokit/endpoint.js#readme) |
