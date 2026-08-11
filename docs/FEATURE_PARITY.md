@@ -38,8 +38,8 @@
 | 审批 | 用户输入请求 | 已测试 | `item/tool/requestUserInput` 挂起、选项/自由文本/秘密输入与退出取消有自动测试 |
 | 沙箱 | 只读/工作区写入/完整访问 | 部分实现 | workspace-write 和 read-only 已真实验证；danger-full-access 与设置 UI 待补 |
 | 沙箱 | 网络与路径权限 | 已测试 | 官方 0.147.0 `permissionProfile/list` 真实集成；网络/文件读写/path/glob 权限反向审批、逐项子集、turn/session、拒绝与伪造 ID 失败关闭均经单元和 Electron E2E |
-| 模型 | OpenAI API Key 登录 | 尚未开发 | account/login/start |
-| 模型 | ChatGPT 浏览器/设备码登录 | 尚未开发 | app-server auth API |
+| 模型 | OpenAI API Key 登录 | 已测试 | 官方 0.147.0 隔离 login/read/logout、主进程脱敏状态机和 Electron 登录/退出闭环；Key 不进入 Aster 持久化、快照或日志，真实计费请求沿用既有 OpenAI 在线回归证据 |
+| 模型 | ChatGPT 浏览器/设备码登录 | 已测试 | 官方浏览器 start/cancel 与在线设备码 URL/code/cancel 已验证；HTTPS 域白名单、主进程 loginId、completed/updated、重开/取消和令牌刷新有自动测试，最终用户授权仪式需用户本人完成 |
 | 模型 | 模型列表与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过 |
 | 模型 | 自定义 Responses provider | 已测试 | 进程级 `-c` provider 注册，不污染用户全局配置；DeepSeek 真实闭环通过 |
 | DeepSeek | 一级提供商配置 | 已测试 | 模型选择、provider 路由、设置状态和 app-server Responses 真实运行 |
@@ -78,7 +78,7 @@
 | MCP | 工具审批和 elicitation | 已测试 | server/thread/tool inventory 约束、显式确认、真实 `node_repl` 调用；elicitation 替身闭环 |
 | 技能 | 按项目发现、刷新、详情 | 已测试 | skills/list/changed/config/write、作用域/依赖/错误、额外根目录与信任门 |
 | 插件 | 市场、安装、卸载和详情 | 被公开技术限制 | 当前官方 app-server 明确标注相关生产 API under development / 不应由生产客户端调用 |
-| 设置 | 模型、推理、权限、外观 | 部分实现 | 工作台覆盖提供商、MCP、技能、审批/沙箱/Web Search，并真实展示权限 profile 及受管状态；快捷键重映射待补 |
+| 设置 | 模型、推理、权限、外观 | 部分实现 | 工作台覆盖 OpenAI/ChatGPT/DeepSeek、MCP、技能、审批/沙箱/Web Search，并真实展示账户用量与权限 profile；快捷键重映射待补 |
 | 设置 | 配置层级和原始 TOML | 部分实现 | 用户/项目/系统/托管层和 requirements 已测试；只开放枚举化原子写入，不提供任意 TOML 覆盖 |
 | 设置 | 快捷键和命令面板 | 部分实现 | 平台化核心快捷键、搜索/键盘命令面板与真实动作 E2E；用户自定义重映射待补 |
 | 计划任务 | 创建、编辑、暂停、删除 | 已测试 | SQLite 持久化、运行中删除保护、删除保留历史；单元与 UI 创建回归通过 |
@@ -100,6 +100,6 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 32 个测试文件 144 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 thread/goal/permission-profile 集成、离线 Electron 生命周期/固定/深链接/更新/崩溃诊断/权限审批、配置渠道与普通目录包、挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 33 个测试文件 152 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；Windows CI/真机与在线账户恢复待执行 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |

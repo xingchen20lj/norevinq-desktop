@@ -214,6 +214,14 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .settings-note { margin: 12px 0; color: var(--muted); font-size: 10.5px; line-height: 1.55; }
 .provider-warning { display: grid; gap: 3px; padding: 10px 11px; border-left: 2px solid #d3a94f; color: var(--muted); background: color-mix(in srgb, #d3a94f 6%, transparent); font-size: 10px; line-height: 1.45; }
 .provider-warning strong { color: var(--text); font-size: 10.5px; }
+.account-login-pending code { width: fit-content; margin: 5px 0 2px; padding: 5px 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--text); background: var(--bg); font-size: 15px; letter-spacing: .12em; user-select: all; }
+.account-login-pending > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.account-login-pending .settings-actions { margin-top: 8px; }
+.account-login-actions { flex-wrap: wrap; }
+.account-rate-limit { display: grid; gap: 5px; margin-top: 14px; padding: 10px 11px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-2); }
+.account-rate-limit > div { display: flex; justify-content: space-between; color: var(--text); font-size: 10.5px; }
+.account-rate-limit progress { width: 100%; height: 5px; accent-color: var(--accent); }
+.account-rate-limit small { color: var(--muted); font-size: 9.5px; }
 .settings-dialog footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 18px; }
 .settings-dialog footer > button:not(.primary-button) { height: 34px; padding: 0 11px; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); background: transparent; font-size: 10.5px; cursor: pointer; }
 

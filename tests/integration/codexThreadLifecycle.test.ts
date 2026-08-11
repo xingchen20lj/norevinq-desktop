@@ -12,7 +12,7 @@ afterEach(async () => {
   await Promise.all(temporaryRoots.splice(0).map((path) => rm(path, { force: true, recursive: true })))
 })
 
-test('official Codex app-server exposes permission profiles and performs the thread lifecycle', async () => {
+test('official Codex app-server exposes account state, permission profiles, and the thread lifecycle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'aster-codex-lifecycle-'))
   temporaryRoots.push(root)
   const codexHome = join(root, 'codex-home')
@@ -42,6 +42,38 @@ test('official Codex app-server exposes permission profiles and performs the thr
       capabilities: {},
     })
     await peer.notify('initialized')
+    const account = asRecord(await peer.request('account/read', { refreshToken: false }))
+    expect(typeof account.requiresOpenaiAuth).toBe('boolean')
+    expect(account.account === null || typeof account.account === 'object').toBe(true)
+    const apiKeyLogin = asRecord(await peer.request('account/login/start', {
+      type: 'apiKey',
+      apiKey: 'sk-test-aster-not-a-real-key',
+    }))
+    expect(apiKeyLogin.type).toBe('apiKey')
+    const apiKeyAccount = asRecord(await peer.request('account/read', { refreshToken: false }))
+    expect(asRecord(apiKeyAccount.account).type).toBe('apiKey')
+    await peer.request('account/logout')
+    const loggedOutAccount = asRecord(await peer.request('account/read', { refreshToken: false }))
+    expect(loggedOutAccount.account).toBeNull()
+    const browserLogin = asRecord(await peer.request('account/login/start', { type: 'chatgpt' }))
+    const browserLoginId = requireId(browserLogin.loginId)
+    const browserLoginUrl = new URL(requireId(browserLogin.authUrl))
+    expect(browserLogin.type).toBe('chatgpt')
+    expect(browserLoginUrl.protocol).toBe('https:')
+    expect(browserLoginUrl.hostname === 'chatgpt.com' || browserLoginUrl.hostname.endsWith('.openai.com')).toBe(true)
+    const canceledLogin = asRecord(await peer.request('account/login/cancel', { loginId: browserLoginId }))
+    expect(['canceled', 'notFound']).toContain(canceledLogin.status)
+    if (process.env.ASTER_TEST_LIVE_AUTH === '1') {
+      const deviceLogin = asRecord(await peer.request('account/login/start', { type: 'chatgptDeviceCode' }))
+      const deviceLoginId = requireId(deviceLogin.loginId)
+      const verificationUrl = new URL(requireId(deviceLogin.verificationUrl))
+      expect(deviceLogin.type).toBe('chatgptDeviceCode')
+      expect(verificationUrl.protocol).toBe('https:')
+      expect(verificationUrl.hostname === 'auth.openai.com' || verificationUrl.hostname.endsWith('.openai.com')).toBe(true)
+      expect(requireId(deviceLogin.userCode).length).toBeGreaterThanOrEqual(4)
+      const canceledDeviceLogin = asRecord(await peer.request('account/login/cancel', { loginId: deviceLoginId }))
+      expect(['canceled', 'notFound']).toContain(canceledDeviceLogin.status)
+    }
     const profiles = asRecord(await peer.request('permissionProfile/list', { cwd: projectPath, limit: 100 }))
     const profileRows = asArray(profiles.data)
     expect(profileRows.length).toBeGreaterThan(0)

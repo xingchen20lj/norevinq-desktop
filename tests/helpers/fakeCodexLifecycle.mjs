@@ -21,6 +21,7 @@ const threads = new Map([
 const archived = new Set()
 const goals = new Map()
 let permissionRequestSent = false
+let account = null
 
 for await (const line of createInterface({ input: process.stdin })) {
   if (!line.trim()) continue
@@ -30,7 +31,10 @@ for await (const line of createInterface({ input: process.stdin })) {
     continue
   }
   if (typeof message.method !== 'string') continue
-  appendFileSync(logPath, `${JSON.stringify({ method: message.method, params: message.params ?? null })}\n`)
+  const loggedParams = message.method === 'account/login/start' && message.params?.type === 'apiKey'
+    ? { ...message.params, apiKey: '[REDACTED]' }
+    : message.params ?? null
+  appendFileSync(logPath, `${JSON.stringify({ method: message.method, params: loggedParams })}\n`)
   if (!Object.hasOwn(message, 'id')) continue
   try {
     respond(message.id, handle(message.method, message.params ?? {}))
@@ -42,6 +46,20 @@ for await (const line of createInterface({ input: process.stdin })) {
 function handle(method, params) {
   if (method === 'initialize') return { userAgent: 'fake-codex/0.147.0', platformFamily: process.platform, platformOs: process.platform }
   if (method === 'model/list') return { data: [{ id: 'fake-model', displayName: 'Fake Model', isDefault: true, defaultReasoningEffort: 'medium', supportedReasoningEfforts: ['medium'], inputModalities: ['text'] }] }
+  if (method === 'account/read') return { account, requiresOpenaiAuth: true }
+  if (method === 'account/login/start' && params.type === 'apiKey') {
+    account = { type: 'apiKey' }
+    queueMicrotask(() => {
+      notify('account/login/completed', { loginId: null, success: true, error: null, onboardingEntrypoint: null })
+      notify('account/updated', { authMode: 'apikey', planType: null })
+    })
+    return { type: 'apiKey' }
+  }
+  if (method === 'account/logout') {
+    account = null
+    queueMicrotask(() => notify('account/updated', { authMode: null, planType: null }))
+    return {}
+  }
   if (method === 'thread/list') return listThreads(params)
   if (method === 'thread/read' || method === 'thread/resume') {
     const thread = requireThread(params.threadId)

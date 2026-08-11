@@ -32,6 +32,7 @@ import { IPC_CHANNELS } from '../shared/contracts.js'
 import { UpdateService } from './update/updateService.js'
 import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
 import { DiagnosticsService } from './diagnostics/diagnosticsService.js'
+import { AccountService } from './account/accountService.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -46,6 +47,7 @@ let runtime: CodexRuntimeSupervisor | null = null
 let runtimeLogger: JsonlLogger | null = null
 let agentService: AgentService | null = null
 let providerService: ProviderService | null = null
+let accountService: AccountService | null = null
 let gitService: GitService | null = null
 let worktreeService: WorktreeService | null = null
 let diffService: DiffService | null = null
@@ -231,6 +233,7 @@ if (!gotLock) {
       } : {}),
     })
     providerService = new ProviderService(runtime, credentialStore, environmentDeepSeekKey)
+    accountService = new AccountService(runtime, { openExternal: (url) => shell.openExternal(url) })
     gitService = new GitService(database)
     const createdWorktreeService = new WorktreeService(database, join(userData, 'worktrees'))
     worktreeService = createdWorktreeService
@@ -256,6 +259,7 @@ if (!gotLock) {
       runtime,
       agentService,
       providerService,
+      accountService,
       gitService,
       worktreeService,
       diffService,
@@ -302,6 +306,8 @@ app.on('before-quit', () => {
   agentService?.dispose()
   agentService = null
   providerService = null
+  accountService?.dispose()
+  accountService = null
   gitService = null
   worktreeService = null
   diffService = null

@@ -65,6 +65,7 @@ import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview
 import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
+import type { AccountSnapshot, AccountSubscription } from '../shared/account.js'
 import {
   requireAuthorizedIpcSender,
   type IpcSenderAuthorizer,
@@ -126,6 +127,18 @@ export type ProviderController = {
   getStatus: () => ProviderStatus
   saveDeepSeekCredential: (apiKey: string) => Promise<unknown>
   deleteDeepSeekCredential: () => Promise<unknown>
+}
+
+export type AccountController = {
+  getSnapshot: () => AccountSnapshot
+  subscribe: (subscription: AccountSubscription) => () => void
+  refresh: (refreshToken?: boolean) => Promise<AccountSnapshot>
+  loginWithApiKey: (apiKey: string) => Promise<AccountSnapshot>
+  startBrowserLogin: () => Promise<AccountSnapshot>
+  startDeviceCodeLogin: () => Promise<AccountSnapshot>
+  openPendingLogin: () => Promise<AccountSnapshot>
+  cancelPendingLogin: () => Promise<AccountSnapshot>
+  logout: () => Promise<AccountSnapshot>
 }
 
 export type GitController = {
@@ -241,6 +254,7 @@ export function registerIpc(
   runtime: RuntimeController,
   agent: AgentController,
   providers: ProviderController,
+  account: AccountController,
   git: GitController,
   worktrees: WorktreeController,
   diffs: DiffController,
@@ -265,6 +279,11 @@ export function registerIpc(
   const unsubscribeAgent = agent.subscribe((snapshot) => {
     for (const contents of webContents) {
       if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.conversationChanged, snapshot)
+    }
+  })
+  const unsubscribeAccount = account.subscribe((snapshot) => {
+    for (const contents of webContents) {
+      if (!contents.isDestroyed()) contents.send(IPC_CHANNELS.accountChanged, snapshot)
     }
   })
   const unsubscribeTerminal = terminals.subscribe((terminalEvent) => {
@@ -304,6 +323,7 @@ export function registerIpc(
     projects: database.listProjects(),
     runtime: runtime.getSnapshot(),
     providers: providers.getStatus(),
+    account: account.getSnapshot(),
     updates: updates.getSnapshot(),
     diagnostics: diagnostics.getSnapshot(),
   }))
@@ -413,6 +433,22 @@ export function registerIpc(
     return providers.saveDeepSeekCredential(parsed.apiKey)
   })
   ipcMain.handle(IPC_CHANNELS.providerDeepSeekDelete, () => providers.deleteDeepSeekCredential())
+  ipcMain.handle(IPC_CHANNELS.accountState, (event) => {
+    webContents.add(event.sender)
+    event.sender.once('destroyed', () => webContents.delete(event.sender))
+    return account.getSnapshot()
+  })
+  ipcMain.handle(IPC_CHANNELS.accountRefresh, (_event, input: unknown) => {
+    const parsed = accountRefreshSchema.parse(input ?? {})
+    return account.refresh(parsed.refreshToken)
+  })
+  ipcMain.handle(IPC_CHANNELS.accountLoginApiKey, (_event, input: unknown) =>
+    account.loginWithApiKey(accountApiKeySchema.parse(input).apiKey))
+  ipcMain.handle(IPC_CHANNELS.accountLoginBrowser, () => account.startBrowserLogin())
+  ipcMain.handle(IPC_CHANNELS.accountLoginDeviceCode, () => account.startDeviceCodeLogin())
+  ipcMain.handle(IPC_CHANNELS.accountLoginOpen, () => account.openPendingLogin())
+  ipcMain.handle(IPC_CHANNELS.accountLoginCancel, () => account.cancelPendingLogin())
+  ipcMain.handle(IPC_CHANNELS.accountLogout, () => account.logout())
   ipcMain.handle(IPC_CHANNELS.gitStatus, (_event, input: unknown) => git.getStatus(projectInputSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitInitialize, (_event, input: unknown) => git.initialize(projectInputSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitStage, (_event, input: unknown) => git.stage(gitPathsSchema.parse(input)))
@@ -628,6 +664,7 @@ export function registerIpc(
   return () => {
     unsubscribeRuntime()
     unsubscribeAgent()
+    unsubscribeAccount()
     unsubscribeTerminal()
     unsubscribeIntegrations()
     unsubscribeSecurity()
@@ -768,6 +805,8 @@ const resolveApprovalSchema = z.object({
   grantedPermissionIds: z.array(z.string().regex(/^(?:network|filesystem-[0-9]{1,3})$/u)).max(64).optional(),
 })
 const saveDeepSeekCredentialSchema = z.object({ apiKey: z.string().trim().min(16).max(512) })
+const accountRefreshSchema = z.object({ refreshToken: z.boolean().optional() })
+const accountApiKeySchema = z.object({ apiKey: z.string().trim().min(16).max(512).refine((value) => !/\s/u.test(value)) })
 const gitPathSchema = z.string().min(1).max(4_096).refine((value) => !value.includes('\0'))
 const gitPathsSchema = z.object({ projectId: z.uuid(), paths: z.array(gitPathSchema).min(1).max(10_000) })
 const gitCommitSchema = z.object({ projectId: z.uuid(), message: z.string().trim().min(1).max(5_000) })

@@ -83,6 +83,11 @@ import type {
 } from './browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from './update.js'
 import type { DiagnosticsExportResult, DiagnosticsSnapshot } from './diagnostics.js'
+import type {
+  AccountSnapshot,
+  AccountSubscription,
+  LoginOpenAiApiKeyInput,
+} from './account.js'
 
 export const IPC_CHANNELS = {
   bootstrap: 'app:bootstrap',
@@ -120,6 +125,15 @@ export const IPC_CHANNELS = {
   conversationChanged: 'conversation:changed',
   providerDeepSeekSave: 'provider:deepseek-save',
   providerDeepSeekDelete: 'provider:deepseek-delete',
+  accountState: 'account:state',
+  accountRefresh: 'account:refresh',
+  accountLoginApiKey: 'account:login-api-key',
+  accountLoginBrowser: 'account:login-browser',
+  accountLoginDeviceCode: 'account:login-device-code',
+  accountLoginOpen: 'account:login-open',
+  accountLoginCancel: 'account:login-cancel',
+  accountLogout: 'account:logout',
+  accountChanged: 'account:changed',
   gitStatus: 'git:status',
   gitInitialize: 'git:initialize',
   gitStage: 'git:stage',
@@ -205,6 +219,7 @@ export type BootstrapState = {
   projects: ProjectSummary[]
   runtime: CodexRuntimeSnapshot
   providers: ProviderStatus
+  account: AccountSnapshot
   updates: UpdateSnapshot
   diagnostics: DiagnosticsSnapshot
 }
@@ -262,6 +277,15 @@ export type AsterDesktopApi = {
     runtime: CodexRuntimeSnapshot
   }>
   deleteDeepSeekCredential: () => Promise<{ providers: ProviderStatus; runtime: CodexRuntimeSnapshot }>
+  getAccountState: () => Promise<AccountSnapshot>
+  refreshOpenAiAccount: (input?: { refreshToken?: boolean }) => Promise<AccountSnapshot>
+  loginOpenAiApiKey: (input: LoginOpenAiApiKeyInput) => Promise<AccountSnapshot>
+  startChatGptBrowserLogin: () => Promise<AccountSnapshot>
+  startChatGptDeviceCodeLogin: () => Promise<AccountSnapshot>
+  openPendingChatGptLogin: () => Promise<AccountSnapshot>
+  cancelPendingChatGptLogin: () => Promise<AccountSnapshot>
+  logoutOpenAiAccount: () => Promise<AccountSnapshot>
+  onAccountChanged: (subscription: AccountSubscription) => () => void
   getGitStatus: (input: GitProjectInput) => Promise<GitRepositorySnapshot>
   initializeGit: (input: GitProjectInput) => Promise<GitRepositorySnapshot>
   stageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>

@@ -29,11 +29,13 @@ import type { ProviderStatus } from '../../shared/providers'
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { UpdateSnapshot } from '../../shared/update'
 import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
+import type { AccountSnapshot } from '../../shared/account'
 
 type SettingsTab = 'providers' | 'mcp' | 'skills' | 'config' | 'app'
 
 export function SettingsWorkbench({
   providers,
+  account,
   apiKey,
   setApiKey,
   project,
@@ -44,10 +46,12 @@ export function SettingsWorkbench({
   close,
   onError,
   onUpdated,
+  onAccount,
   onUpdate,
   onDiagnostics,
 }: {
   providers: ProviderStatus | null
+  account: AccountSnapshot | null
   apiKey: string
   setApiKey: (value: string) => void
   project: ProjectSummary | null
@@ -58,6 +62,7 @@ export function SettingsWorkbench({
   close: () => void
   onError: (message: string | null) => void
   onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
+  onAccount: (snapshot: AccountSnapshot) => void
   onUpdate: (snapshot: UpdateSnapshot) => void
   onDiagnostics: (snapshot: DiagnosticsSnapshot) => void
 }): React.JSX.Element {
@@ -86,11 +91,13 @@ export function SettingsWorkbench({
       <div className="settings-workbench-body">
         {tab === 'providers' && <ProviderTab
           providers={providers}
+          account={account}
           apiKey={apiKey}
           setApiKey={setApiKey}
           busy={busy}
           run={run}
           onUpdated={onUpdated}
+          onAccount={onAccount}
         />}
         {tab === 'mcp' && <McpTab
           project={project}
@@ -171,16 +178,58 @@ function formatBytes(value: number): string {
   return `${(value / (1024 * 1024)).toFixed(1)} MiB`
 }
 
-function ProviderTab({ providers, apiKey, setApiKey, busy, run, onUpdated }: {
+function ProviderTab({ providers, account, apiKey, setApiKey, busy, run, onUpdated, onAccount }: {
   providers: ProviderStatus | null
+  account: AccountSnapshot | null
   apiKey: string
   setApiKey: (value: string) => void
   busy: boolean
   run: (action: () => Promise<unknown>) => Promise<void>
   onUpdated: (result: { providers: ProviderStatus; runtime: CodexRuntimeSnapshot }) => void
+  onAccount: (snapshot: AccountSnapshot) => void
 }): React.JSX.Element {
   const status = providers?.deepseek
+  const [openAiApiKey, setOpenAiApiKey] = useState('')
+  const accountLabel = account?.account?.type === 'chatgpt'
+    ? `ChatGPT · ${account.account.planType}`
+    : account?.account?.type === 'apiKey'
+      ? 'OpenAI API Key'
+      : account?.account?.type === 'amazonBedrock'
+        ? 'Amazon Bedrock'
+        : account?.account?.type === 'unknown'
+          ? account.account.label
+          : '未登录'
+  const accountDetail = account?.account?.type === 'chatgpt'
+    ? account.account.email ?? 'ChatGPT 账户未提供邮箱'
+    : account?.account?.type === 'apiKey'
+      ? '凭据由 app-server 持久化；Aster 无法读回'
+      : account?.account?.type === 'amazonBedrock'
+        ? `凭据来源：${account.account.credentialSource}`
+        : account?.requiresOpenaiAuth === false
+          ? '当前提供商不要求 OpenAI 认证'
+          : '可使用 ChatGPT 或 OpenAI API Key'
   return <div className="settings-section">
+    <div className="section-heading"><div><h3>OpenAI Codex</h3><p>认证状态和登录由官方 Codex app-server 管理。</p></div><button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.refreshOpenAiAccount()))}><RefreshCw size={13} />刷新</button></div>
+    <div className="provider-state">
+      <div className="provider-icon"><KeyRound size={17} /></div>
+      <div><strong>{accountLabel}</strong><p>{accountDetail}</p></div>
+      <span className={account?.status === 'authenticated' ? 'connected' : ''}>{accountStatusLabel(account?.status)}</span>
+    </div>
+    {account?.error && <div className="provider-warning"><strong>认证状态</strong><span>{account.error}</span></div>}
+    {account?.pendingLogin ? <div className="provider-warning account-login-pending"><strong>{account.pendingLogin.type === 'deviceCode' ? '设备码登录等待完成' : '浏览器登录等待完成'}</strong>{account.pendingLogin.userCode && <code>{account.pendingLogin.userCode}</code>}<span>{account.pendingLogin.verificationUrl}</span><div className="settings-actions"><button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.cancelPendingChatGptLogin()))}>取消</button><button className="primary-button" disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.openPendingChatGptLogin()))}><ExternalLink size={12} />重新打开</button></div></div> : account?.status === 'authenticated' ? <div className="settings-actions"><button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.logoutOpenAiAccount()))}>退出登录</button>{account.account?.type === 'chatgpt' && <button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.refreshOpenAiAccount({ refreshToken: true })))}><RefreshCw size={12} />刷新令牌</button>}</div> : <>
+      <label className="credential-field"><span>OpenAI API Key</span><input type="password" autoComplete="new-password" spellCheck={false} value={openAiApiKey} onChange={(event) => setOpenAiApiKey(event.target.value)} placeholder="直接交给 app-server；Aster 不提供读回接口" /></label>
+      <div className="settings-actions account-login-actions">
+        <button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.startChatGptDeviceCodeLogin()))}>设备码登录</button>
+        <button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.startChatGptBrowserLogin()))}><ExternalLink size={12} />浏览器登录</button>
+        <button className="primary-button" disabled={busy || openAiApiKey.trim().length < 16} onClick={() => void run(async () => {
+          const snapshot = await window.aster.loginOpenAiApiKey({ apiKey: openAiApiKey })
+          setOpenAiApiKey('')
+          onAccount(snapshot)
+        })}>使用 API Key</button>
+      </div>
+    </>}
+    {account?.rateLimits?.primary && <div className="account-rate-limit"><div><strong>{account.rateLimits.limitName ?? account.rateLimits.limitId ?? 'Codex 用量窗口'}</strong><span>{account.rateLimits.primary.usedPercent.toFixed(0)}%</span></div><progress max={100} value={account.rateLimits.primary.usedPercent} /><small>{formatRateLimitReset(account.rateLimits.primary.resetsAt)}</small></div>}
+    <p className="settings-note">ChatGPT 令牌和 API Key 均由 app-server 持久化并刷新；Renderer 不读取凭据。实验性的外部 ChatGPT token 注入未启用。</p>
     <div className="section-heading"><div><h3>DeepSeek Responses</h3><p>一级模型提供商，通过 Codex Responses wire API 工作。</p></div></div>
     <div className="provider-state">
       <div className="provider-icon"><KeyRound size={17} /></div>
@@ -199,6 +248,23 @@ function ProviderTab({ providers, apiKey, setApiKey, busy, run, onUpdated }: {
       })} disabled={busy || apiKey.trim().length < 16}>{busy ? '正在重启运行时…' : '安全保存并启用'}</button>
     </div>
   </div>
+}
+
+function formatRateLimitReset(resetsAt: number | null): string {
+  if (!resetsAt) return '重置时间未提供'
+  return `预计 ${new Date(resetsAt * 1_000).toLocaleString()} 重置`
+}
+
+function accountStatusLabel(status: AccountSnapshot['status'] | undefined): string {
+  const labels: Record<AccountSnapshot['status'], string> = {
+    unavailable: '不可用',
+    loading: '读取中',
+    signedOut: '未登录',
+    authenticated: '已认证',
+    loginPending: '等待登录',
+    error: '异常',
+  }
+  return status ? labels[status] : '读取中'
 }
 
 function McpTab({ project, threadId, snapshot, busy, run }: {

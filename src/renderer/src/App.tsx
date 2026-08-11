@@ -59,6 +59,7 @@ import type { SchedulerSnapshot } from '../../shared/scheduler'
 import type { BrowserSnapshot } from '../../shared/browser'
 import type { UpdateSnapshot } from '../../shared/update'
 import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
+import type { AccountSnapshot } from '../../shared/account'
 import type { CommandAction } from './CommandPalette'
 
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
@@ -77,6 +78,7 @@ export function App(): React.JSX.Element {
   const [runtime, setRuntime] = useState<CodexRuntimeSnapshot | null>(null)
   const [conversations, setConversations] = useState<ConversationSnapshot | null>(null)
   const [providers, setProviders] = useState<ProviderStatus | null>(null)
+  const [account, setAccount] = useState<AccountSnapshot | null>(null)
   const [selectedProject, setSelectedProject] = useState<ProjectSummary | null>(null)
   const [composer, setComposer] = useState('')
   const [model, setModel] = useState('')
@@ -159,10 +161,17 @@ export function App(): React.JSX.Element {
       setBootstrap(state)
       setRuntime(state.runtime)
       setProviders(state.providers)
+      setAccount(state.account)
       setUpdates(state.updates)
       setDiagnostics(state.diagnostics)
       setSelectedProject(state.projects[0] ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
+  }, [])
+
+  useEffect(() => {
+    const unsubscribe = window.aster.onAccountChanged(setAccount)
+    void window.aster.getAccountState().then(setAccount).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    return unsubscribe
   }, [])
 
   useEffect(() => {
@@ -824,6 +833,7 @@ export function App(): React.JSX.Element {
       </main>
       {settingsOpen && <Suspense fallback={<WorkbenchLoading label="正在加载设置…" overlay />}><SettingsWorkbench
         providers={providers}
+        account={account}
         apiKey={deepSeekKey}
         setApiKey={setDeepSeekKey}
         project={selectedProject}
@@ -834,6 +844,7 @@ export function App(): React.JSX.Element {
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
+        onAccount={setAccount}
         onUpdate={setUpdates}
         onDiagnostics={setDiagnostics}
       /></Suspense>}

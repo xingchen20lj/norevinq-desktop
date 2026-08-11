@@ -15,6 +15,14 @@
 - 权限 profile 是服务器/组织策略目录，不足以代替逐请求审批。客户端不得允许 Renderer 自行构造授权路径；应把请求映射为不透明选项 ID，并在可信主进程按原始请求重建响应。
 - 运行中 app-server 崩溃不能盲目重放 turn，避免重复执行副作用；活动 turn 标记失败并允许显式恢复，空闲连接才自动重建订阅。
 
+### 账户与登录
+
+- `account/read` 返回当前账户和当前 provider 是否要求 OpenAI 认证；账户响应不包含可供客户端读回的 API Key 或 OAuth token。
+- `account/login/start` 的稳定模式包括 `apiKey`、Codex 托管的 ChatGPT 浏览器 OAuth 和 `chatgptDeviceCode`；托管模式由 Codex 持久化并刷新 token。
+- 浏览器/设备码成功或失败通过 `account/login/completed` 通知，账户切换通过 `account/updated`；托管登录可按主进程保存的 `loginId` 取消。
+- `chatgptAuthTokens` 明确是实验性、面向已拥有 ChatGPT token 生命周期的宿主；Aster 不启用该模式，也不尝试从 ChatGPT 或本机其他应用提取 token。
+- ChatGPT 账户可通过 `account/rateLimits/read` 与 updated 通知显示用量窗口；API Key 模式不应伪装成 ChatGPT 用量。
+
 来源：
 
 - [Codex 0.147.0 release](https://github.com/openai/codex/releases/tag/rust-v0.147.0)
@@ -22,6 +30,7 @@
 - [app-server README](https://github.com/openai/codex/blob/main/codex-rs/app-server/README.md)
 - [app-server protocol v2](https://github.com/openai/codex/tree/main/codex-rs/app-server-protocol/src/protocol/v2)
 - [提交的 JSON schemas](https://github.com/openai/codex/tree/main/codex-rs/app-server-protocol/schema/json)
+- [官方 Auth endpoints](https://learn.chatgpt.com/docs/app-server#auth-endpoints)
 
 ## DeepSeek Responses API
 

@@ -28,6 +28,16 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     const taskRow = (name: string): Locator =>
       window.locator('.thread-row').filter({ hasText: name })
     await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await window.getByRole('button', { name: '设置', exact: true }).click()
+    const settings = window.getByRole('dialog', { name: '设置工作台' })
+    await expect(settings).toContainText('未登录')
+    await settings.getByLabel('OpenAI API Key').fill('sk-e2e-not-a-real-openai-key')
+    await settings.getByRole('button', { name: '使用 API Key' }).click()
+    await expect(settings.locator('.provider-state').first()).toContainText('OpenAI API Key')
+    await window.screenshot({ path: 'test-results/aster-openai-account.png' })
+    await settings.getByRole('button', { name: '退出登录' }).click()
+    await expect(settings.locator('.provider-state').first()).toContainText('未登录')
+    await settings.getByRole('button', { name: '关闭设置' }).click()
     await window.getByRole('button', { name: `固定项目 ${project.name}` }).click()
     await expect(window.getByRole('button', { name: `取消固定项目 ${project.name}` })).toBeVisible()
     await expect(taskRow('Lifecycle primary')).toBeVisible()
@@ -120,7 +130,14 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
       'thread/goal/get',
       'thread/goal/set',
       'thread/goal/clear',
+      'account/read',
+      'account/login/start',
+      'account/logout',
     ]))
+    expect(requests.find(({ method }) => method === 'account/login/start')?.params).toEqual({
+      type: 'apiKey',
+      apiKey: '[REDACTED]',
+    })
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.cursor === 'page-2')).toBe(true)
     expect(requests.some(({ method, params }) => method === 'thread/list' && params?.searchTerm === 'secondary')).toBe(true)
     expect(requests.find(({ method }) => method === 'client/permission-response')?.params).toEqual({

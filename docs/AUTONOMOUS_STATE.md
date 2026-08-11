@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 完成沙箱网络/路径权限 profile、反向审批、桌面实测、文档与提交。
-- 继续逐项审计功能一致性表，下一项处理 OpenAI API Key 与 ChatGPT 登录。
+- 完成 OpenAI API Key、ChatGPT 浏览器/设备码登录、桌面实测、文档与提交。
+- 继续逐项审计功能一致性表，下一项处理 GitHub PR 创建或工作树 Handoff。
 
 ## 已完成任务
 
@@ -183,11 +183,17 @@
 - 权限面板支持逐项选择、本回合/本会话范围和拒绝；伪造或未请求 ID 会失败关闭且保持原请求挂起，退出时返回协议有效的空授权。
 - 离线 Electron E2E 真实展示网络与超长路径权限，取消一项文件读取后精确断言 app-server 仅收到其余授权；1320×840 界面无溢出。
 - 权限阶段 `verify:ci`：32 个测试文件 144 项、覆盖率 80.83/69.21/85.37/87.69、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过。
+- 建立独立账户领域层，接入稳定 `account/read`、`account/login/start|cancel`、`account/logout`、`account/rateLimits/read` 及 updated/completed 通知；运行时重启会使未完成登录失败关闭。
+- OpenAI API Key 只经最小 IPC 进入 app-server，不写入 Aster SQLite、快照或日志；错误即使回显原 Key 也会再次脱敏，Renderer 没有凭据读回能力。
+- ChatGPT 浏览器与设备码 URL 仅允许 OpenAI/ChatGPT HTTPS 域；loginId 只保留在主进程，Renderer 不能伪造取消目标或任意外链；实验性外部 token 注入明确未启用。
+- 直接启动随应用固定的官方 Codex 0.147.0，在隔离 `CODEX_HOME` 中真实完成假测试 Key 的 login/read/logout、浏览器登录 start/cancel；设备码在线取得官方 URL/代码并立即 cancel，未调用模型或污染用户凭据。
+- 设置页完成账户状态、API Key、浏览器/设备码、取消/重开、退出、令牌刷新和 ChatGPT 用量窗口；离线 Electron E2E 验证 API Key 登录/退出及替身日志脱敏，1320×840 浅色截图无溢出。
+- 认证阶段 `verify:ci`：33 个测试文件 152 项、覆盖率 80.48/69.11/84.96/87.22、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过。
 
 ## 下一任务
 
-1. 实现 app-server OpenAI API Key 与 ChatGPT 浏览器/设备码登录的安全状态和交互闭环。
-2. 随后评估 GitHub PR 创建、工作树 Handoff 与剩余部分实现项。
+1. 评估并实现 GitHub PR 创建的公开 CLI 闭环。
+2. 随后处理工作树 Handoff 与剩余部分实现项。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -213,10 +219,11 @@
 - 更新 URL 只在受保护发布构建时注入并固化进签名包；Renderer 无权读写 feed URL，未签名内部包不生成更新渠道。
 - 诊断默认本地优先；不引入自动遥测、不保存内存 dump，只在用户明确导出时产生二次脱敏的有界 ZIP。
 - 权限授权采用“原请求白名单 + Renderer 不透明 ID + 主进程重建”模式；UI 不能提交任意路径或扩大 app-server 请求，未选择项按协议视为拒绝。
+- OpenAI/ChatGPT 凭据生命周期只委托稳定 app-server 账户 API；Aster 不自建 OAuth token 库、不启用内部 external-token 模式，loginId 与受信认证 URL 保留在主进程。
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 32 个测试文件 144 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限生命周期、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 33 个测试文件 152 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户生命周期、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 

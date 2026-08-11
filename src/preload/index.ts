@@ -68,6 +68,7 @@ import type {
 } from '../shared/browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
+import type { AccountSnapshot, AccountSubscription, LoginOpenAiApiKeyInput } from '../shared/account.js'
 
 const api: AsterDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
@@ -135,6 +136,25 @@ const api: AsterDesktopApi = {
   saveDeepSeekCredential: (input: SaveDeepSeekCredentialInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekSave, input),
   deleteDeepSeekCredential: () => ipcRenderer.invoke(IPC_CHANNELS.providerDeepSeekDelete),
+  getAccountState: (): Promise<AccountSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.accountState),
+  refreshOpenAiAccount: (input?: { refreshToken?: boolean }): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountRefresh, input),
+  loginOpenAiApiKey: (input: LoginOpenAiApiKeyInput): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountLoginApiKey, input),
+  startChatGptBrowserLogin: (): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountLoginBrowser),
+  startChatGptDeviceCodeLogin: (): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountLoginDeviceCode),
+  openPendingChatGptLogin: (): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountLoginOpen),
+  cancelPendingChatGptLogin: (): Promise<AccountSnapshot> =>
+    ipcRenderer.invoke(IPC_CHANNELS.accountLoginCancel),
+  logoutOpenAiAccount: (): Promise<AccountSnapshot> => ipcRenderer.invoke(IPC_CHANNELS.accountLogout),
+  onAccountChanged: (subscription: AccountSubscription) => {
+    const listener = (_event: Electron.IpcRendererEvent, snapshot: AccountSnapshot): void => subscription(snapshot)
+    ipcRenderer.on(IPC_CHANNELS.accountChanged, listener)
+    return () => ipcRenderer.removeListener(IPC_CHANNELS.accountChanged, listener)
+  },
   getGitStatus: (input: GitProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.gitStatus, input),
   initializeGit: (input: GitProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.gitInitialize, input),
   stageGitPaths: (input: GitPathsInput) => ipcRenderer.invoke(IPC_CHANNELS.gitStage, input),
