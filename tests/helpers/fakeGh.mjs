@@ -37,6 +37,7 @@ if (args[0] === 'pr' && args[1] === 'list') {
       isDraft: state.draft,
       baseRefName: state.base,
       headRefName: state.head.split(':').slice(1).join(':'),
+      headRepositoryOwner: { login: state.head.split(':')[0] },
     }]))
   }
   process.exit(0)

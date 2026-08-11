@@ -1,10 +1,11 @@
 /* eslint-disable @typescript-eslint/require-await -- async mocks implement the production Promise interface. */
-import { mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import {
   GitHubService,
+  discoverGitHubCli,
   runGitHubCommand,
   type GitHubCommandRunner,
 } from '../../src/main/git/githubService.js'
@@ -137,7 +138,9 @@ describe('GitHubService', () => {
       pushRepository: 'contributor/project',
       baseRepository: 'aster-fixture/project',
     })
-    expect(mutableCalls.find((args) => args[0] === 'pr')).toContain('contributor:feature/pr')
+    expect(mutableCalls.find((args) => args[0] === 'pr')).toEqual(expect.arrayContaining([
+      '--head', 'feature/pr', '--limit', '100',
+    ]))
     fixture.database.close()
   })
 
@@ -215,6 +218,26 @@ describe('GitHubService', () => {
       restoreEnvironment('GH_TOKEN', previousGitHubToken)
     }
   })
+
+  it('discovers an executable from explicit, PATH, and desktop user-bin locations without hardcoding a host path', () => {
+    if (process.platform === 'win32') return
+    const root = mkdtempSync(join(tmpdir(), 'aster-gh-discovery-'))
+    temporaryPaths.push(root)
+    const pathDirectory = join(root, 'path-bin')
+    const homeDirectory = join(root, 'home')
+    const homeBinary = join(homeDirectory, 'bin', 'gh')
+    const pathBinary = join(pathDirectory, 'gh')
+    const explicitBinary = join(root, 'explicit-gh')
+    mkdirSync(pathDirectory)
+    mkdirSync(join(homeDirectory, 'bin'), { recursive: true })
+    for (const binary of [homeBinary, pathBinary, explicitBinary]) {
+      writeFileSync(binary, '#!/bin/sh\nexit 0\n', { mode: 0o755, flag: 'w' })
+      chmodSync(binary, 0o755)
+    }
+    expect(discoverGitHubCli({ GH_BINARY: explicitBinary, PATH: pathDirectory }, process.platform, homeDirectory)).toBe(explicitBinary)
+    expect(discoverGitHubCli({ PATH: pathDirectory }, process.platform, homeDirectory)).toBe(pathBinary)
+    expect(discoverGitHubCli({ PATH: '/missing' }, process.platform, homeDirectory)).toBe(homeBinary)
+  })
 })
 
 function createFixture(overrides: Partial<GitRepositorySnapshot> = {}): {
@@ -273,6 +296,7 @@ function pullRequestJson(): Record<string, unknown> {
     isDraft: true,
     baseRefName: 'main',
     headRefName: 'feature/pr',
+    headRepositoryOwner: { login: 'aster-fixture' },
   }
 }
 

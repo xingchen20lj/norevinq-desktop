@@ -76,6 +76,8 @@
 - `--body-file -` 是官方 stdin 入口，可避免 PR 描述出现在本机进程参数。官方明确说明 `--dry-run` 仍可能推送，因此不作为只读预检。
 - 预检采用 `gh auth status --hostname`、`gh repo view --json nameWithOwner,url,defaultBranchRef` 与 `gh pr list --state open --json ...`；创建成功后再次结构化读取 PR，并在主进程验证 HTTPS host、owner/repository 和数字编号路径。
 - fork 工作流把 push/head remote 与 base/upstream remote 分开；两者必须位于同一 GitHub host。同项目并发创建合并为单个在途操作，已有 open PR 时返回既有结果。
+- 当前 `gh pr create --head` 接受 `owner:branch`，但 `gh pr list --head` 应使用纯分支名；为避免 fork 中同名分支误认，列表 JSON 还必须包含并校验 `headRepositoryOwner.login`。
+- Electron GUI 可能不继承登录 shell PATH；实际本机 `gh` 位于 `~/bin`。Aster 通过绝对 PATH、用户 bin、Homebrew 和 Windows 标准安装位置发现，不把本机路径写进发布包。
 
 来源：
 

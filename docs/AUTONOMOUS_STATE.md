@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 通过 Aster 桌面自身向新建私有仓库创建真实 GitHub Draft Pull Request，补齐线上闭环证据。
-- 继续逐项审计功能一致性表，下一项处理工作树 Handoff。
+- 实现已有任务和未提交修改在 Local/托管 worktree 之间的安全 Handoff。
+- 继续逐项审计剩余“部分实现”功能。
 
 ## 已完成任务
 
@@ -196,14 +196,18 @@
 - Git remote 快照在进入共享领域层前清除 URL userinfo、query 与 fragment；旧仓库即使把 token 写入远端 URL也不会向 Renderer 暴露。
 - 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
 - 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
-- GitHub PR 阶段最终 `verify:ci`：34 个测试文件 158 项、覆盖率 80.62/69.20/85.37/87.50、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
+- GitHub PR 线上修复后最终 `verify:ci`：34 个测试文件 159 项、覆盖率 80.62/69.16/85.40/87.45、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
 - 仓库级 Git 身份固定为 `xingchen20lj <71823107+xingchen20lj@users.noreply.github.com>`；从首条提交到 GitHub PR 阶段提交的作者身份均已核对一致，无需重写历史。
 - 按用户授权创建私有仓库 `xingchen20lj/aster-code-desktop` 并首次推送完整 `main`；GitHub 回读确认 `PRIVATE`、默认分支 `main`，本地/远端 SHA 同为 `d154183f41783f2139e07b017800357b36a43ebc`。
+- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位 `/Users/cyber/bin/gh`，未发生外部写入；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
+- 第二次真实桌面测试已由 Aster 成功推送 `codex/github-pr-validation` 并创建 Draft PR #1，但创建后验证错误使用 `gh pr list --head owner:branch` 而未识别结果；改为纯分支过滤并严格匹配 `headRepositoryOwner.login`，避免重复创建和 fork 同名分支误认。
+- 第三次真实 Electron 回归通过 Aster 自身重新读取私有 GitHub Draft PR #1，精确验证仓库 `xingchen20lj/aster-code-desktop`、head `codex/github-pr-validation`、base `main`、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
+- 实际检查真实 PR 完成态截图：GitHub 登录、origin head/base、Draft 卡片和“在 GitHub 打开”在 1320×840 浅色界面无明显溢出或错位。
 
 ## 下一任务
 
-1. 在 `codex/github-pr-validation` 上通过 Aster UI 创建真实 Draft PR 并回读验证。
-2. 处理工作树 Handoff 与剩余部分实现项。
+1. 处理工作树 Handoff 与已有任务/未提交修改迁移。
+2. 继续审计剩余部分实现项。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -234,7 +238,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：`verify:ci` 的 34 个测试文件 158 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：`verify:ci` 的 34 个测试文件 159 项、2 项性能基准、覆盖率门槛、类型、规范、脚本、workflow 守门、许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
