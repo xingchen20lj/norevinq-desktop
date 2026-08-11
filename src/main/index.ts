@@ -242,7 +242,9 @@ if (!gotLock) {
     worktreeService = createdWorktreeService
     diffService = new DiffService(database, gitService)
     terminalService = new TerminalService(runtime, database)
-    const createdAgentService = new AgentService(runtime, database)
+    const createdAgentService = new AgentService(runtime, database, {
+      moveWorktreeChanges: (input) => createdWorktreeService.moveChanges(input),
+    })
     agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)
     securityService = new SecurityService(database, join(userData, 'security'))

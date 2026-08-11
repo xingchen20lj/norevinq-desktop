@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 实现已有任务和未提交修改在 Local/托管 worktree 之间的安全 Handoff。
 - 继续逐项审计剩余“部分实现”功能。
+- 优先处理仍可公开实现的 Git、工作树和提供商错误体验缺口。
 
 ## 已完成任务
 
@@ -209,11 +209,16 @@
 - 私有仓库 `main` ruleset/classic branch protection API 均返回 GitHub 403（当前套餐要求升级 GitHub Pro 或公开仓库）；为保护源码隐私未擅自公开，限制已作为外部仓库治理依赖记录。
 - Windows 远端 34 个测试文件已全部通过；随后性能夹具暴露出逐条造 3,000 条历史在 Windows 文件系统耗时约 58 秒，而实际查询/批量已读仅 418.5 ms。状态库现提供原子事务批量写入，新增回归后本地 160 项通过，3,000 条夹具与被测操作合计约 105 ms。
 - 事务批量写入后的 Windows 远端 160 项、性能和生产构建通过；Electron 冒烟准确打开安全工作台，但测试定位器同时命中总览卡片与弹窗同名标题，现按语义 dialog 范围限定安全/计划任务断言。
+- PR #1 最终 macOS/Windows 检查及合并后的 `main` 检查均通过；主分支运行 `31462134036` 两个平台为绿色，重复 PR workflow 邮件问题已关闭。
+- 完成已有任务在 Local/托管 worktree 间的显式 Handoff：SQLite migration v9 持久化任务上下文，后续 `turn/start` 从主进程解析目标 cwd，Renderer 不能提交任意路径。
+- Handoff 使用真实 Git stash OID 迁移已暂存、未暂存和未跟踪修改；目标必须干净，冲突时硬恢复原本干净的目标并把源修改还原，无法删除仍被任务引用的 worktree。
+- 真实仓库自动测试完成 Local→worktree→Local、staged/unstaged/untracked 保真和冲突回滚；离线 Electron E2E 通过确认 UI 将已有任务与真实未提交修改交接到 detached worktree。
+- Handoff 阶段本地完整回归为 34 个测试文件 166 项，覆盖率 80.76/69.13/85.28/87.78，类型、规范、workflow、许可证、性能、生产构建与 bundle 守门通过；定向生命周期 Electron E2E 通过。
 
 ## 下一任务
 
-1. 处理工作树 Handoff 与已有任务/未提交修改迁移。
-2. 继续审计剩余部分实现项。
+1. 继续审计剩余部分实现项，优先处理整文件 recoverable discard 与工作树基线选择。
+2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
 ## 已做技术决策
@@ -244,7 +249,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：Windows 跨平台与计划历史批量写入修复后的 `verify:ci` 有 34 个测试文件 160 项、2 项性能基准，覆盖率 80.63/69.24/85.47/87.42，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：Handoff 后本地 `verify:ci` 有 34 个测试文件 166 项、2 项性能基准，覆盖率 80.76/69.13/85.28/87.78，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。最近远端 `main` macOS/Windows CI 为绿色；本次 Handoff 分支尚未推送。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
 
 ## 已知问题
 
@@ -275,4 +280,4 @@
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的真实进程重新 resume 与订阅恢复语义（替身层已测试）。
-- GitHub Actions 修复后 macOS/Windows 远端复跑结果。
+- Handoff 分支合入前的 macOS/Windows 远端 CI；本地 macOS 和跨平台单元夹具已通过。

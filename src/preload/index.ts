@@ -11,6 +11,7 @@ import type {
   ConversationSnapshot,
   ConversationSubscription,
   ForkConversationInput,
+  HandoffConversationInput,
   InterruptTurnInput,
   LoadProjectConversationsInput,
   RenameConversationInput,
@@ -128,6 +129,8 @@ const api: AsterDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.conversationGoalSet, input),
   clearThreadGoal: (input: SelectConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationGoalClear, input),
+  handoffConversation: (input: HandoffConversationInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.conversationHandoff, input),
   startConversation: (input: StartConversationInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.conversationStart, input),
   startTurn: (input: StartTurnInput) => ipcRenderer.invoke(IPC_CHANNELS.conversationTurnStart, input),

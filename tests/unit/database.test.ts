@@ -87,8 +87,41 @@ describe('StateDatabase', () => {
     const migrated = new StateDatabase(databasePath)
     expect(migrated.getProject('project-1')).toMatchObject({ pinned: false })
     expect(migrated.isThreadPinned('thread-1')).toBe(false)
+    expect(migrated.getThreadWorktreeId('thread-1')).toBeNull()
     expect(migrated.listPinnedProjectThreadIds('project-1', false)).toEqual([])
     migrated.close()
+  })
+
+  it('persists conversation worktree context without erasing it during list refreshes', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-db-worktree-context-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const worktreePath = mkdtempSync(join(root, 'worktree-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    database.insertManagedWorktree({
+      id: 'worktree-1',
+      projectId: project.id,
+      path: worktreePath,
+      baseRef: 'HEAD',
+      branch: null,
+      createdAt: new Date().toISOString(),
+      copiedIncludeFiles: 0,
+    })
+
+    database.associateThread(project.id, 'thread-1', false, 'worktree-1')
+    expect(database.countThreadsForWorktree('worktree-1')).toBe(1)
+    database.associateThread(project.id, 'thread-1', true)
+    expect(database.getThreadProjectContext('thread-1')).toEqual({
+      projectId: project.id,
+      worktreeId: 'worktree-1',
+    })
+    database.setThreadWorktree(project.id, 'thread-1', null)
+    expect(database.getThreadWorktreeId('thread-1')).toBeNull()
+    expect(database.countThreadsForWorktree('worktree-1')).toBe(0)
+    expect(() => database.setThreadWorktree(project.id, 'missing-thread', 'worktree-1'))
+      .toThrow('Conversation association not found')
+    database.close()
   })
 
   it('bounds pinned conversation hydration to twenty records per project', () => {

@@ -16,6 +16,7 @@ export type ConversationThreadSummary = {
   parentThreadId: string | null
   cliVersion: string
   pinned: boolean
+  worktreeId: string | null
 }
 
 export type ApprovalKind = 'command' | 'fileChange' | 'permissions'
@@ -85,6 +86,12 @@ export type StartTurnInput = {
   threadId: string
   text: string
   reasoningEffort?: string
+}
+
+export type HandoffConversationInput = {
+  threadId: string
+  targetWorktreeId: string | null
+  moveChanges: boolean
 }
 
 export type LoadProjectConversationsInput = {

@@ -147,18 +147,62 @@ export class StateDatabase {
     return project
   }
 
-  associateThread(projectId: string, threadId: string, archived?: boolean): void {
+  associateThread(projectId: string, threadId: string, archived?: boolean, worktreeId?: string | null): void {
     const archivedValue = archived === undefined ? null : archived ? 1 : 0
+    const updateWorktree = worktreeId === undefined ? 0 : 1
     this.#database
       .prepare(`
-        INSERT INTO project_threads (project_id, thread_id, last_opened_at, pinned, archived)
-        VALUES (?, ?, ?, 0, COALESCE(?, 0))
+        INSERT INTO project_threads (project_id, thread_id, last_opened_at, pinned, archived, worktree_id)
+        VALUES (?, ?, ?, 0, COALESCE(?, 0), ?)
         ON CONFLICT(thread_id) DO UPDATE SET
           project_id = excluded.project_id,
           last_opened_at = excluded.last_opened_at,
-          archived = CASE WHEN ? IS NULL THEN project_threads.archived ELSE ? END
+          archived = CASE WHEN ? IS NULL THEN project_threads.archived ELSE ? END,
+          worktree_id = CASE WHEN ? = 0 THEN project_threads.worktree_id ELSE ? END
       `)
-      .run(projectId, threadId, new Date().toISOString(), archivedValue, archivedValue, archivedValue)
+      .run(
+        projectId,
+        threadId,
+        new Date().toISOString(),
+        archivedValue,
+        worktreeId ?? null,
+        archivedValue,
+        archivedValue,
+        updateWorktree,
+        worktreeId ?? null,
+      )
+  }
+
+  getThreadWorktreeId(threadId: string): string | null {
+    const row = this.#database.prepare('SELECT worktree_id FROM project_threads WHERE thread_id = ?')
+      .get(threadId) as { worktree_id: string | null } | undefined
+    return row?.worktree_id ?? null
+  }
+
+  getThreadProjectContext(threadId: string): { projectId: string; worktreeId: string | null } | null {
+    const row = this.#database.prepare(`
+      SELECT project_id, worktree_id FROM project_threads WHERE thread_id = ?
+    `).get(threadId) as { project_id: string; worktree_id: string | null } | undefined
+    return row ? { projectId: row.project_id, worktreeId: row.worktree_id } : null
+  }
+
+  countThreadsForWorktree(worktreeId: string): number {
+    const row = this.#database.prepare(`
+      SELECT COUNT(*) AS count FROM project_threads WHERE worktree_id = ?
+    `).get(worktreeId) as { count: number }
+    return row.count
+  }
+
+  setThreadWorktree(projectId: string, threadId: string, worktreeId: string | null): void {
+    if (worktreeId) {
+      const worktree = this.getManagedWorktree(worktreeId)
+      if (worktree?.projectId !== projectId) throw new Error('Managed worktree not found for this project.')
+    }
+    const result = this.#database.prepare(`
+      UPDATE project_threads SET worktree_id = ?, last_opened_at = ?
+      WHERE project_id = ? AND thread_id = ?
+    `).run(worktreeId, new Date().toISOString(), projectId, threadId)
+    if (result.changes !== 1) throw new Error('Conversation association not found.')
   }
 
   listProjectThreadIds(projectId: string): string[] {
@@ -247,6 +291,7 @@ export class StateDatabase {
   }
 
   deleteManagedWorktree(worktreeId: string): void {
+    this.#database.prepare('UPDATE project_threads SET worktree_id = NULL WHERE worktree_id = ?').run(worktreeId)
     this.#database.prepare('DELETE FROM managed_worktrees WHERE id = ?').run(worktreeId)
   }
 
@@ -517,6 +562,16 @@ export class StateDatabase {
         CREATE INDEX IF NOT EXISTS project_threads_pinned_idx
           ON project_threads(project_id, archived, pinned DESC, last_opened_at DESC);
         PRAGMA user_version = 8;
+        COMMIT;
+      `)
+    }
+    if (version.user_version < 9) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE project_threads ADD COLUMN worktree_id TEXT;
+        CREATE INDEX IF NOT EXISTS project_threads_worktree_idx
+          ON project_threads(worktree_id);
+        PRAGMA user_version = 9;
         COMMIT;
       `)
     }

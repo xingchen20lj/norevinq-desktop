@@ -55,10 +55,10 @@
 | Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读私有 Draft PR #1，在线重复调用未创建第二项 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
 | 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根、默认 detached、可选显式分支；真实仓库/E2E 通过 |
-| 工作树 | 本地与工作树 Handoff | 部分实现 | Local/Worktree composer 上下文切换和新任务 cwd 已实现；已有 turn/未提交修改 Handoff 待补 |
+| 工作树 | 本地与工作树 Handoff | 已测试 | 任务上下文 SQLite 持久化、后续 turn cwd、确认 UI，以及 staged/unstaged/untracked 的 Local↔worktree 真实 Git 迁移和冲突回滚均通过自动测试；目标脏时失败关闭 |
 | 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
 | 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |
-| 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、安全 remove 已实现；未提交快照/Handoff 待补 |
+| 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、引用保护 remove、Handoff recovery stash 与冲突回滚已测试；进程在 stash/apply 窗口崩溃后的自动恢复元数据待补 |
 | 差异 | 文件树和 unified/split diff | 已测试 | working/staged、准确新旧行号、unified/split 及浅色真实桌面截图通过 |
 | 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量、截断禁用操作与离屏 hunk `content-visibility`；单个超长 hunk 行窗口待性能阶段 |
 | 差异 | 行内评论并发送给智能体 | 已测试 | E2E 选择新增行，携带文件/行号/hunk/代码上下文真实追加并收到 `ASTER_REVIEW_OK` |
@@ -100,6 +100,6 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 34 个测试文件 160 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；Windows 跨平台路径/工作树/进程/CRLF/mode 和 3,000 条计划历史事务夹具回归已补，远端 CI 复跑与目标真机、在线账户恢复待验证 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 34 个测试文件 166 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、目标真机与在线账户恢复待验证 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |

@@ -60,6 +60,80 @@ describe('WorktreeService', () => {
       setup.database.close()
     }
   }, 30_000)
+
+  it('moves staged, unstaged, and untracked changes between Local and a managed worktree', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot)
+      const target = await service.create({ projectId: setup.projectId })
+      writeFileSync(join(setup.projectPath, 'README.md'), '# staged\n')
+      runGit(setup.projectPath, ['add', 'README.md'])
+      writeFileSync(join(setup.projectPath, 'README.md'), '# staged\nunstaged\n')
+      writeFileSync(join(setup.projectPath, 'new file.txt'), 'untracked\n')
+
+      await expect(service.moveChanges({
+        projectId: setup.projectId,
+        sourceWorktreeId: null,
+        targetWorktreeId: target.id,
+      })).resolves.toEqual({ moved: true, recoveryStash: null })
+      expect(runGit(setup.projectPath, ['status', '--porcelain'])).toBe('')
+      expect(readFileSync(join(target.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# staged\nunstaged\n')
+      expect(readFileSync(join(target.path, 'new file.txt'), 'utf8')).toBe('untracked\n')
+      expect(runGit(target.path, ['status', '--porcelain'])).toContain('MM README.md')
+
+      await service.moveChanges({
+        projectId: setup.projectId,
+        sourceWorktreeId: target.id,
+        targetWorktreeId: null,
+      })
+      expect(runGit(target.path, ['status', '--porcelain'])).toBe('')
+      expect(readFileSync(join(setup.projectPath, 'new file.txt'), 'utf8')).toBe('untracked\n')
+      await service.remove({ worktreeId: target.id })
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
+  it('restores the source and target when a handoff patch conflicts', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot)
+      const target = await service.create({ projectId: setup.projectId })
+      writeFileSync(join(target.path, 'README.md'), '# target commit\n')
+      runGit(target.path, ['add', 'README.md'])
+      runGit(target.path, ['commit', '-m', 'target divergence'])
+      writeFileSync(join(setup.projectPath, 'README.md'), '# source changes\n')
+
+      await expect(service.moveChanges({
+        projectId: setup.projectId,
+        sourceWorktreeId: null,
+        targetWorktreeId: target.id,
+      })).rejects.toThrow('source was restored')
+      expect(readFileSync(join(setup.projectPath, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# source changes\n')
+      expect(readFileSync(join(target.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# target commit\n')
+      expect(runGit(target.path, ['status', '--porcelain'])).toBe('')
+      await service.remove({ worktreeId: target.id })
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
+  it('refuses to remove a worktree still associated with a conversation', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot)
+      const target = await service.create({ projectId: setup.projectId })
+      setup.database.associateThread(setup.projectId, 'thread-1', false, target.id)
+
+      await expect(service.remove({ worktreeId: target.id })).rejects.toThrow('Hand off 1 conversation')
+      expect(existsSync(target.path)).toBe(true)
+
+      setup.database.setThreadWorktree(setup.projectId, 'thread-1', null)
+      await expect(service.remove({ worktreeId: target.id })).resolves.toEqual([])
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
 })
 
 function createRepository(): {

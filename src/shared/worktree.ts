@@ -20,3 +20,12 @@ export type CreateWorktreeInput = {
 }
 export type WorktreeActionInput = { worktreeId: string }
 export type RemoveWorktreeInput = { worktreeId: string; force?: boolean }
+export type MoveWorktreeChangesInput = {
+  projectId: string
+  sourceWorktreeId: string | null
+  targetWorktreeId: string | null
+}
+export type MoveWorktreeChangesResult = {
+  moved: boolean
+  recoveryStash: string | null
+}

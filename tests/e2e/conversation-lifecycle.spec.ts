@@ -1,4 +1,5 @@
 import { _electron as electron, expect, test, type Locator } from '@playwright/test'
+import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
@@ -7,6 +8,7 @@ import { StateDatabase } from '../../src/main/state/database.js'
 test.skip(process.platform === 'win32', 'The deterministic fixture wrapper uses a POSIX launcher; protocol coverage remains cross-platform.')
 
 test('searches, paginates, renames, forks, compacts, archives, restores, and deletes tasks', async () => {
+  test.setTimeout(60_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-lifecycle-e2e-'))
   const projectPath = join(profile, 'project')
   const codexHome = join(profile, 'codex-home')
@@ -14,6 +16,12 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   const helper = resolve('tests/helpers/fakeCodexLifecycle.mjs')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
+  execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Aster Lifecycle'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'aster-lifecycle@example.invalid'], { cwd: projectPath })
+  writeFileSync(join(projectPath, 'README.md'), '# lifecycle\n')
+  execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
+  execFileSync('git', ['commit', '-m', 'test: lifecycle baseline'], { cwd: projectPath })
   const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
@@ -92,6 +100,28 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await goalDialog.getByRole('button', { name: '清除目标' }).click()
     await expect(window.getByRole('article', { name: '当前长期目标' })).toHaveCount(0)
+
+    await window.getByRole('button', { name: 'Local', exact: true }).click()
+    const worktreePanel = window.getByRole('complementary', { name: '工作树' })
+    await worktreePanel.getByRole('button', { name: '创建', exact: true }).click()
+    await expect(worktreePanel.getByRole('button', { name: /Detached/ })).toBeVisible()
+    const [managedWorktree] = await window.evaluate(async ({ projectId }) => {
+      const bridge = Reflect.get(window, 'aster') as {
+        listWorktrees: (input: { projectId: string }) => Promise<{ id: string; path: string }[]>
+      }
+      return bridge.listWorktrees({ projectId })
+    }, { projectId: project.id })
+    expect(managedWorktree).toBeDefined()
+    writeFileSync(join(projectPath, 'README.md'), '# staged\n')
+    execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
+    writeFileSync(join(projectPath, 'README.md'), '# staged\nunstaged\n')
+    writeFileSync(join(projectPath, 'handoff.txt'), 'ASTER_HANDOFF_OK\n')
+
+    window.once('dialog', async (dialog) => { await dialog.accept() })
+    await worktreePanel.getByRole('button', { name: /Detached/ }).click()
+    await expect(window.getByRole('button', { name: 'Worktree', exact: true })).toBeVisible()
+    expect(execFileSync('git', ['status', '--porcelain'], { cwd: projectPath, encoding: 'utf8' })).toBe('')
+    expect(readFileSync(join(managedWorktree?.path ?? '', 'handoff.txt'), 'utf8')).toBe('ASTER_HANDOFF_OK\n')
 
     await window.getByRole('button', { name: '重命名任务' }).click()
     const rename = window.getByRole('dialog', { name: '重命名任务' })
