@@ -408,7 +408,7 @@ function reduceTextDelta(
   const ids = notificationItemIds(params)
   const delta = stringValue(params.delta)
   if (!ids || delta === null) return addMalformedEvent(state, `${target}/delta`, params, emittedAtMs)
-  const index = state.activities.findIndex((activity) => activity.id === ids.itemId)
+  const index = findActivityIndex(state.activities, ids.itemId)
   const existing = state.activities[index] ?? placeholderActivity(target, ids, emittedAtMs)
   if (existing.type !== target) return addMalformedEvent(state, `${target}/delta:type-mismatch`, params, emittedAtMs)
 
@@ -439,7 +439,7 @@ function reduceReasoningDelta(
   if (!ids || delta === null || valueIndex === null || valueIndex < 0 || !Number.isInteger(valueIndex)) {
     return addMalformedEvent(state, `reasoning/${target}Delta`, params, emittedAtMs)
   }
-  const index = state.activities.findIndex((activity) => activity.id === ids.itemId)
+  const index = findActivityIndex(state.activities, ids.itemId)
   const existing: AgentActivity = state.activities[index]
     ?? { ...baseActivity(ids.itemId, ids.threadId, ids.turnId, 'inProgress', emittedAtMs, null), type: 'reasoning', summary: [], content: [] }
   if (existing.type !== 'reasoning') return addMalformedEvent(state, `reasoning/${target}Delta:type-mismatch`, params, emittedAtMs)
@@ -473,7 +473,7 @@ function reduceReasoningPart(
   if (!ids || summaryIndex === null || summaryIndex < 0 || !Number.isInteger(summaryIndex)) {
     return addMalformedEvent(state, 'reasoning/summaryPartAdded', params, emittedAtMs)
   }
-  const index = state.activities.findIndex((activity) => activity.id === ids.itemId)
+  const index = findActivityIndex(state.activities, ids.itemId)
   const existing: AgentActivity = state.activities[index]
     ?? { ...baseActivity(ids.itemId, ids.threadId, ids.turnId, 'inProgress', emittedAtMs, null), type: 'reasoning', summary: [], content: [] }
   if (existing.type !== 'reasoning') return addMalformedEvent(state, 'reasoning/summaryPartAdded:type-mismatch', params, emittedAtMs)
@@ -492,7 +492,7 @@ function reduceMcpProgress(
   const ids = notificationItemIds(params)
   const message = stringValue(params.message)
   if (!ids || message === null) return addMalformedEvent(state, 'item/mcpToolCall/progress', params, emittedAtMs)
-  const index = state.activities.findIndex((activity) => activity.id === ids.itemId)
+  const index = findActivityIndex(state.activities, ids.itemId)
   const existing: AgentActivity = state.activities[index]
     ?? {
         ...baseActivity(ids.itemId, ids.threadId, ids.turnId, 'inProgress', emittedAtMs, null),
@@ -582,7 +582,7 @@ function placeholderActivity(
 }
 
 function upsertActivity(activities: readonly AgentActivity[], incoming: AgentActivity): AgentActivity[] {
-  const index = activities.findIndex((activity) => activity.id === incoming.id)
+  const index = findActivityIndex(activities, incoming.id)
   if (index < 0) return [...activities, incoming]
   const existing = activities[index]
   if (!existing) return [...activities, incoming]
@@ -794,7 +794,18 @@ function preferCompleteArray(incoming: string[], existing: string[]): string[] {
 }
 
 function replaceAt(activities: readonly AgentActivity[], index: number, activity: AgentActivity): AgentActivity[] {
-  return activities.map((value, valueIndex) => valueIndex === index ? activity : value)
+  const next = [...activities]
+  next[index] = activity
+  return next
+}
+
+function findActivityIndex(activities: readonly AgentActivity[], id: string): number {
+  // Streaming deltas overwhelmingly target the newest activity. Walking backwards
+  // avoids a full history scan while retaining the immutable public state shape.
+  for (let index = activities.length - 1; index >= 0; index -= 1) {
+    if (activities[index]?.id === id) return index
+  }
+  return -1
 }
 
 type TextBudget = { remaining: number; truncatedChars: number }

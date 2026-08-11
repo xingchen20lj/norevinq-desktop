@@ -30,10 +30,7 @@ import {
   Wrench,
   X,
 } from 'lucide-react'
-import { FitAddon } from '@xterm/addon-fit'
-import { SearchAddon } from '@xterm/addon-search'
-import { Terminal } from '@xterm/xterm'
-import { useEffect, useRef, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import type { AgentActivity, AgentActivityState } from '../../shared/agent'
 import type { BootstrapState, ProjectSummary } from '../../shared/contracts'
 import type { ConversationSnapshot, PendingApproval } from '../../shared/conversation'
@@ -42,17 +39,20 @@ import type { ProviderStatus } from '../../shared/providers'
 import type { GitRepositorySnapshot } from '../../shared/git'
 import type { ManagedWorktree } from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
-import type { TerminalEvent, TerminalSession, TerminalState } from '../../shared/terminal'
+import type { TerminalEvent, TerminalState } from '../../shared/terminal'
 import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } from '../../shared/integrations'
 import type { SecuritySnapshot } from '../../shared/security'
-import { SettingsWorkbench } from './SettingsWorkbench'
-import { SecurityWorkbench } from './SecurityWorkbench'
 import type { SchedulerSnapshot } from '../../shared/scheduler'
-import { SchedulerWorkbench } from './SchedulerWorkbench'
-import { FileWorkbench } from './FileWorkbench'
 import type { BrowserSnapshot } from '../../shared/browser'
-import { BrowserWorkbench } from './BrowserWorkbench'
-import { CommandPalette, type CommandAction } from './CommandPalette'
+import type { CommandAction } from './CommandPalette'
+
+const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
+const CommandPalette = lazy(() => import('./CommandPalette').then(({ CommandPalette: component }) => ({ default: component })))
+const FileWorkbench = lazy(() => import('./FileWorkbench').then(({ FileWorkbench: component }) => ({ default: component })))
+const SchedulerWorkbench = lazy(() => import('./SchedulerWorkbench').then(({ SchedulerWorkbench: component }) => ({ default: component })))
+const SecurityWorkbench = lazy(() => import('./SecurityWorkbench').then(({ SecurityWorkbench: component }) => ({ default: component })))
+const SettingsWorkbench = lazy(() => import('./SettingsWorkbench').then(({ SettingsWorkbench: component }) => ({ default: component })))
+const TerminalPanel = lazy(() => import('./TerminalPanel').then(({ TerminalPanel: component }) => ({ default: component })))
 
 type Theme = 'dark' | 'light'
 type ThemePreference = Theme | 'system'
@@ -572,7 +572,7 @@ export function App(): React.JSX.Element {
           select={(item) => { setSelectedWorktree(item); setWorktreeOpen(false) }}
           onError={setError}
         />}
-        {terminalOpen && selectedProject && <TerminalPanel
+        {terminalOpen && selectedProject && <Suspense fallback={<WorkbenchLoading label="正在加载终端…" />}><TerminalPanel
           projectId={selectedProject.id}
           sessions={terminalState.sessions}
           selectedId={selectedTerminalId}
@@ -582,18 +582,18 @@ export function App(): React.JSX.Element {
           create={() => openTerminal(true)}
           onError={setError}
           appendContext={appendTerminalContext}
-        />}
-        {filesOpen && selectedProject && <FileWorkbench
+        /></Suspense>}
+        {filesOpen && selectedProject && <Suspense fallback={<WorkbenchLoading label="正在加载文件工作台…" />}><FileWorkbench
           key={`${selectedProject.id}:${selectedWorktree?.id ?? 'local'}:${initialFilePath ?? ''}`}
           project={selectedProject}
           worktree={selectedWorktree}
           initialPath={initialFilePath}
           close={() => { setFilesOpen(false); setInitialFilePath(null) }}
           onError={setError}
-        />}
-        {browserOpen && <BrowserWorkbench snapshot={browser} close={() => setBrowserOpen(false)} onError={setError} />}
+        /></Suspense>}
+        {browserOpen && <Suspense fallback={<WorkbenchLoading label="正在加载网页预览…" />}><BrowserWorkbench snapshot={browser} close={() => setBrowserOpen(false)} onError={setError} /></Suspense>}
       </main>
-      {settingsOpen && <SettingsWorkbench
+      {settingsOpen && <Suspense fallback={<WorkbenchLoading label="正在加载设置…" overlay />}><SettingsWorkbench
         providers={providers}
         apiKey={deepSeekKey}
         setApiKey={setDeepSeekKey}
@@ -603,189 +603,27 @@ export function App(): React.JSX.Element {
         close={() => setSettingsOpen(false)}
         onError={setError}
         onUpdated={(result) => { setProviders(result.providers); setRuntime(result.runtime) }}
-      />}
-      {securityOpen && <SecurityWorkbench
+      /></Suspense>}
+      {securityOpen && <Suspense fallback={<WorkbenchLoading label="正在加载安全工作台…" overlay />}><SecurityWorkbench
         snapshot={security}
         project={selectedProject}
         close={() => setSecurityOpen(false)}
         onError={setError}
-      />}
-      {schedulerOpen && <SchedulerWorkbench
+      /></Suspense>}
+      {schedulerOpen && <Suspense fallback={<WorkbenchLoading label="正在加载计划任务…" overlay />}><SchedulerWorkbench
         snapshot={scheduler}
         projects={projects}
         models={runtime?.models ?? []}
         close={() => setSchedulerOpen(false)}
         onError={setError}
-      />}
-      {commandOpen && <CommandPalette actions={commands} close={() => setCommandOpen(false)} onError={setError} />}
+      /></Suspense>}
+      {commandOpen && <Suspense fallback={<WorkbenchLoading label="正在加载命令面板…" overlay />}><CommandPalette actions={commands} close={() => setCommandOpen(false)} onError={setError} /></Suspense>}
     </div>
   )
 }
 
-function TerminalPanel({ projectId, sessions, selectedId, theme, select, close, create, onError, appendContext }: {
-  projectId: string
-  sessions: TerminalSession[]
-  selectedId: string | null
-  theme: Theme
-  select: (sessionId: string | null) => void
-  close: () => void
-  create: () => Promise<void>
-  onError: (message: string | null) => void
-  appendContext: (sessionId: string) => Promise<void>
-}): React.JSX.Element {
-  const [busy, setBusy] = useState(false)
-  const projectSessions = sessions.filter((session) => session.projectId === projectId)
-  const selected = projectSessions.find(({ id }) => id === selectedId) ?? projectSessions[0] ?? null
-
-  async function run(action: () => Promise<unknown>): Promise<void> {
-    setBusy(true)
-    onError(null)
-    try { await action() }
-    catch (reason) { onError(toErrorMessage(reason)) }
-    finally { setBusy(false) }
-  }
-
-  async function closeSession(sessionId: string): Promise<void> {
-    await run(async () => {
-      await window.aster.closeTerminal({ sessionId })
-      const next = projectSessions.find(({ id }) => id !== sessionId)
-      select(next?.id ?? null)
-    })
-  }
-
-  return <section className="terminal-drawer" aria-label="集成终端">
-    <header className="terminal-header">
-      <div className="terminal-tabs" role="tablist" aria-label="终端会话">
-        {projectSessions.map((session, index) => <button
-          role="tab"
-          aria-selected={selected?.id === session.id}
-          className={selected?.id === session.id ? 'selected' : ''}
-          onClick={() => select(session.id)}
-          key={session.id}
-          title={session.cwd}
-        ><TerminalSquare size={12} /><span>{terminalTitle(session, index)}</span><i className={session.status} /></button>)}
-      </div>
-      <button className="icon-button" aria-label="新建终端" disabled={busy} onClick={() => void run(create)}><Plus size={14} /></button>
-      <button className="icon-button" aria-label="关闭终端面板" onClick={close}><X size={15} /></button>
-    </header>
-    {selected ? <>
-      <div className="terminal-toolbar">
-        <span title={selected.cwd}>{selected.cwd}</span>
-        <strong>{terminalStatusLabel(selected)}</strong>
-        <button disabled={busy} onClick={() => void run(() => appendContext(selected.id))}>共享输出给智能体</button>
-        <button disabled={busy} onClick={() => void run(async () => {
-          if (selected.status === 'running' || selected.status === 'starting') {
-            await window.aster.writeTerminal({ sessionId: selected.id, data: '\f' })
-          }
-          await window.aster.clearTerminal({ sessionId: selected.id })
-        })}>清屏</button>
-        {(selected.status === 'running' || selected.status === 'starting') && <button className="terminal-stop" disabled={busy} onClick={() => void run(() => window.aster.terminateTerminal({ sessionId: selected.id }))}><Square size={10} fill="currentColor" />终止</button>}
-        <button disabled={busy} onClick={() => void closeSession(selected.id)}>关闭会话</button>
-      </div>
-      <TerminalCanvas session={selected} theme={theme} onError={onError} />
-    </> : <div className="terminal-empty"><TerminalSquare size={22} /><p>当前项目没有终端会话。</p><button onClick={() => void run(create)}>新建终端</button></div>}
-  </section>
-}
-
-function TerminalCanvas({ session, theme, onError }: {
-  session: TerminalSession
-  theme: Theme
-  onError: (message: string | null) => void
-}): React.JSX.Element {
-  const hostRef = useRef<HTMLDivElement | null>(null)
-  const terminalRef = useRef<Terminal | null>(null)
-  const searchRef = useRef<SearchAddon | null>(null)
-  const renderedOutput = useRef('')
-  const [query, setQuery] = useState('')
-
-  useEffect(() => {
-    const host = hostRef.current
-    if (!host) return
-    const terminal = new Terminal({
-      allowProposedApi: false,
-      cursorBlink: true,
-      cursorStyle: 'bar',
-      fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
-      fontSize: 12,
-      lineHeight: 1.25,
-      scrollback: 10_000,
-      theme: xtermTheme(theme),
-    })
-    const fit = new FitAddon()
-    const search = new SearchAddon()
-    terminal.loadAddon(fit)
-    terminal.loadAddon(search)
-    terminal.open(host)
-    terminalRef.current = terminal
-    searchRef.current = search
-    renderedOutput.current = session.output
-    terminal.write(session.output)
-    const dataDisposable = terminal.onData((data) => {
-      void window.aster.writeTerminal({ sessionId: session.id, data }).catch((reason: unknown) => onError(toErrorMessage(reason)))
-    })
-    const resizeDisposable = terminal.onResize(({ cols, rows }) => {
-      void window.aster.resizeTerminal({ sessionId: session.id, cols, rows }).catch((reason: unknown) => onError(toErrorMessage(reason)))
-    })
-    const resizeObserver = new ResizeObserver(() => {
-      try { fit.fit() } catch { /* The drawer may be transitioning out of layout. */ }
-    })
-    resizeObserver.observe(host)
-    requestAnimationFrame(() => { try { fit.fit(); terminal.focus() } catch { /* Unmounted before frame. */ } })
-    return () => {
-      resizeObserver.disconnect()
-      dataDisposable.dispose()
-      resizeDisposable.dispose()
-      search.dispose()
-      fit.dispose()
-      terminal.dispose()
-      terminalRef.current = null
-      searchRef.current = null
-      renderedOutput.current = ''
-    }
-  }, [session.id])
-
-  useEffect(() => {
-    if (terminalRef.current) terminalRef.current.options.theme = xtermTheme(theme)
-  }, [theme])
-
-  useEffect(() => {
-    const terminal = terminalRef.current
-    if (!terminal || session.output === renderedOutput.current) return
-    if (session.output.startsWith(renderedOutput.current)) {
-      terminal.write(session.output.slice(renderedOutput.current.length))
-    } else {
-      terminal.reset()
-      terminal.write(session.output)
-    }
-    renderedOutput.current = session.output
-  }, [session.output])
-
-  return <div className="terminal-canvas-shell">
-    <div className="terminal-search"><Search size={12} /><input aria-label="搜索终端输出" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => {
-      if (event.key === 'Enter' && query) searchRef.current?.findNext(query)
-      if (event.key === 'Escape') { setQuery(''); terminalRef.current?.focus() }
-    }} placeholder="搜索" /><button disabled={!query} onClick={() => searchRef.current?.findPrevious(query)}>↑</button><button disabled={!query} onClick={() => searchRef.current?.findNext(query)}>↓</button></div>
-    <div className="terminal-canvas" ref={hostRef} />
-  </div>
-}
-
-function terminalTitle(session: TerminalSession, index: number): string {
-  const parts = session.cwd.split(/[\\/]/)
-  return `${parts.at(-1) ?? 'Terminal'} ${String(index + 1)}`
-}
-
-function terminalStatusLabel(session: TerminalSession): string {
-  if (session.status === 'exited') return `已退出 (${String(session.exitCode ?? '?')})`
-  if (session.status === 'failed') return '连接失败'
-  if (session.status === 'terminating') return '正在终止'
-  if (session.status === 'starting') return '正在启动'
-  return session.outputTruncated ? '运行中 · 输出已截断' : '运行中'
-}
-
-function xtermTheme(theme: Theme): { background: string; foreground: string; cursor: string; selectionBackground: string } {
-  return theme === 'dark'
-    ? { background: '#0d0f12', foreground: '#d9dee7', cursor: '#95a2ff', selectionBackground: '#38416a' }
-    : { background: '#f6f7f9', foreground: '#252a33', cursor: '#4655d6', selectionBackground: '#c9cff6' }
+function WorkbenchLoading({ label, overlay = false }: { label: string; overlay?: boolean }): React.JSX.Element {
+  return <div className={`workbench-loading ${overlay ? 'overlay' : ''}`} role="status"><LoaderCircle size={16} className="spin" />{label}</div>
 }
 
 function WorktreePanel({ project, items, selected, close, update, select, onError }: {

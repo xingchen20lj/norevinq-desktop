@@ -17,6 +17,20 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
     })
     expect(bootstrap.appVersion).toBe('0.1.0')
     expect(bootstrap.platform).toBe(process.platform)
+
+    await window.getByRole('button', { name: '设置', exact: true }).click()
+    await expect(window.getByRole('heading', { name: '设置与集成' })).toBeVisible()
+    await window.getByRole('button', { name: '关闭设置' }).click()
+    await window.getByRole('button', { name: '安全', exact: true }).click()
+    await expect(window.getByRole('heading', { name: '安全工作台' })).toBeVisible()
+    await window.getByRole('button', { name: '关闭安全工作台' }).click()
+    await window.getByRole('button', { name: '计划任务', exact: true }).click()
+    await expect(window.getByRole('heading', { name: '计划任务' })).toBeVisible()
+    await window.getByRole('button', { name: '关闭计划任务' }).click()
+    await window.getByRole('button', { name: '命令面板' }).click()
+    await expect(window.getByRole('dialog', { name: '命令面板' })).toBeVisible()
+    await window.keyboard.press('Escape')
+
     if (process.env.ASTER_REQUIRE_CODEX_RUNTIME === '1') {
       await expect.poll(() => window.evaluate(async () => {
         const bridge = Reflect.get(window, 'aster') as {

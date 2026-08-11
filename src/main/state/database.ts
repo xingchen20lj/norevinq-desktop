@@ -54,7 +54,7 @@ export class StateDatabase {
 
   listProjects(): ProjectSummary[] {
     const rows = this.#database
-      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects ORDER BY last_opened_at DESC')
+      .prepare('SELECT id, name, path, trusted, last_opened_at FROM projects ORDER BY last_opened_at DESC LIMIT 500')
       .all() as ProjectRow[]
 
     return rows.map(toProjectSummary)
@@ -279,10 +279,18 @@ export class StateDatabase {
   }
 
   markScheduledRunsRead(runIds?: string[]): void {
+    if (!runIds) {
+      this.#database.prepare(`
+        UPDATE scheduled_runs
+        SET unread = 0, run_json = json_set(run_json, '$.unread', json('false'))
+        WHERE unread = 1
+      `).run()
+      return
+    }
     const runs = this.listScheduledRuns(1_000)
-    const selected = runIds ? new Set(runIds) : null
+    const selected = new Set(runIds)
     for (const run of runs) {
-      if (!run.unread || (selected && !selected.has(run.id))) continue
+      if (!run.unread || !selected.has(run.id)) continue
       this.upsertScheduledRun({ ...run, unread: false })
     }
   }
@@ -407,6 +415,15 @@ export class StateDatabase {
           updated_at TEXT NOT NULL
         );
         PRAGMA user_version = 6;
+        COMMIT;
+      `)
+    }
+    if (version.user_version < 7) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE INDEX IF NOT EXISTS projects_last_opened_idx ON projects(last_opened_at DESC);
+        CREATE INDEX IF NOT EXISTS scheduled_runs_scheduled_idx ON scheduled_runs(scheduled_for DESC);
+        PRAGMA user_version = 7;
         COMMIT;
       `)
     }

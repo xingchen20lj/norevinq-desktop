@@ -7,8 +7,11 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `pnpm verify`：严格类型检查、ESLint、脚本语法、单元/集成测试和生产构建。
 - `pnpm verify:ci`：在上述检查中启用 V8 覆盖率门槛。
 - `pnpm test:coverage`：生成 `coverage/index.html`、LCOV 和 JSON summary。
+- `pnpm test:performance`：运行长活动历史与真实 SQLite 大数据量基准。
 - `pnpm test:e2e`：构建后运行真实 Electron 桌面回归；需要可用的 Codex app-server 和相应账户凭据。
 - `pnpm test:e2e:offline`：不调用模型，验证 Electron 启动、主窗口 IPC 和非主 Renderer 拒绝；用于 macOS/Windows CI。
+- `pnpm test:e2e:performance`：用全新 profile 测量真实 Electron 冷启动、DOMContentLoaded 和总工作集。
+- `pnpm check:bundle`：从生产 HTML 校验首屏 JS/CSS 与 Renderer 总资产预算。
 - `pnpm audit:dependencies`：查询当前漏洞数据库并拒绝生产依赖的高严重度问题。
 - `pnpm audit:licenses`：列出生产依赖许可证，发布前用于生成 third-party notices。
 
@@ -20,7 +23,8 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 2. 集成测试使用真实临时 SQLite、Git 仓库、工作树和 app-server JSONL 替身。
 3. 崩溃注入测试验证空闲 app-server 自动恢复，而活动 turn 失败关闭且绝不自动重放副作用请求。
 4. Electron E2E 使用临时真实仓库，验证沙箱 Renderer、在线 Codex、DeepSeek（存在密钥时）、审批允许/拒绝、Git/diff/worktree、终端、文件预览、本地网页、计划任务和应用重启恢复。
-5. GitHub Actions 在 macOS 与 Windows 上执行 `verify:ci`、生产依赖审计和离线 Electron IPC 对抗测试。CI 构建通过不能替代 Windows 真机 UI、签名或安装程序验证。
+5. 性能层对 5,000 条活动、3,000 条计划运行和真实冷启动建立可重复基线；详见 [性能基线](PERFORMANCE.md)。
+6. GitHub Actions 在 macOS 与 Windows 上执行 `verify:ci`、生产依赖审计和离线 Electron IPC 对抗测试。CI 构建通过不能替代 Windows 真机 UI、签名或安装程序验证。
 
 ## 外部依赖
 

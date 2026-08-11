@@ -127,7 +127,7 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .send-button.stop-button { color: var(--danger); background: color-mix(in srgb, var(--danger) 13%, var(--surface)); }
 
 .activity-timeline { width: min(820px, 100%); margin: 0 auto; display: flex; flex-direction: column; gap: 9px; }
-.activity-card { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 9px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); }
+.activity-card { display: grid; grid-template-columns: 29px minmax(0, 1fr); gap: 9px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 10px; background: color-mix(in srgb, var(--surface) 92%, transparent); content-visibility: auto; contain-intrinsic-size: auto 96px; }
 .activity-card.userMessage { margin-left: 64px; border-color: color-mix(in srgb, var(--accent) 25%, var(--border)); background: color-mix(in srgb, var(--accent-soft) 48%, var(--surface)); }
 .activity-card.agentMessage { padding: 14px; background: transparent; border-color: transparent; }
 .activity-card.reasoning { background: color-mix(in srgb, var(--surface) 60%, transparent); }
@@ -155,6 +155,8 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .approval-panel button.approve { border-color: transparent; color: #fff; background: var(--accent); }
 
 .modal-backdrop { position: fixed; z-index: 20; inset: 0; display: grid; place-items: center; padding: 30px; background: rgba(4, 6, 9, .58); backdrop-filter: blur(5px); }
+.workbench-loading { position: absolute; z-index: 18; inset: 45px 0 0; display: flex; align-items: center; justify-content: center; gap: 7px; color: var(--muted); background: color-mix(in srgb, var(--bg) 92%, transparent); font-size: 10px; }
+.workbench-loading.overlay { position: fixed; z-index: 39; inset: 0; background: rgba(4, 6, 9, .58); backdrop-filter: blur(5px); }
 .settings-dialog { width: min(560px, 100%); padding: 20px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); box-shadow: 0 28px 90px rgba(0,0,0,.4); }
 .settings-dialog header { display: flex; align-items: flex-start; justify-content: space-between; }
 .settings-dialog header .eyebrow { margin-bottom: 5px; }
