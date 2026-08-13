@@ -216,7 +216,7 @@
 - Handoff 阶段本地完整回归为 34 个测试文件 166 项，覆盖率 80.76/69.13/85.28/87.78，类型、规范、workflow、许可证、性能、生产构建与 bundle 守门通过；定向生命周期 Electron E2E 通过。
 - 所有本地/内部打包入口在构建前安全重建 `release`，避免旧包的更新元数据或其他产物污染新包；即使 `release` 被替换为符号链接，也只移除链接本身而不修改外部目标。
 - 默认打包显式禁用 electron-builder 从 Git remote 推断发布渠道；只有 `package:update` 能在受控 HTTPS URL 校验通过后生成 generic 更新元数据，普通体验包保持无更新渠道。
-- 2026-08-13 最新 Intel macOS 体验包真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，DMG CRC 与 ZIP 全文件校验通过；DMG 为 260 MiB，SHA-256 `70e0efaefa18ab38bc76f81c57ddd70810b52e3a55deb13869c7d763cbf0521f`。
+- 2026-08-13 最新 Intel macOS 隔离体验包 `ba33d79` 真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，私有 `codex-home` 为真实 `0700` 目录，DMG CRC 与 ZIP 全文件校验通过；DMG 为 263 MiB，SHA-256 `fb8e35f4199155432ee001d7a36c41e66ed215afeb9c58057dc66e2a73fbaa79`。
 - Codex home 隔离后完整 `verify:ci`：36 个测试文件 172 项、2 项性能基准、覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
 - GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
 - 将 Aster app-server 的 `CODEX_HOME` 固定到独立 Electron `userData/codex-home`（macOS 实际为 `~/Library/Application Support/aster-code/codex-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界。
