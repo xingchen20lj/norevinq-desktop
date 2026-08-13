@@ -1,6 +1,6 @@
 # 官方上游研究基线
 
-调查日期：2026-08-11。所有动态能力必须在运行时再次探测；本文只作为首个实现和回归基线。
+调查日期：2026-08-11；DeepSeek 动态能力更新于 2026-08-13。所有动态能力必须在运行时再次探测；本文只作为首个实现和回归基线。
 
 ## OpenAI Codex
 
@@ -36,7 +36,7 @@
 
 - 官方端点：`POST https://api.deepseek.com/responses`。
 - 认证：`Authorization: Bearer $DEEPSEEK_API_KEY`。
-- 截至调查日，Responses 可用模型为 `deepseek-v4-flash`；`deepseek-v4-pro` 虽在模型目录和 Chat Completions 可见，但真实 Responses 请求返回 HTTP 400。
+- 2026-08-10 首次调查时只有 `deepseek-v4-flash` 可用，Pro 真实返回 HTTP 400。2026-08-13 官方 reference 已把 `deepseek-v4-pro` 加入 `/responses` 模型枚举，官方 Codex catalog 也标为 `supported_in_api=true`；当前账户的最小请求真实返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `ASTER_PRO_OK`。
 - 已用当前环境安全配置的凭据完成最小在线验证：非流式响应、SSE、函数调用、`function_call_output` 第二轮闭环和服务端 Web Search。
 - SSE 以语义事件传输，终态是 `response.completed`、`response.incomplete` 或 `response.failed`，没有 `[DONE]`。
 - 支持 function tools、Codex 特例 `apply_patch` custom tool、推理和 server-side Web Search。
@@ -46,19 +46,19 @@
 
 首个能力注册：
 
-| 能力 | `deepseek-v4-flash` |
-|---|---|
-| Responses | 是 |
-| 文本输入 | 是 |
-| function tools | 是 |
-| `apply_patch` custom tool | 是 |
-| 推理 | 是：none/low/high/max |
-| 服务端 Web Search | 是，需检查子调用状态 |
-| 图片/文件 | 否 |
-| MCP/Code Interpreter/Computer Use | 否 |
-| 有状态/后台 Responses | 否 |
-| 推理摘要 | 否 |
-| Responses WebSocket | 未公开，按否处理 |
+| 能力 | `deepseek-v4-flash` | `deepseek-v4-pro` |
+|---|---|---|
+| Responses | 是 | 是 |
+| 文本输入 | 是 | 是 |
+| function tools | 是 | 是 |
+| `apply_patch` custom tool | 是 | 是 |
+| 推理 | none/low/high/max | none/low/high/max |
+| 服务端 Web Search | 是，需检查子调用状态 | 是，需检查子调用状态 |
+| 图片/文件 | 否 | 否 |
+| MCP/Code Interpreter/Computer Use | 否 | 否 |
+| 有状态/后台 Responses | 否 | 否 |
+| 推理摘要 | 否 | 否 |
+| Responses WebSocket | 未公开，按否处理 | 未公开，按否处理 |
 
 来源：
 

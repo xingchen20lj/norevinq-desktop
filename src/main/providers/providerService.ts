@@ -35,11 +35,7 @@ export class ProviderService {
         configured: this.#environmentKey !== null || vaultConfigured,
         credentialSource: this.#environmentKey !== null ? 'environment' : vaultConfigured ? 'os-vault' : 'none',
         credentialStorageAvailable: this.#credentials.isAvailable(),
-        responsesModel: 'deepseek-v4-flash',
-        unavailableModels: [{
-          model: 'deepseek-v4-pro',
-          reason: 'Responses API 当前返回 HTTP 400；不会静默切换到 Chat Completions。',
-        }],
+        responsesModels: ['deepseek-v4-flash', 'deepseek-v4-pro'],
       },
     }
   }

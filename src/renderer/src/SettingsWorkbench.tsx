@@ -234,11 +234,11 @@ function ProviderTab({ providers, account, apiKey, setApiKey, busy, run, onUpdat
     <div className="provider-state">
       <div className="provider-icon"><KeyRound size={17} /></div>
       <div><strong>{status?.configured ? '已配置' : '未配置'}</strong><p>{status?.credentialSource === 'environment' ? '由进程环境安全提供' : status?.credentialSource === 'os-vault' ? '保存在操作系统加密保险库' : '添加 API Key 以启用'}</p></div>
-      <span className={status?.configured ? 'connected' : ''}>{status?.responsesModel ?? 'deepseek-v4-flash'}</span>
+      <span className={status?.configured ? 'connected' : ''}>{status?.responsesModels.join(' · ') ?? 'deepseek-v4-flash · deepseek-v4-pro'}</span>
     </div>
     <label className="credential-field"><span>API Key</span><input type="password" autoComplete="off" value={apiKey} onChange={(event) => setApiKey(event.target.value)} placeholder="仅加密保存，不写入日志或数据库" /></label>
     <p className="settings-note">支持文本、推理、函数工具、custom apply_patch 与服务端 Web Search。不支持图片、文件输入、MCP、Computer Use、后台任务或 stateful Responses。</p>
-    <div className="provider-warning"><strong>DeepSeek V4 Pro 暂不可用</strong><span>截至 2026-08-10，Responses API 返回 HTTP 400；Aster 不会静默降级到 Chat Completions。</span></div>
+    <div className="provider-warning"><strong>两个 Responses 模型均可用</strong><span>V4 Flash 偏重速度，V4 Pro 偏重复杂任务质量；两者均保持文本输入和同一组显式能力边界。</span></div>
     <div className="settings-actions">
       {status?.credentialSource === 'os-vault' && <button onClick={() => void run(async () => onUpdated(await window.aster.deleteDeepSeekCredential()))} disabled={busy}>删除已保存密钥</button>}
       <button className="primary-button" onClick={() => void run(async () => {

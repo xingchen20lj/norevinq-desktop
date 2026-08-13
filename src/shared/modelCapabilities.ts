@@ -46,11 +46,6 @@ export const DEEPSEEK_V4_FLASH_CAPABILITIES = {
 export const DEEPSEEK_V4_PRO_CAPABILITIES = {
   ...DEEPSEEK_V4_FLASH_CAPABILITIES,
   model: 'deepseek-v4-pro',
-  responsesApi: false,
-  functionTools: false,
-  applyPatchCustomTool: false,
-  webSearch: false,
-  unavailableReason: 'DeepSeek Responses API returned HTTP 400 during the 2026-08-10 capability probe.',
 } as const satisfies ModelCapabilities
 
 export function canRunCodex(capabilities: ModelCapabilities): boolean {

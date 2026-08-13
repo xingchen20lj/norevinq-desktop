@@ -31,8 +31,10 @@ describe('ProviderService', () => {
     const result = await service.saveDeepSeekCredential('sk-deepseek-test-secret')
 
     expect(result.providers.deepseek).toMatchObject({ configured: true, credentialSource: 'os-vault' })
+    expect(result.providers.deepseek.responsesModels).toEqual(['deepseek-v4-flash', 'deepseek-v4-pro'])
     expect(configurations[0]?.childEnvironment).toEqual({ DEEPSEEK_API_KEY: 'sk-deepseek-test-secret' })
     expect(configurations[0]?.extraModels?.some(({ id }) => id === 'deepseek-v4-flash')).toBe(true)
+    expect(configurations[0]?.extraModels?.some(({ id }) => id === 'deepseek-v4-pro')).toBe(true)
 
     await service.deleteDeepSeekCredential()
     expect(service.getStatus().deepseek.configured).toBe(false)
