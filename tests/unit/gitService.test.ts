@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -84,8 +84,114 @@ describe('GitService', () => {
     expect(JSON.stringify(status)).not.toContain('secret')
     database.close()
   })
+
+  it('discards and restores a whole file without losing staged or unstaged content', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+    await service.initialize({ projectId: project.id })
+    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
+    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    writeFileSync(join(projectPath, 'proof.txt'), 'baseline\n')
+    runGit(projectPath, ['add', 'proof.txt'])
+    runGit(projectPath, ['commit', '-m', 'test: baseline'])
+
+    writeFileSync(join(projectPath, 'proof.txt'), 'staged\n')
+    await service.stage({ projectId: project.id, paths: ['proof.txt'] })
+    writeFileSync(join(projectPath, 'proof.txt'), 'staged\nunstaged\n')
+    const discarded = await service.discardFile({ projectId: project.id, path: 'proof.txt' })
+
+    expect(discarded.files).toEqual([])
+    expect(readFileSync(join(projectPath, 'proof.txt'), 'utf8')).toBe('baseline\n')
+    expect(discarded.discards).toHaveLength(1)
+    expect(discarded.discards[0]).toMatchObject({ path: 'proof.txt' })
+    expect(runGitOutput(projectPath, ['stash', 'list'])).toBe('')
+
+    const discardId = discarded.discards[0]?.id
+    if (!discardId) throw new Error('Expected a recoverable discard id.')
+    const restored = await service.restoreDiscard({ projectId: project.id, discardId })
+    expect(readFileSync(join(projectPath, 'proof.txt'), 'utf8')).toBe('staged\nunstaged\n')
+    expect(runGitOutput(projectPath, ['show', ':proof.txt'])).toBe('staged\n')
+    expect(restored.files).toContainEqual(expect.objectContaining({ path: 'proof.txt', indexStatus: 'M', worktreeStatus: 'M' }))
+    expect(restored.discards).toEqual([])
+    database.close()
+  }, 30_000)
+
+  it('recovers untracked files and keeps the recovery point when a target is occupied', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+    await service.initialize({ projectId: project.id })
+    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
+    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    writeFileSync(join(projectPath, 'README.md'), 'baseline\n')
+    runGit(projectPath, ['add', 'README.md'])
+    runGit(projectPath, ['commit', '-m', 'test: baseline'])
+    writeFileSync(join(projectPath, 'untracked.txt'), 'recover me\n')
+
+    const discarded = await service.discardFile({ projectId: project.id, path: 'untracked.txt' })
+    const discardId = discarded.discards[0]?.id
+    if (!discardId) throw new Error('Expected a recoverable discard id.')
+    expect(existsSync(join(projectPath, 'untracked.txt'))).toBe(false)
+    writeFileSync(join(projectPath, 'untracked.txt'), 'new occupant\n')
+
+    await expect(service.restoreDiscard({ projectId: project.id, discardId })).rejects.toThrow(/new changes|occupied/u)
+    expect(readFileSync(join(projectPath, 'untracked.txt'), 'utf8')).toBe('new occupant\n')
+    expect((await service.getStatus({ projectId: project.id })).discards).toContainEqual(expect.objectContaining({ id: discardId }))
+    rmSync(join(projectPath, 'untracked.txt'))
+    const restored = await service.restoreDiscard({ projectId: project.id, discardId })
+    expect(readFileSync(join(projectPath, 'untracked.txt'), 'utf8')).toBe('recover me\n')
+    expect(restored.discards).toEqual([])
+    database.close()
+  }, 30_000)
+
+  it('preserves an existing user stash while discarding and restoring a renamed file', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+    await service.initialize({ projectId: project.id })
+    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
+    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    writeFileSync(join(projectPath, 'old.txt'), 'baseline\n')
+    writeFileSync(join(projectPath, 'unrelated.txt'), 'baseline\n')
+    runGit(projectPath, ['add', '.'])
+    runGit(projectPath, ['commit', '-m', 'test: baseline'])
+
+    writeFileSync(join(projectPath, 'unrelated.txt'), 'user stash content\n')
+    runGit(projectPath, ['stash', 'push', '--message', 'user-owned-stash', '--', 'unrelated.txt'])
+    runGit(projectPath, ['mv', 'old.txt', 'new.txt'])
+    writeFileSync(join(projectPath, 'new.txt'), 'renamed staged\nrenamed unstaged\n')
+
+    const discarded = await service.discardFile({ projectId: project.id, path: 'new.txt' })
+    expect(readFileSync(join(projectPath, 'old.txt'), 'utf8')).toBe('baseline\n')
+    expect(existsSync(join(projectPath, 'new.txt'))).toBe(false)
+    expect(runGitOutput(projectPath, ['stash', 'list'])).toContain('user-owned-stash')
+    expect(runGitOutput(projectPath, ['stash', 'list'])).not.toContain('aster-discard-v1')
+
+    const discardId = discarded.discards[0]?.id
+    if (!discardId) throw new Error('Expected a recoverable discard id.')
+    const restored = await service.restoreDiscard({ projectId: project.id, discardId })
+    expect(existsSync(join(projectPath, 'old.txt'))).toBe(false)
+    expect(readFileSync(join(projectPath, 'new.txt'), 'utf8')).toBe('renamed staged\nrenamed unstaged\n')
+    expect(restored.files).toContainEqual(expect.objectContaining({ path: 'new.txt', originalPath: 'old.txt' }))
+    expect(runGitOutput(projectPath, ['stash', 'list'])).toContain('user-owned-stash')
+    database.close()
+  }, 30_000)
 })
 
 function runGit(cwd: string, args: string[]): void {
   execFileSync('git', args, { cwd, env: { ...process.env, LC_ALL: 'C' } })
+}
+
+function runGitOutput(cwd: string, args: string[]): string {
+  return execFileSync('git', args, { cwd, env: { ...process.env, LC_ALL: 'C' }, encoding: 'utf8' })
 }

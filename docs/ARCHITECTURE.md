@@ -64,9 +64,11 @@ flowchart LR
 16. 计划任务只执行已登记项目；同一任务不重叠，崩溃后运行标记失败且不自动重放，避免重复文件或命令副作用。
 17. 文件预览只使用项目相对路径；任何符号链接组件和根目录逃逸都失败关闭，媒体 URL 不包含本地路径且短时过期。
 18. 内嵌浏览器不含 preload/Node/Aster IPC，只允许 loopback 顶级导航与子资源；所有设备权限、下载和弹窗默认拒绝。
-19. 窗口状态只由主进程写入内部 SQLite；恢复前必须验证数值、最小尺寸和当前显示器交集，损坏状态回退默认值。
-20. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
-21. Aster app-server 固定使用 Electron `userData/codex-home`；不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为仓库指令读取，不属于桌面私有状态。
+19. 浏览器工作台在宽屏占用独立右侧栏、在窄屏占用独立底部栏；不能覆盖任务时间线或 composer。分隔条同时支持指针和键盘调整，Renderer 的占位尺寸是原生 WebContentsView bounds 的唯一来源。
+20. 窗口状态只由主进程写入内部 SQLite；恢复前必须验证数值、最小尺寸和当前显示器交集，损坏状态回退默认值。
+21. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
+22. Aster app-server 固定使用 Electron `userData/codex-home`；不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为仓库指令读取，不属于桌面私有状态。
+23. 整文件丢弃先用 Git stash 事务捕获 index/worktree/untracked 状态，再移动到 `refs/aster/discards/<uuid>` 并删除临时 stash 项；恢复成功后才删除 ref，失败时保留恢复点且绝不自动清理可能包含外部并发编辑的冲突文件。
 
 ## 上游与公开资料
 

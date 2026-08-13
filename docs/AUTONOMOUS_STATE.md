@@ -4,12 +4,12 @@
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备（完成）；正在执行最终功能一致性逐项审计。
+阶段 20：桌面打包和发布准备（完成）；正在执行最终功能一致性逐项审计与体验缺口修复。
 
 ## 当前任务
 
-- 完成 DeepSeek V4 Pro Responses 一级模型支持的完整质量门与跨平台 CI。
-- 随后继续逐项审计剩余“部分实现”的 Git、工作树和提供商错误体验缺口。
+- 完成整文件可恢复丢弃与内嵌浏览器非阻挡布局的完整质量门。
+- 随后继续逐项审计剩余“部分实现”的工作树和提供商错误体验缺口。
 
 ## 已完成任务
 
@@ -221,10 +221,14 @@
 - Codex home 隔离后完整 `verify:ci`：36 个测试文件 172 项、2 项性能基准、覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
 - GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
 - 将 Aster app-server 的 `CODEX_HOME` 固定到独立 Electron `userData/codex-home`（macOS 实际为 `~/Library/Application Support/aster-code/codex-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界。
+- 完成整文件可恢复丢弃：staged/unstaged/untracked/rename 内容与 index 保真，恢复点存入 `refs/aster/discards/<uuid>`、最多 32 个，跨应用重启保持，不占用或删除用户已有 stash；目标出现新修改时失败关闭。
+- 完成 Git 面板丢弃确认、恢复历史与专属离线 Electron E2E；真实仓库跨重启恢复文件，单元测试覆盖用户 stash、rename 和占用目标。
+- 修复内嵌浏览器覆盖任务和输入框：宽屏改为可拖动/键盘缩放的右侧分栏，窄屏自动底部停靠；1200×760 与 800×640 Electron 布局断言和截图通过。
+- 本阶段完整 `verify:ci`：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算全部通过；Git/浏览器两项专属 Electron E2E 通过。
 
 ## 下一任务
 
-1. 继续审计剩余部分实现项，优先处理整文件 recoverable discard 与工作树基线选择。
+1. 继续审计剩余部分实现项，优先处理工作树基线选择。
 2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
@@ -256,7 +260,7 @@
 
 ## 当前失败测试
 
-当前无失败测试。PR #3 已在 macOS 15/Windows 2025 双绿后合并；普通 I/O 测试使用统一有限 15 秒上限，性能测试仍使用独立严格预算。DeepSeek V4 Pro 分支完整 `verify:ci` 通过：36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；生产依赖审计为 0 个已知漏洞。最小真实 Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
+当前无失败测试。整文件恢复与浏览器分栏阶段完整 `verify:ci` 通过：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；两项专属 Electron E2E 通过。真实 Git 多子进程用例在全套并发覆盖率下采用有限 30 秒测试预算，产品 Git 命令超时未放宽。最小 DeepSeek Pro Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
 
 ## 已知问题
 

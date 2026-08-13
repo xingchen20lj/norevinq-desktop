@@ -23,12 +23,21 @@ export type GitRepositorySnapshot = {
   ahead: number
   behind: number
   files: GitFileStatus[]
+  discards: GitDiscardSnapshot[]
   remotes: GitRemote[]
   error: string | null
 }
 
+export type GitDiscardSnapshot = {
+  id: string
+  path: string
+  createdAt: string
+}
+
 export type GitProjectInput = { projectId: string }
 export type GitPathsInput = { projectId: string; paths: string[] }
+export type GitDiscardInput = { projectId: string; path: string }
+export type GitDiscardRestoreInput = { projectId: string; discardId: string }
 export type GitCommitInput = { projectId: string; message: string }
 export type GitPushInput = { projectId: string; remote?: string; branch?: string; setUpstream?: boolean }
 

@@ -50,7 +50,7 @@
 | DeepSeek | 图片、网络能力展示 | 部分实现 | 设置页明确图片/文件否、Web Search 是；搜索逐调用 UI 与真实回归待补 |
 | DeepSeek | 错误、限流、重试和取消 | 部分实现 | 通用 turn 错误/取消路径可用；provider 专属限流分类和重试 UI 待补 |
 | Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
-| Git | stage/unstage/revert 文件和区块 | 部分实现 | 文件 stage/unstage、区块 stage/unstage/revert 已真实测试；整文件 recoverable discard 待文件工作台 |
+| Git | stage/unstage/revert 文件和区块 | 已测试 | 文件与区块 stage/unstage/revert 均真实测试；整文件丢弃使用独立 Git ref 可恢复 staged/unstaged/untracked/rename，跨重启桌面恢复通过且不占用用户 stash |
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
 | Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读私有 Draft PR #1，在线重复调用未创建第二项 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
@@ -70,7 +70,7 @@
 | 文件 | 文件树、文本与代码预览 | 已测试 | 项目/worktree 根绑定、500 项目录、2 MiB UTF-8、无扩展名检测；单元及真实文本 E2E |
 | 文件 | 图片、音频、视频、PDF 预览 | 部分实现 | 图片自定义协议真实解码；音视频/PDF UI、MIME、Range/HEAD/206/416 已测试，真实格式矩阵待最终回归 |
 | 文件 | 产物链接和外部打开 | 已测试 | fileChange 直达真实文本产物；确认式系统打开、可执行/脚本拒绝和路径边界单测 |
-| 浏览器 | 本地网页预览 | 已测试 | 独立临时 WebContentsView、无 preload/Node、loopback 顶级与子资源策略；真实 HTTP E2E |
+| 浏览器 | 本地网页预览 | 已测试 | 独立临时 WebContentsView、无 preload/Node、loopback 顶级与子资源策略；宽屏右侧分栏、窄屏底部停靠，不遮挡对话和输入区；真实 HTTP/Electron E2E |
 | 浏览器 | 导航、刷新、开发日志 | 已测试 | 地址/前后退/刷新/停止/外部打开、标题/加载/错误、500 条控制台；真实导航/后退/console 回归 |
 | 浏览器 | 通用 Computer Use | 被私有服务阻塞 | 只采用公开可调用能力，不伪造 |
 | MCP | 服务器列表、状态、启停 | 部分实现 | 真实 app-server inventory/reload、工具/资源展示已测试；启停需受控 MCP 配置编辑 |

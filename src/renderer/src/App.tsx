@@ -116,6 +116,7 @@ export function App(): React.JSX.Element {
   const [filesOpen, setFilesOpen] = useState(false)
   const [initialFilePath, setInitialFilePath] = useState<string | null>(null)
   const [browserOpen, setBrowserOpen] = useState(false)
+  const [browserWidth, setBrowserWidth] = useState(() => Math.round(Math.min(520, Math.max(380, window.innerWidth * 0.36))))
   const [browser, setBrowser] = useState<BrowserSnapshot | null>(null)
   const [updates, setUpdates] = useState<UpdateSnapshot | null>(null)
   const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null)
@@ -753,7 +754,7 @@ export function App(): React.JSX.Element {
         </div>
       </aside>
 
-      <main className="main-area">
+      <main className={`main-area ${browserOpen ? 'browser-open' : ''}`} style={{ '--browser-width': `${String(browserWidth)}px` } as React.CSSProperties}>
         <header className="topbar">
           <div className="topbar-title">
             <span>{selectedThread?.name ?? selectedProject?.name ?? '欢迎'}</span>
@@ -867,7 +868,7 @@ export function App(): React.JSX.Element {
           close={() => { setFilesOpen(false); setInitialFilePath(null) }}
           onError={setError}
         /></Suspense>}
-        {browserOpen && <Suspense fallback={<WorkbenchLoading label="正在加载网页预览…" />}><BrowserWorkbench snapshot={browser} close={() => setBrowserOpen(false)} onError={setError} /></Suspense>}
+        {browserOpen && <Suspense fallback={<WorkbenchLoading label="正在加载网页预览…" />}><BrowserWorkbench snapshot={browser} width={browserWidth} setWidth={setBrowserWidth} close={() => setBrowserOpen(false)} onError={setError} /></Suspense>}
       </main>
       {settingsOpen && <Suspense fallback={<WorkbenchLoading label="正在加载设置…" overlay />}><SettingsWorkbench
         providers={providers}
@@ -1046,6 +1047,16 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
     finally { setBusy(false) }
   }
 
+  async function discardFile(path: string): Promise<void> {
+    if (!window.confirm(`丢弃 ${path} 的全部已暂存和未暂存修改？Aster 会先创建可恢复快照。`)) return
+    await act(() => window.aster.discardGitFile({ projectId: project.id, path }))
+  }
+
+  async function restoreDiscard(discardId: string, path: string): Promise<void> {
+    if (!window.confirm(`恢复 ${path} 的已暂存和未暂存修改？目标路径必须没有新的修改。`)) return
+    await act(() => window.aster.restoreGitDiscard({ projectId: project.id, discardId }))
+  }
+
   async function checkGitHub(pushRemote = githubPushRemote, baseRemote = githubBaseRemote): Promise<void> {
     setBusy(true)
     onError(null)
@@ -1108,8 +1119,9 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
     /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
       <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.aster.getGitStatus({ projectId: project.id }))}>刷新</button></div>
       <div className="diff-actions"><button disabled={busy || unstaged.length === 0} onClick={() => void review('working')}>审阅未暂存</button><button disabled={busy || staged.length === 0} onClick={() => void review('staged')}>审阅已暂存</button></div>
-      <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} />
-      <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.aster.stageGitPaths({ projectId: project.id, paths: [path] }))} />
+      <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => file.worktreeStatus === '.' ? discardFile(file.path) : Promise.resolve()} showSecondary={(file) => file.worktreeStatus === '.'} />
+      <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.aster.stageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => discardFile(file.path)} />
+      {snapshot.discards.length > 0 && <section className="git-discard-group" aria-label="可恢复的丢弃"><h3>可恢复的丢弃<span>{snapshot.discards.length}</span></h3>{snapshot.discards.map((discard) => <div className="git-discard" key={discard.id}><div><strong title={discard.path}>{discard.path}</strong><span>{new Date(discard.createdAt).toLocaleString()}</span></div><button disabled={busy} onClick={() => void restoreDiscard(discard.id, discard.path)}>恢复</button></div>)}</section>}
       {snapshot.files.length === 0 && <div className="git-clean"><Check size={16} />工作区干净</div>}
       <div className="commit-box"><textarea aria-label="提交说明" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="提交说明" rows={3} /><button disabled={busy || !message.trim() || staged.length === 0} onClick={() => void act(async () => {
         const next = await window.aster.commitGit({ projectId: project.id, message })
@@ -1356,14 +1368,17 @@ function splitDiffLines(lines: DiffLine[]): { old: DiffLine | null; new: DiffLin
   return result
 }
 
-function GitFileGroup({ title, files, actionLabel, action }: {
+function GitFileGroup({ title, files, actionLabel, action, secondaryActionLabel, secondaryAction, showSecondary }: {
   title: string
   files: GitRepositorySnapshot['files']
   actionLabel: string
   action: (path: string) => Promise<void>
+  secondaryActionLabel?: string
+  secondaryAction?: (file: GitRepositorySnapshot['files'][number]) => Promise<void>
+  showSecondary?: (file: GitRepositorySnapshot['files'][number]) => boolean
 }): React.JSX.Element {
   if (files.length === 0) return <></>
-  return <section className="git-file-group"><h3>{title}<span>{files.length}</span></h3>{files.map((file) => <div className="git-file" key={`${title}:${file.path}`}><span className="git-code">{file.indexStatus}{file.worktreeStatus}</span><span title={file.path}>{file.path}</span><button onClick={() => void action(file.path)} aria-label={`${actionLabel} ${file.path}`}>{actionLabel}</button></div>)}</section>
+  return <section className="git-file-group"><h3>{title}<span>{files.length}</span></h3>{files.map((file) => <div className="git-file" key={`${title}:${file.path}`}><span className="git-code">{file.indexStatus}{file.worktreeStatus}</span><span title={file.path}>{file.path}</span><span className="git-file-actions">{secondaryAction && secondaryActionLabel && (showSecondary?.(file) ?? true) && <button className="discard" onClick={() => void secondaryAction(file)} aria-label={`${secondaryActionLabel} ${file.path}`}>{secondaryActionLabel}</button>}<button onClick={() => void action(file.path)} aria-label={`${actionLabel} ${file.path}`}>{actionLabel}</button></span></div>)}</section>
 }
 
 function Welcome({ selectedProject, runtime, isOpening, openProject }: {

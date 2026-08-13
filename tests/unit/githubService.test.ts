@@ -263,6 +263,7 @@ function createFixture(overrides: Partial<GitRepositorySnapshot> = {}): {
       ahead: 1,
       behind: 0,
       files: [{ path: 'draft.txt', originalPath: null, indexStatus: '.', worktreeStatus: 'M', kind: 'ordinary' }],
+      discards: [],
       remotes: [{
         name: 'origin',
         fetchUrl: 'https://github.com/aster-fixture/project.git',

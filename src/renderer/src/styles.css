@@ -490,8 +490,19 @@ button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-
 .git-file:hover { background: var(--surface-hover); }
 .git-file > span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .git-code { color: var(--accent-strong); font: 9px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.git-file-actions { display: flex; gap: 3px; }
 .git-file button { opacity: 0; border: 0; color: var(--accent-strong); background: transparent; font-size: 9px; cursor: pointer; }
+.git-file button.discard { color: var(--danger); }
 .git-file:hover button, .git-file button:focus { opacity: 1; }
+.git-discard-group { margin-top: 17px; padding-top: 12px; border-top: 1px solid var(--border); }
+.git-discard-group h3 { display: flex; align-items: center; gap: 6px; margin: 0 0 6px; color: var(--muted); font-size: 10px; text-transform: uppercase; letter-spacing: .06em; }
+.git-discard-group h3 span { padding: 1px 5px; border-radius: 999px; background: var(--surface-2); font-size: 8px; }
+.git-discard { display: flex; align-items: center; gap: 8px; min-height: 38px; padding: 5px; border-radius: 6px; }
+.git-discard:hover { background: var(--surface-hover); }
+.git-discard > div { display: grid; min-width: 0; flex: 1; gap: 2px; }
+.git-discard strong { overflow: hidden; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.git-discard span { color: var(--muted); font-size: 8.5px; }
+.git-discard button { border: 0; color: var(--accent-strong); background: transparent; font-size: 9px; cursor: pointer; }
 .git-clean { display: flex; align-items: center; justify-content: center; gap: 7px; margin: 35px 0; color: #57bd86; font-size: 10.5px; }
 .commit-box { margin-top: 18px; border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .commit-box textarea { width: 100%; resize: vertical; border: 0; outline: 0; padding: 10px; color: var(--text); background: var(--bg); font-size: 10.5px; }
@@ -578,7 +589,12 @@ button.worktree-row { gap: 8px; cursor: pointer; }
 .media-preview audio { width: min(430px, 90%); }
 .pdf-preview { width: 100%; height: 100%; border: 0; background: #ececec; }
 
-.browser-workbench { position: absolute; z-index: 16; top: 45px; right: 0; bottom: 0; left: 0; display: grid; grid-template-rows: 39px 25px minmax(100px, 1fr) 150px; min-width: 0; min-height: 0; background: var(--bg); }
+.main-area.browser-open .workspace { margin-right: var(--browser-width); }
+.main-area.browser-open .composer-shell { right: calc(var(--browser-width) + 30px); }
+.browser-workbench { position: absolute; z-index: 16; top: 45px; right: 0; bottom: 0; display: grid; width: var(--browser-width); grid-template-rows: 39px 25px minmax(100px, 1fr) 150px; min-width: 0; min-height: 0; border-left: 1px solid var(--border); background: var(--bg); box-shadow: -12px 0 35px rgba(0,0,0,.16); }
+.browser-resize-handle { position: absolute; z-index: 2; top: 0; bottom: 0; left: -4px; width: 8px; cursor: col-resize; touch-action: none; }
+.browser-resize-handle::after { position: absolute; top: 0; bottom: 0; left: 3px; width: 2px; content: ''; background: transparent; }
+.browser-resize-handle:hover::after, .browser-resize-handle:focus::after { background: var(--accent); }
 .browser-toolbar { display: flex; min-width: 0; align-items: center; gap: 4px; padding: 0 8px; border-bottom: 1px solid var(--border); background: var(--surface); }
 .browser-toolbar > button { display: grid; width: 27px; height: 27px; flex: none; place-items: center; padding: 0; border: 1px solid transparent; border-radius: 6px; color: var(--muted); background: transparent; cursor: pointer; }
 .browser-toolbar > button:hover { border-color: var(--border); background: var(--surface-hover); }
@@ -607,6 +623,13 @@ button.worktree-row { gap: 8px; cursor: pointer; }
 .browser-console p.error strong { color: var(--danger); }
 .browser-console p code { color: var(--text); font: 8.5px var(--font-mono, ui-monospace, monospace); }
 .browser-console p.empty { display: block; min-width: 0; padding: 12px; color: var(--subtle); }
+
+@media (max-width: 860px) {
+  .main-area.browser-open .workspace { margin-right: 0; margin-bottom: min(48vh, 390px); }
+  .main-area.browser-open .composer-shell { right: 30px; bottom: calc(min(48vh, 390px) + 22px); }
+  .browser-workbench { top: auto; left: 0; width: auto; height: min(48vh, 390px); grid-template-rows: 39px 25px minmax(80px, 1fr) 90px; border-top: 1px solid var(--border); border-left: 0; box-shadow: 0 -12px 35px rgba(0,0,0,.16); }
+  .browser-resize-handle { display: none; }
+}
 
 .command-backdrop { position: fixed; z-index: 40; inset: 0; display: grid; align-items: start; justify-items: center; padding: min(15vh, 120px) 20px 20px; background: rgba(5,7,10,.47); backdrop-filter: blur(4px); }
 .command-palette { display: grid; grid-template-rows: 48px minmax(0, 1fr) 29px; width: min(620px, 100%); max-height: min(620px, 70vh); overflow: hidden; border: 1px solid var(--border); border-radius: 12px; background: color-mix(in srgb, var(--surface) 97%, transparent); box-shadow: 0 28px 100px rgba(0,0,0,.42); }
