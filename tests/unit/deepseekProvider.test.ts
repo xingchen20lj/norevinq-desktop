@@ -14,13 +14,13 @@ describe('DeepSeek Codex provider launch configuration', () => {
     expect(DEEPSEEK_CODEX_CONFIG_OVERRIDES.join(' ')).not.toMatch(/sk-[a-z0-9]/i)
   })
 
-  it('only advertises the verified flash model as selectable', () => {
+  it('advertises both verified Responses models as selectable', () => {
     const flash = DEEPSEEK_CODEX_MODELS.find(({ id }) => id === 'deepseek-v4-flash')
     const pro = DEEPSEEK_CODEX_MODELS.find(({ id }) => id === 'deepseek-v4-pro')
     expect(flash).toMatchObject({ hidden: false, inputModalities: ['text'] })
     expect(flash?.supportedReasoningEfforts).toEqual(['none', 'low', 'high', 'max'])
-    expect(pro).toMatchObject({ hidden: true })
-    expect(pro?.description).toContain('HTTP 400')
+    expect(pro).toMatchObject({ hidden: false, inputModalities: ['text'] })
+    expect(pro?.supportedReasoningEfforts).toEqual(['none', 'low', 'high', 'max'])
   })
 
   it('does not treat blank credentials as configured', () => {

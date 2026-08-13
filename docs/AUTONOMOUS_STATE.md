@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 继续逐项审计剩余“部分实现”功能。
-- 优先处理仍可公开实现的 Git、工作树和提供商错误体验缺口。
+- 完成 DeepSeek V4 Pro Responses 一级模型支持的完整质量门与跨平台 CI。
+- 随后继续逐项审计剩余“部分实现”的 Git、工作树和提供商错误体验缺口。
 
 ## 已完成任务
 
@@ -23,7 +23,8 @@
 - 选择 Electron + React + TypeScript 作为初始桌面架构，并记录 ADR。
 - 完成 OpenAI Codex 0.147.0、Codex Security 0.1.8 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`。
 - 使用已有安全凭据真实验证 `deepseek-v4-flash` 的非流式、SSE、函数调用回传和 Web Search；未记录或输出密钥。
-- 真实确认 `deepseek-v4-pro` 截至 2026-08-10 仍不能调用 Responses API。
+- 记录 `deepseek-v4-pro` 在 2026-08-10 仍不能调用 Responses API；2026-08-13 复核官方 reference/Codex catalog 后确认已开放，当前账户最小真实请求返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `ASTER_PRO_OK`。
+- 完成 `deepseek-v4-pro` 模型目录、能力注册、设置状态和专属在线 Electron E2E；随应用固定的官方 Codex 0.147.0 经 app-server 在 47.9 秒内真实调用 `apply_patch`，创建 `DEEPSEEK_PRO_TOOL_OK\n` 文件并返回 `ASTER_DEEPSEEK_PRO_OK`。
 - 创建 Electron 43 + React 19 + TypeScript 6 的主进程、CJS 预加载桥、渲染器和共享领域层。
 - 创建 SQLite schema migration、最近项目去重/恢复和真实系统目录选择入口。
 - 完成独立品牌的响应式桌面外壳，包含项目、任务、安全、计划任务、设置和 composer 信息架构。
@@ -50,7 +51,7 @@
 - 真实中断 `sleep 20` turn，确认未产生 `INTERRUPT_FAILED` 最终消息；修复了中断时上游省略 item/completed 导致活动卡滞留 inProgress 的问题。
 - 以 app-server 进程级配置接入 DeepSeek，不修改用户 `~/.codex/config.toml`。
 - 完成 Electron safeStorage 凭据保险库、0600 原子写入、环境优先级与不可读回 IPC。
-- 设置页显示 DeepSeek 配置来源、能力限制与 V4 Pro Responses HTTP 400 阻塞原因。
+- 设置页显示 DeepSeek 配置来源、Flash/Pro 两个 Responses 模型及统一的显式能力限制。
 - 真实 `deepseek-v4-flash` Responses 产生 reasoning 和 custom apply_patch，创建文件内容精确为 `DEEPSEEK_TOOL_OK\n`，最终消息为 `ASTER_DEEPSEEK_OK`。
 - 完成项目根约束、参数数组、相对路径校验、无凭据提示、超时与 8 MiB 输出边界的 Git 服务。
 - 完成 porcelain v2 NUL 状态、branch/upstream/ahead/behind、remote、stage/unstage、commit/push。
@@ -255,7 +256,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：Codex home 隔离后本地 `verify:ci` 有 36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow 守门、93 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/只读挂载 DMG packaged E2E 通过。PR #2 已合并且最近远端 `main` macOS/Windows CI 为绿色；PR #3 两轮 Windows runner 分别在 SQLite 与文件预览 I/O 测试超过 Vitest 默认 5 秒，产品断言与其余 170 项均通过，现已把普通测试的统一有限上限调整为 15 秒，性能测试仍使用独立配置和严格预算。显式使用既有认证 home 的长在线 E2E 在 MCP inventory 外部服务处超时，隔离默认与离线闭环不受影响。
+当前无失败测试。PR #3 已在 macOS 15/Windows 2025 双绿后合并；普通 I/O 测试使用统一有限 15 秒上限，性能测试仍使用独立严格预算。DeepSeek V4 Pro 分支完整 `verify:ci` 通过：36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；生产依赖审计为 0 个已知漏洞。最小真实 Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
 
 ## 已知问题
 
@@ -286,4 +287,4 @@
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的真实进程重新 resume 与订阅恢复语义（替身层已测试）。
-- PR #3 数据库测试超时边界修复后的 macOS/Windows 远端 CI；本地 macOS 全量回归和体验包验证已通过。
+- DeepSeek V4 Pro 分支 macOS/Windows 远端 CI；本地完整质量门、最小 Responses 和真实 app-server 工具闭环已通过。

@@ -12,8 +12,9 @@ describe('DeepSeek capability registry', () => {
     expect(DEEPSEEK_V4_FLASH_CAPABILITIES.statefulResponses).toBe(false)
   })
 
-  it('keeps pro disabled until Responses is actually available', () => {
-    expect(canRunCodex(DEEPSEEK_V4_PRO_CAPABILITIES)).toBe(false)
-    expect(DEEPSEEK_V4_PRO_CAPABILITIES.unavailableReason).toContain('HTTP 400')
+  it('allows the verified pro model to power Codex', () => {
+    expect(canRunCodex(DEEPSEEK_V4_PRO_CAPABILITIES)).toBe(true)
+    expect(DEEPSEEK_V4_PRO_CAPABILITIES.imageInput).toBe(false)
+    expect(DEEPSEEK_V4_PRO_CAPABILITIES.webSearch).toBe(true)
   })
 })

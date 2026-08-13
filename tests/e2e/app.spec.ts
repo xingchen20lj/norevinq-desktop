@@ -59,6 +59,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     const deepSeekConfigured = typeof process.env.DEEPSEEK_API_KEY === 'string' && process.env.DEEPSEEK_API_KEY.trim().length > 0
     const runtimeModelIds = runtime.models.map((item) => (item as { id?: string }).id)
     expect(runtimeModelIds.includes('deepseek-v4-flash')).toBe(deepSeekConfigured)
+    expect(runtimeModelIds.includes('deepseek-v4-pro')).toBe(deepSeekConfigured)
 
     const securityState = await window.evaluate(() => ({
       hasNodeRequire: typeof Reflect.get(globalThis, 'require') !== 'undefined',
@@ -81,7 +82,8 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(settings).toContainText(
       deepSeekConfigured ? '由进程环境安全提供' : '添加 API Key 以启用',
     )
-    await expect(settings).toContainText('DeepSeek V4 Pro 暂不可用')
+    await expect(settings).toContainText('deepseek-v4-pro')
+    await expect(settings).toContainText('两个 Responses 模型均可用')
     await expect.poll(async () => window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
         getIntegrationState: () => Promise<{

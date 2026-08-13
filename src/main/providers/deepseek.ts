@@ -24,10 +24,10 @@ export const DEEPSEEK_CODEX_MODELS: CodexModelSummary[] = [
   },
   {
     id: 'deepseek-v4-pro',
-    displayName: 'DeepSeek V4 Pro（Responses 暂不可用）',
-    description: '截至 2026-08-10，DeepSeek Responses 端点对该模型返回 HTTP 400。',
+    displayName: 'DeepSeek V4 Pro',
+    description: 'DeepSeek Responses API；文本、推理、函数工具、apply_patch 与 Web Search。',
     isDefault: false,
-    hidden: true,
+    hidden: false,
     defaultReasoningEffort: 'high',
     supportedReasoningEfforts: ['none', 'low', 'high', 'max'],
     inputModalities: ['text'],

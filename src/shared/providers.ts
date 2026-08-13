@@ -4,8 +4,7 @@ export type DeepSeekProviderStatus = {
   configured: boolean
   credentialSource: CredentialSource
   credentialStorageAvailable: boolean
-  responsesModel: 'deepseek-v4-flash'
-  unavailableModels: { model: string; reason: string }[]
+  responsesModels: ('deepseek-v4-flash' | 'deepseek-v4-pro')[]
 }
 
 export type ProviderStatus = {

@@ -42,10 +42,10 @@
 | 模型 | ChatGPT 浏览器/设备码登录 | 已测试 | 官方浏览器 start/cancel 与在线设备码 URL/code/cancel 已验证；HTTPS 域白名单、主进程 loginId、completed/updated、重开/取消和令牌刷新有自动测试，最终用户授权仪式需用户本人完成 |
 | 模型 | 模型列表与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过 |
 | 模型 | 自定义 Responses provider | 已测试 | 进程级 `-c` provider 注册，不污染用户全局配置；DeepSeek 真实闭环通过 |
-| DeepSeek | 一级提供商配置 | 已测试 | 模型选择、provider 路由、设置状态和 app-server Responses 真实运行 |
+| DeepSeek | 一级提供商配置 | 已测试 | Flash/Pro 模型选择、provider 路由、设置状态和 app-server Responses 真实运行；Pro 于 2026-08-13 经官方 reference 与真实端点确认开放 |
 | DeepSeek | 安全保存 API Key | 已测试 | Electron safeStorage + 0600 原子文件；renderer 不可读回；环境密钥优先 |
 | DeepSeek | 官方 Responses API 流式连接 | 已测试 | 桌面经 app-server 真实收到 reasoning、工具和最终文本事件 |
-| DeepSeek | 工具调用与文件修改闭环 | 已测试 | custom apply_patch 创建文件，精确断言 `DEEPSEEK_TOOL_OK\n` |
+| DeepSeek | 工具调用与文件修改闭环 | 已测试 | Flash 与 Pro 均经官方 Codex 0.147.0 custom apply_patch 创建文件；分别精确断言 `DEEPSEEK_TOOL_OK\n` 与 `DEEPSEEK_PRO_TOOL_OK\n` |
 | DeepSeek | 推理能力/强度映射 | 已测试 | none/low/high/max 能力注册；真实 low reasoning 活动通过，不宣称 summary |
 | DeepSeek | 图片、网络能力展示 | 部分实现 | 设置页明确图片/文件否、Web Search 是；搜索逐调用 UI 与真实回归待补 |
 | DeepSeek | 错误、限流、重试和取消 | 部分实现 | 通用 turn 错误/取消路径可用；provider 专属限流分类和重试 UI 待补 |
