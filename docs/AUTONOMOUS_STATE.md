@@ -218,6 +218,7 @@
 - 默认打包显式禁用 electron-builder 从 Git remote 推断发布渠道；只有 `package:update` 能在受控 HTTPS URL 校验通过后生成 generic 更新元数据，普通体验包保持无更新渠道。
 - 2026-08-13 最新 Intel macOS 体验包真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，DMG CRC 与 ZIP 全文件校验通过；DMG 为 260 MiB，SHA-256 `70e0efaefa18ab38bc76f81c57ddd70810b52e3a55deb13869c7d763cbf0521f`。
 - 打包清理阶段完整 `verify:ci`：35 个测试文件 169 项、2 项性能基准、覆盖率 80.69/69.01/85.20/87.69，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
+- GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
 
 ## 下一任务
 
