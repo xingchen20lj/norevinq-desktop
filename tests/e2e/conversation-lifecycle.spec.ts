@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test, type Locator } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
@@ -29,7 +29,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   chmodSync(wrapper, 0o755)
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, CODEX_BINARY: wrapper, CODEX_HOME: codexHome },
+    env: { ...process.env, ASTER_CODEX_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
@@ -176,7 +176,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
         fileSystem: {
           read: null,
           write: null,
-          entries: [{ path: { type: 'glob_pattern', pattern: `${projectPath}/generated/**` }, access: 'write' }],
+          entries: [{ path: { type: 'glob_pattern', pattern: `${realpathSync(projectPath)}/generated/**` }, access: 'write' }],
         },
       },
       scope: 'session',

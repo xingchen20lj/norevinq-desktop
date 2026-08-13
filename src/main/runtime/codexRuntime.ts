@@ -29,6 +29,7 @@ export type CodexRuntimeOptions = {
   restartBaseDelayMs?: number
   initializeTimeoutMs?: number
   configOverrides?: readonly string[]
+  fixedChildEnvironment?: Readonly<Record<string, string>>
   childEnvironment?: Readonly<Record<string, string>>
   baseEnvironment?: NodeJS.ProcessEnv
   extraModels?: readonly CodexModelSummary[]
@@ -54,6 +55,7 @@ export class CodexRuntimeSupervisor {
   readonly #restartBaseDelayMs: number
   readonly #initializeTimeoutMs: number
   readonly #baseEnvironment: NodeJS.ProcessEnv
+  readonly #fixedChildEnvironment: Readonly<Record<string, string>>
   #configOverrides: readonly string[]
   #childEnvironment: Readonly<Record<string, string>>
   #extraModels: readonly CodexModelSummary[]
@@ -79,6 +81,7 @@ export class CodexRuntimeSupervisor {
     this.#restartBaseDelayMs = options.restartBaseDelayMs ?? 500
     this.#initializeTimeoutMs = options.initializeTimeoutMs ?? 15_000
     this.#baseEnvironment = options.baseEnvironment ?? process.env
+    this.#fixedChildEnvironment = options.fixedChildEnvironment ?? {}
     this.#configOverrides = options.configOverrides ?? []
     this.#childEnvironment = options.childEnvironment ?? {}
     this.#extraModels = options.extraModels ?? []
@@ -228,6 +231,7 @@ export class CodexRuntimeSupervisor {
       env: {
         ...createCodexChildEnvironment(this.#baseEnvironment),
         ...this.#childEnvironment,
+        ...this.#fixedChildEnvironment,
         LOG_FORMAT: 'json',
         RUST_LOG: this.#baseEnvironment.RUST_LOG ?? 'warn',
       },

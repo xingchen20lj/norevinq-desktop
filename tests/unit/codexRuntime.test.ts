@@ -77,6 +77,35 @@ describe('CodexRuntimeSupervisor recovery', () => {
     })
   })
 
+  it('keeps the private Codex home authoritative across provider reconfiguration', async () => {
+    const environments: NodeJS.ProcessEnv[] = []
+    const runtime = new CodexRuntimeSupervisor({
+      discover: () => Promise.resolve({
+        path: '/fake/codex', source: 'explicit', version: 'codex-cli 0.147.0-test',
+      }),
+      fixedChildEnvironment: { CODEX_HOME: '/private/aster/codex-home' },
+      childEnvironment: { CODEX_HOME: '/shared/official/codex-home' },
+      spawnProcess: (_command, _args, options) => {
+        environments.push(options.env ?? {})
+        return spawn(process.execPath, ['--input-type=module', '-e', FAKE_APP_SERVER], {
+          stdio: ['pipe', 'pipe', 'pipe'],
+        })
+      },
+      initializeTimeoutMs: 2_000,
+    })
+    try {
+      await runtime.start()
+      expect(environments[0]?.CODEX_HOME).toBe('/private/aster/codex-home')
+      await runtime.updateLaunchConfiguration({
+        childEnvironment: { CODEX_HOME: '/another/shared/home', DEEPSEEK_API_KEY: 'test-key' },
+      })
+      expect(environments[1]?.CODEX_HOME).toBe('/private/aster/codex-home')
+      expect(environments[1]?.DEEPSEEK_API_KEY).toBe('test-key')
+    } finally {
+      await runtime.stop()
+    }
+  })
+
   it('restarts an idle crashed app-server without replaying the failed request', async () => {
     const { runtime, getSpawnCount } = createSupervisor()
     try {

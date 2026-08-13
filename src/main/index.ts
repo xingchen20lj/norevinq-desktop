@@ -34,6 +34,7 @@ import { UpdateService } from './update/updateService.js'
 import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
 import { DiagnosticsService } from './diagnostics/diagnosticsService.js'
 import { AccountService } from './account/accountService.js'
+import { prepareAsterCodexHome } from './runtime/codexHome.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -199,6 +200,8 @@ if (!gotLock) {
 
   void app.whenReady().then(() => {
     const userData = app.getPath('userData')
+    const codexHome = prepareAsterCodexHome(userData, process.env.ASTER_CODEX_HOME)
+    process.env.CODEX_HOME = codexHome
     database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
     const createdFileService = new FileService(database, { openPath: (path) => shell.openPath(path) })
     fileService = createdFileService
@@ -228,6 +231,7 @@ if (!gotLock) {
     const deepSeekKey = environmentDeepSeekKey ?? vaultDeepSeekKey
     runtime = new CodexRuntimeSupervisor({
       logger: runtimeLogger,
+      fixedChildEnvironment: { CODEX_HOME: codexHome },
       ...(deepSeekKey ? {
         childEnvironment: { [DEEPSEEK_ENV_KEY]: deepSeekKey },
         configOverrides: DEEPSEEK_CODEX_CONFIG_OVERRIDES,
