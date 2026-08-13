@@ -9,7 +9,9 @@ import { StateDatabase } from '../../src/main/state/database.js'
 const temporaryPaths: string[] = []
 
 afterEach(() => {
-  for (const path of temporaryPaths.splice(0)) rmSync(path, { force: true, recursive: true })
+  for (const path of temporaryPaths.splice(0)) {
+    rmSync(path, { force: true, maxRetries: process.platform === 'win32' ? 5 : 0, recursive: true, retryDelay: 100 })
+  }
 })
 
 describe('GitService', () => {
@@ -25,8 +27,7 @@ describe('GitService', () => {
 
     expect((await service.getStatus({ projectId: project.id })).initialized).toBe(false)
     await service.initialize({ projectId: project.id })
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    configureTestRepository(projectPath)
     writeFileSync(join(projectPath, 'file with spaces.txt'), 'one\n')
 
     const untracked = await service.getStatus({ projectId: project.id })
@@ -59,6 +60,7 @@ describe('GitService', () => {
     const project = database.upsertProject(projectPath)
     const service = new GitService(database)
     await service.initialize({ projectId: project.id })
+    configureTestRepository(projectPath)
 
     await expect(service.stage({ projectId: project.id, paths: ['/etc/passwd'] })).rejects.toThrow('project-relative')
     await expect(service.stage({ projectId: project.id, paths: ['../escape'] })).rejects.toThrow('escapes')
@@ -73,6 +75,7 @@ describe('GitService', () => {
     const project = database.upsertProject(projectPath)
     const service = new GitService(database)
     await service.initialize({ projectId: project.id })
+    configureTestRepository(projectPath)
     runGit(projectPath, ['remote', 'add', 'origin', 'https://user:ghp_secret_value@github.com/owner/repository.git?token=also-secret#fragment'])
 
     const status = await service.getStatus({ projectId: project.id })
@@ -93,8 +96,7 @@ describe('GitService', () => {
     const project = database.upsertProject(projectPath)
     const service = new GitService(database)
     await service.initialize({ projectId: project.id })
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    configureTestRepository(projectPath)
     writeFileSync(join(projectPath, 'proof.txt'), 'baseline\n')
     runGit(projectPath, ['add', 'proof.txt'])
     runGit(projectPath, ['commit', '-m', 'test: baseline'])
@@ -128,8 +130,7 @@ describe('GitService', () => {
     const project = database.upsertProject(projectPath)
     const service = new GitService(database)
     await service.initialize({ projectId: project.id })
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    configureTestRepository(projectPath)
     writeFileSync(join(projectPath, 'README.md'), 'baseline\n')
     runGit(projectPath, ['add', 'README.md'])
     runGit(projectPath, ['commit', '-m', 'test: baseline'])
@@ -159,8 +160,7 @@ describe('GitService', () => {
     const project = database.upsertProject(projectPath)
     const service = new GitService(database)
     await service.initialize({ projectId: project.id })
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    configureTestRepository(projectPath)
     writeFileSync(join(projectPath, 'old.txt'), 'baseline\n')
     writeFileSync(join(projectPath, 'unrelated.txt'), 'baseline\n')
     runGit(projectPath, ['add', '.'])
@@ -190,6 +190,12 @@ describe('GitService', () => {
 
 function runGit(cwd: string, args: string[]): void {
   execFileSync('git', args, { cwd, env: { ...process.env, LC_ALL: 'C' } })
+}
+
+function configureTestRepository(cwd: string): void {
+  runGit(cwd, ['config', 'core.autocrlf', 'false'])
+  runGit(cwd, ['config', 'user.name', 'Aster Test'])
+  runGit(cwd, ['config', 'user.email', 'aster@example.invalid'])
 }
 
 function runGitOutput(cwd: string, args: string[]): string {
