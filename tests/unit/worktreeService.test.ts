@@ -15,13 +15,75 @@ afterEach(() => {
 })
 
 describe('WorktreeService', () => {
+  it('treats a plain project folder as Local-only instead of surfacing a Git fatal error', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-worktree-plain-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    try {
+      const service = new WorktreeService(database, join(root, 'managed'))
+      await expect(service.list(project.id)).resolves.toEqual([])
+      await expect(service.listBases(project.id)).resolves.toEqual({
+        projectId: project.id,
+        repositoryInitialized: false,
+        bases: [],
+        truncated: false,
+      })
+      await expect(service.create({ projectId: project.id })).rejects.toThrow('Initialize Git')
+    } finally {
+      database.close()
+    }
+  })
+
+  it('lists typed bases and creates from the selected immutable commit', async () => {
+    const setup = createRepository()
+    try {
+      const baselineOid = runGit(setup.projectPath, ['rev-parse', 'HEAD']).trim()
+      runGit(setup.projectPath, ['branch', 'release/old', baselineOid])
+      runGit(setup.projectPath, ['tag', 'v0.1-base', baselineOid])
+      writeFileSync(join(setup.projectPath, 'README.md'), '# current\n')
+      runGit(setup.projectPath, ['add', 'README.md'])
+      runGit(setup.projectPath, ['commit', '-m', 'test: current head'])
+      const currentOid = runGit(setup.projectPath, ['rev-parse', 'HEAD']).trim()
+      const service = new WorktreeService(setup.database, setup.managedRoot)
+
+      const catalog = await service.listBases(setup.projectId)
+      expect(catalog.repositoryInitialized).toBe(true)
+      expect(catalog.bases).toEqual(expect.arrayContaining([
+        expect.objectContaining({ ref: 'HEAD', kind: 'current', oid: currentOid }),
+        expect.objectContaining({ ref: 'refs/heads/release/old', kind: 'localBranch', oid: baselineOid }),
+        expect.objectContaining({ ref: 'refs/tags/v0.1-base', kind: 'tag', oid: baselineOid }),
+      ]))
+
+      const created = await service.create({
+        projectId: setup.projectId,
+        baseRef: 'refs/heads/release/old',
+        expectedBaseOid: baselineOid,
+      })
+      expect(created).toMatchObject({ baseRef: 'refs/heads/release/old', baseOid: baselineOid, headOid: baselineOid })
+      expect(readFileSync(join(created.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# worktree\n')
+      await service.remove({ worktreeId: created.id })
+
+      runGit(setup.projectPath, ['branch', '-f', 'release/old', currentOid])
+      await expect(service.create({
+        projectId: setup.projectId,
+        baseRef: 'refs/heads/release/old',
+        expectedBaseOid: baselineOid,
+      })).rejects.toThrow('base moved')
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
   it('creates, persists, locks, unlocks, and removes a detached managed worktree', async () => {
     const setup = createRepository()
     try {
       const service = new WorktreeService(setup.database, setup.managedRoot)
 
       const created = await service.create({ projectId: setup.projectId })
-      expect(created).toMatchObject({ projectId: setup.projectId, branch: null, locked: false, missing: false })
+      expect(created).toMatchObject({ projectId: setup.projectId, baseRef: 'HEAD', branch: null, locked: false, missing: false })
+      expect(created.baseOid).toMatch(/^[0-9a-f]{40}$/u)
       expect(created.path.startsWith(join(realpathSync(setup.managedRoot), setup.projectId))).toBe(true)
       expect(readFileSync(join(created.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# worktree\n')
       expect(runGit(created.path, ['rev-parse', '--abbrev-ref', 'HEAD']).trim()).toBe('HEAD')

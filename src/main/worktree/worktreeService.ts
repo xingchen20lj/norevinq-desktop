@@ -17,12 +17,15 @@ import type {
   MoveWorktreeChangesResult,
   RemoveWorktreeInput,
   WorktreeActionInput,
+  WorktreeBase,
+  WorktreeBaseCatalog,
 } from '../../shared/worktree.js'
 import type { StateDatabase } from '../state/database.js'
 
 const execFileAsync = promisify(execFile)
 const MAX_INCLUDE_FILE_BYTES = 10 * 1024 * 1024
 const MAX_INCLUDE_TOTAL_BYTES = 100 * 1024 * 1024
+const MAX_BASE_REFS = 500
 
 export class WorktreeService {
   readonly #database: StateDatabase
@@ -37,6 +40,14 @@ export class WorktreeService {
 
   async list(projectId: string): Promise<ManagedWorktree[]> {
     const project = this.#requireProject(projectId)
+    if (!(await isGitRepository(project.path))) {
+      return this.#database.listManagedWorktrees(projectId).map((record) => ({
+        ...record,
+        headOid: null,
+        locked: false,
+        missing: true,
+      }))
+    }
     const actual = await readWorktreeMetadata(project.path)
     return this.#database.listManagedWorktrees(projectId).map((record) => {
       const metadata = actual.get(worktreePathKey(record.path))
@@ -51,8 +62,15 @@ export class WorktreeService {
 
   async create(input: CreateWorktreeInput): Promise<ManagedWorktree> {
     const project = this.#requireProject(input.projectId)
+    if (!(await isGitRepository(project.path))) {
+      throw new Error('Initialize Git before creating an isolated worktree.')
+    }
     const id = randomUUID()
     const baseRef = validateRef(input.baseRef ?? 'HEAD', 'base ref')
+    const baseOid = await resolveCommit(project.path, baseRef)
+    if (input.expectedBaseOid && input.expectedBaseOid !== baseOid) {
+      throw new Error('The selected worktree base moved. Refresh the base list and choose again.')
+    }
     const branch = input.branch ? validateRef(input.branch, 'branch') : null
     const repositoryDirectory = join(this.#managedRoot, input.projectId)
     const path = join(repositoryDirectory, id)
@@ -62,12 +80,12 @@ export class WorktreeService {
     const args = ['worktree', 'add']
     if (branch) args.push('-b', branch)
     else args.push('--detach')
-    args.push(path, baseRef)
+    args.push(path, baseOid)
     await runGit(project.path, args, 120_000)
     let copiedIncludeFiles = 0
     try {
       if (input.copyIncludes !== false) copiedIncludeFiles = await copyWorktreeIncludes(project.path, path)
-      const record = { id, projectId: input.projectId, path, baseRef, branch, createdAt: new Date().toISOString(), copiedIncludeFiles }
+      const record = { id, projectId: input.projectId, path, baseRef, baseOid, branch, createdAt: new Date().toISOString(), copiedIncludeFiles }
       this.#database.insertManagedWorktree(record)
       const [created] = await this.list(input.projectId)
       const match = created?.id === id ? created : (await this.list(input.projectId)).find((item) => item.id === id)
@@ -77,6 +95,46 @@ export class WorktreeService {
       await runGit(project.path, ['worktree', 'remove', '--force', path], 120_000).catch(() => undefined)
       throw error
     }
+  }
+
+  async listBases(projectId: string): Promise<WorktreeBaseCatalog> {
+    const project = this.#requireProject(projectId)
+    if (!(await isGitRepository(project.path))) {
+      return { projectId, repositoryInitialized: false, bases: [], truncated: false }
+    }
+    const headOid = await resolveCommit(project.path, 'HEAD').catch(() => null)
+    if (!headOid) return { projectId, repositoryInitialized: true, bases: [], truncated: false }
+    const headLabelResult = await runGit(project.path, ['symbolic-ref', '--quiet', '--short', 'HEAD']).catch(() => null)
+    const symbolicHead = headLabelResult?.stdout.trim()
+    const headLabel = symbolicHead && symbolicHead.length > 0 ? symbolicHead : `Detached ${headOid.slice(0, 7)}`
+    const result = await runGit(project.path, [
+      'for-each-ref',
+      '--sort=-committerdate',
+      '--format=%(refname)%00%(refname:short)%00%(*objectname)%00%(objectname)%00%(*objecttype)%00%(objecttype)',
+      'refs/heads',
+      'refs/remotes',
+      'refs/tags',
+    ])
+    const bases: WorktreeBase[] = [{ ref: 'HEAD', label: `当前 HEAD · ${headLabel}`, kind: 'current', oid: headOid }]
+    const seenRefs = new Set([`current:HEAD`])
+    let truncated = false
+    for (const line of result.stdout.split(/\r?\n/u)) {
+      if (!line) continue
+      const [fullRef, shortRef, peeledOid, objectOid, peeledType, objectType] = line.split('\0')
+      if (!fullRef || !shortRef) continue
+      if (fullRef.startsWith('refs/remotes/') && shortRef.endsWith('/HEAD')) continue
+      const oid = peeledOid && peeledOid.length > 0 ? peeledOid : objectOid
+      const type = peeledType && peeledType.length > 0 ? peeledType : objectType
+      if (type !== 'commit' || !oid || !/^[0-9a-f]{40,64}$/u.test(oid)) continue
+      const kind = worktreeBaseKind(fullRef)
+      if (!kind) continue
+      const key = fullRef
+      if (seenRefs.has(key)) continue
+      seenRefs.add(key)
+      if (bases.length >= MAX_BASE_REFS) { truncated = true; break }
+      bases.push({ ref: fullRef, label: shortRef, kind, oid })
+    }
+    return { projectId, repositoryInitialized: true, bases, truncated }
   }
 
   async lock(input: WorktreeActionInput): Promise<ManagedWorktree[]> {
@@ -174,6 +232,15 @@ async function hasChanges(cwd: string): Promise<boolean> {
   return result.stdout.length > 0
 }
 
+async function isGitRepository(cwd: string): Promise<boolean> {
+  try {
+    const result = await runGit(cwd, ['rev-parse', '--is-inside-work-tree'])
+    return result.stdout.trim() === 'true'
+  } catch {
+    return false
+  }
+}
+
 async function hasUnmergedChanges(cwd: string): Promise<boolean> {
   const result = await runGit(cwd, ['diff', '--name-only', '--diff-filter=U', '-z'])
   return result.stdout.length > 0
@@ -240,6 +307,24 @@ function validateRef(value: string, label: string): string {
     throw new Error(`Invalid worktree ${label}.`)
   }
   return value
+}
+
+async function resolveCommit(cwd: string, ref: string): Promise<string> {
+  try {
+    const result = await runGit(cwd, ['rev-parse', '--verify', `${ref}^{commit}`])
+    const oid = result.stdout.trim()
+    if (!/^[0-9a-f]{40,64}$/u.test(oid)) throw new Error('Invalid commit OID.')
+    return oid
+  } catch (error) {
+    throw new Error(`Worktree base does not resolve to a commit: ${ref}`, { cause: error })
+  }
+}
+
+function worktreeBaseKind(fullRef: string): WorktreeBase['kind'] | null {
+  if (fullRef.startsWith('refs/heads/')) return 'localBranch'
+  if (fullRef.startsWith('refs/remotes/')) return 'remoteBranch'
+  if (fullRef.startsWith('refs/tags/')) return 'tag'
+  return null
 }
 
 type WorktreeMetadata = { headOid: string | null; locked: boolean }

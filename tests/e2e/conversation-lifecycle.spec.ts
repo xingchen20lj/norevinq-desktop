@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test, type Locator } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
@@ -22,6 +22,11 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   writeFileSync(join(projectPath, 'README.md'), '# lifecycle\n')
   execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: lifecycle baseline'], { cwd: projectPath })
+  const baselineOid = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: projectPath, encoding: 'utf8' }).trim()
+  execFileSync('git', ['branch', 'release/base', baselineOid], { cwd: projectPath })
+  writeFileSync(join(projectPath, 'current-only.txt'), 'not in selected baseline\n')
+  execFileSync('git', ['add', 'current-only.txt'], { cwd: projectPath })
+  execFileSync('git', ['commit', '-m', 'test: advance main'], { cwd: projectPath })
   const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
@@ -103,15 +108,19 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
 
     await window.getByRole('button', { name: 'Local', exact: true }).click()
     const worktreePanel = window.getByRole('complementary', { name: '工作树' })
+    await worktreePanel.getByLabel('工作树基线').selectOption('refs/heads/release/base')
     await worktreePanel.getByRole('button', { name: '创建', exact: true }).click()
     await expect(worktreePanel.getByRole('button', { name: /Detached/ })).toBeVisible()
+    await window.screenshot({ path: 'test-results/aster-worktree-base.png' })
     const [managedWorktree] = await window.evaluate(async ({ projectId }) => {
       const bridge = Reflect.get(window, 'aster') as {
-        listWorktrees: (input: { projectId: string }) => Promise<{ id: string; path: string }[]>
+        listWorktrees: (input: { projectId: string }) => Promise<{ id: string; path: string; baseRef: string; baseOid: string | null; headOid: string | null }[]>
       }
       return bridge.listWorktrees({ projectId })
     }, { projectId: project.id })
     expect(managedWorktree).toBeDefined()
+    expect(managedWorktree).toMatchObject({ baseRef: 'refs/heads/release/base', baseOid: baselineOid, headOid: baselineOid })
+    expect(existsSync(join(managedWorktree?.path ?? '', 'current-only.txt'))).toBe(false)
     writeFileSync(join(projectPath, 'README.md'), '# staged\n')
     execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
     writeFileSync(join(projectPath, 'README.md'), '# staged\nunstaged\n')

@@ -33,7 +33,7 @@ import type {
   GitHubStatusInput,
   GitRepositorySnapshot,
 } from '../shared/git.js'
-import type { ManagedWorktree } from '../shared/worktree.js'
+import type { ManagedWorktree, WorktreeBaseCatalog } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, DiffMode, DiffSnapshot } from '../shared/diff.js'
 import type {
   CreateTerminalInput,
@@ -167,7 +167,8 @@ export type GitHubController = {
 
 export type WorktreeController = {
   list: (projectId: string) => Promise<ManagedWorktree[]>
-  create: (input: { projectId: string; baseRef?: string; branch?: string; copyIncludes?: boolean }) => Promise<ManagedWorktree>
+  listBases: (projectId: string) => Promise<WorktreeBaseCatalog>
+  create: (input: { projectId: string; baseRef?: string; expectedBaseOid?: string; branch?: string; copyIncludes?: boolean }) => Promise<ManagedWorktree>
   lock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
   unlock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
   remove: (input: { worktreeId: string; force?: boolean }) => Promise<ManagedWorktree[]>
@@ -505,10 +506,15 @@ export function registerIpc(
     const parsed = projectInputSchema.parse(input)
     return worktrees.list(parsed.projectId)
   })
+  ipcMain.handle(IPC_CHANNELS.worktreeBases, (_event, input: unknown) => {
+    const parsed = projectInputSchema.parse(input)
+    return worktrees.listBases(parsed.projectId)
+  })
   ipcMain.handle(IPC_CHANNELS.worktreeCreate, (_event, input: unknown) =>
     worktrees.create(worktreeCreateSchema.parse(input) as {
       projectId: string
       baseRef?: string
+      expectedBaseOid?: string
       branch?: string
       copyIncludes?: boolean
     }))
@@ -882,6 +888,7 @@ const worktreeRefSchema = z.string().regex(/^[A-Za-z0-9._/@{}^~+-]{1,255}$/)
 const worktreeCreateSchema = z.object({
   projectId: z.uuid(),
   baseRef: worktreeRefSchema.optional(),
+  expectedBaseOid: z.string().regex(/^[0-9a-f]{40,64}$/u),
   branch: worktreeRefSchema.optional(),
   copyIncludes: z.boolean().optional(),
 })

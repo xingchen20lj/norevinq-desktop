@@ -69,6 +69,7 @@ flowchart LR
 21. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
 22. Aster app-server 固定使用 Electron `userData/codex-home`；不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为仓库指令读取，不属于桌面私有状态。
 23. 整文件丢弃先用 Git stash 事务捕获 index/worktree/untracked 状态，再移动到 `refs/aster/discards/<uuid>` 并删除临时 stash 项；恢复成功后才删除 ref，失败时保留恢复点且绝不自动清理可能包含外部并发编辑的冲突文件。
+24. 普通项目目录不要求预先存在 Git；Git/工作树能力必须返回显式未初始化状态。工作树基线只能来自主进程枚举的 HEAD/heads/remotes/tags，创建前再次解析并匹配 UI 所见 OID，再以不可变 OID调用 Git，防止 ref 移动造成错误基线。
 
 ## 上游与公开资料
 

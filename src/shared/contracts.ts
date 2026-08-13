@@ -32,9 +32,11 @@ import type {
 import type {
   CreateWorktreeInput,
   ListWorktreesInput,
+  ListWorktreeBasesInput,
   ManagedWorktree,
   RemoveWorktreeInput,
   WorktreeActionInput,
+  WorktreeBaseCatalog,
 } from './worktree.js'
 import type { ApplyDiffHunkInput, DiffSnapshot, GetDiffInput } from './diff.js'
 import type {
@@ -153,6 +155,7 @@ export const IPC_CHANNELS = {
   githubStatus: 'github:status',
   githubPullRequestCreate: 'github:pull-request-create',
   worktreeList: 'worktree:list',
+  worktreeBases: 'worktree:bases',
   worktreeCreate: 'worktree:create',
   worktreeLock: 'worktree:lock',
   worktreeUnlock: 'worktree:unlock',
@@ -310,6 +313,7 @@ export type AsterDesktopApi = {
   getGitHubStatus: (input: GitHubStatusInput) => Promise<GitHubRepositoryStatus>
   createGitHubPullRequest: (input: CreateGitHubPullRequestInput) => Promise<CreateGitHubPullRequestResult>
   listWorktrees: (input: ListWorktreesInput) => Promise<ManagedWorktree[]>
+  listWorktreeBases: (input: ListWorktreeBasesInput) => Promise<WorktreeBaseCatalog>
   createWorktree: (input: CreateWorktreeInput) => Promise<ManagedWorktree>
   lockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
   unlockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>

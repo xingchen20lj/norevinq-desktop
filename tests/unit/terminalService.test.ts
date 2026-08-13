@@ -118,6 +118,7 @@ describe('TerminalService', () => {
       projectId: project.id,
       path: worktreePath,
       baseRef: 'HEAD',
+      baseOid: null,
       branch: null,
       createdAt: new Date().toISOString(),
       copiedIncludeFiles: 0,
