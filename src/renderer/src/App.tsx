@@ -51,7 +51,7 @@ import type {
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitHubRepositoryStatus, GitRepositorySnapshot } from '../../shared/git'
-import type { ManagedWorktree } from '../../shared/worktree'
+import type { ManagedWorktree, WorktreeBaseCatalog } from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 import type { TerminalEvent, TerminalState } from '../../shared/terminal'
 import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } from '../../shared/integrations'
@@ -951,7 +951,21 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
   onError: (message: string | null) => void
 }): React.JSX.Element {
   const [branch, setBranch] = useState('')
+  const [baseCatalog, setBaseCatalog] = useState<WorktreeBaseCatalog | null>(null)
+  const [baseRef, setBaseRef] = useState('HEAD')
   const [busy, setBusy] = useState(false)
+
+  useEffect(() => {
+    let cancelled = false
+    setBaseCatalog(null)
+    setBaseRef('HEAD')
+    void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => {
+      if (!cancelled) setBaseCatalog(catalog)
+    }).catch((reason: unknown) => {
+      if (!cancelled) onError(toErrorMessage(reason))
+    })
+    return () => { cancelled = true }
+  }, [onError, project.id])
 
   async function act(action: () => Promise<ManagedWorktree[]>): Promise<void> {
     setBusy(true)
@@ -962,11 +976,15 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
   }
 
   async function create(): Promise<void> {
+    const selectedBase = baseCatalog?.bases.find((base) => base.ref === baseRef)
+    if (!selectedBase) { onError('请选择有效的工作树基线。'); return }
     setBusy(true)
     onError(null)
     try {
       const created = await window.aster.createWorktree({
         projectId: project.id,
+        baseRef: selectedBase.ref,
+        expectedBaseOid: selectedBase.oid,
         ...(branch.trim() ? { branch: branch.trim() } : {}),
       })
       update([created, ...items])
@@ -980,11 +998,16 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
 
   return <aside className="git-panel worktree-panel" aria-label="工作树">
     <header><div><p className="eyebrow">MANAGED WORKTREES</p><h2>隔离工作区</h2></div><button className="icon-button" onClick={close} aria-label="关闭工作树"><X size={16} /></button></header>
-    <p className="worktree-note">默认从 HEAD 创建 detached worktree。填写分支名时才创建分支；`.worktreeinclude` 只复制显式匹配的已忽略普通文件。</p>
-    <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选：codex/feature-name" /><button disabled={busy} onClick={() => void create()}><Plus size={13} />创建</button></div>
+    <p className="worktree-note">从明确的提交基线创建 detached worktree。填写新分支名时才创建分支；创建前若所选 ref 移动会要求刷新。</p>
+    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Codex 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
+      {baseCatalog?.repositoryInitialized && baseCatalog.bases.length === 0 && <div className="worktree-init-note"><strong>Git 仓库还没有提交</strong><span>请先创建首次提交，再从提交基线建立隔离工作树。</span></div>}
+      <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
+      {baseCatalog?.truncated && <p className="worktree-warning">基线列表已限制为前 500 项。</p>}
+      <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选新分支：codex/feature-name" /><button disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} onClick={() => void create()}><Plus size={13} />创建</button></div>
+    </>}
     <button disabled={busy} className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => void select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
     {items.map((item) => <div className={`worktree-row ${selected?.id === item.id ? 'selected' : ''}`} key={item.id}>
-      <button disabled={busy || item.missing} className="worktree-select" onClick={() => void select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small>{item.path}</small></span></button>
+      <button disabled={busy || item.missing} className="worktree-select" onClick={() => void select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small title={item.path}>基线 {item.baseRef} · {(item.baseOid ?? item.headOid)?.slice(0, 7) ?? '未知'} · {item.path}</small></span></button>
       <div className="worktree-actions">
         <button disabled={busy || item.missing} onClick={() => void act(() => item.locked ? window.aster.unlockWorktree({ worktreeId: item.id }) : window.aster.lockWorktree({ worktreeId: item.id }))}>{item.locked ? '解锁' : '锁定'}</button>
         <button disabled={busy || item.locked} onClick={() => void act(async () => {
@@ -995,6 +1018,13 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     </div>)}
     {items.length === 0 && <div className="git-clean">暂无托管工作树</div>}
   </aside>
+}
+
+function baseKindLabel(kind: WorktreeBaseCatalog['bases'][number]['kind']): string {
+  if (kind === 'current') return '当前'
+  if (kind === 'localBranch') return '本地分支'
+  if (kind === 'remoteBranch') return '远端分支'
+  return '标签'
 }
 
 function GitPanel({ project, snapshot, close, update, onError, onComment }: {

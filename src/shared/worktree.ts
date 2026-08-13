@@ -3,6 +3,7 @@ export type ManagedWorktree = {
   projectId: string
   path: string
   baseRef: string
+  baseOid: string | null
   branch: string | null
   headOid: string | null
   locked: boolean
@@ -12,9 +13,24 @@ export type ManagedWorktree = {
 }
 
 export type ListWorktreesInput = { projectId: string }
+export type WorktreeBaseKind = 'current' | 'localBranch' | 'remoteBranch' | 'tag'
+export type WorktreeBase = {
+  ref: string
+  label: string
+  kind: WorktreeBaseKind
+  oid: string
+}
+export type WorktreeBaseCatalog = {
+  projectId: string
+  repositoryInitialized: boolean
+  bases: WorktreeBase[]
+  truncated: boolean
+}
+export type ListWorktreeBasesInput = { projectId: string }
 export type CreateWorktreeInput = {
   projectId: string
   baseRef?: string
+  expectedBaseOid?: string
   branch?: string
   copyIncludes?: boolean
 }

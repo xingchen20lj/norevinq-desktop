@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 完成整文件可恢复丢弃与内嵌浏览器非阻挡布局的完整质量门。
-- 随后继续逐项审计剩余“部分实现”的工作树和提供商错误体验缺口。
+- 修复普通非 Git 项目触发 `worktree:list` fatal，并完成工作树基线选择器的完整质量门。
+- 随后继续逐项审计剩余“部分实现”的工作树崩溃恢复和提供商错误体验缺口。
 
 ## 已完成任务
 
@@ -226,10 +226,15 @@
 - 修复内嵌浏览器覆盖任务和输入框：宽屏改为可拖动/键盘缩放的右侧分栏，窄屏自动底部停靠；1200×760 与 800×640 Electron 布局断言和截图通过。
 - 本阶段完整 `verify:ci`：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算全部通过；Git/浏览器两项专属 Electron E2E 通过。
 - PR #5 首轮 macOS 15 全绿；Windows 2025 准确发现 runner 全局 `core.autocrlf` 使恢复后的测试文本按平台转换为 CRLF，并因断言提前失败导致 SQLite 句柄阻塞临时目录清理。测试仓库现固定 `core.autocrlf=false` 验证字节保真，清理增加 Windows 有界重试；产品仍尊重用户仓库配置。
+- 用户在试用 DMG 打开 `/Users/cyber/test/0811` 时准确发现普通文件夹被 `worktree:list` 当 Git 仓库执行，首页冒泡 `fatal: not a git repository`；实地只读复核确认该路径没有 `.git`。
+- 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Codex 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
+- 完成工作树基线目录与选择器：最多 500 个 HEAD/本地分支/远端分支/标签，annotated tag 解析到 commit；UI 显示类型/ref/短 OID，创建时再次解析并匹配 expected OID，ref 移动失败关闭。
+- SQLite migration v10 持久化所选 `base_ref` 与实际 `base_oid`；真实仓库从非当前 `release/base` 创建 detached worktree，实际 HEAD、旧版本文件和 UI 闭环均经自动测试。
+- 本阶段完整 `verify:ci`：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建与 bundle 预算全部通过；两项专属 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
 
 ## 下一任务
 
-1. 继续审计剩余部分实现项，优先处理工作树基线选择。
+1. 完成本轮非 Git/基线选择的质量门与跨平台 CI，随后审计工作树 stash/apply 崩溃恢复窗口。
 2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
@@ -261,7 +266,7 @@
 
 ## 当前失败测试
 
-当前无失败测试。整文件恢复与浏览器分栏阶段完整 `verify:ci` 通过：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；两项专属 Electron E2E 通过。真实 Git 多子进程用例在全套并发覆盖率下采用有限 30 秒测试预算，产品 Git 命令超时未放宽。最小 DeepSeek Pro Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
+当前无失败测试。非 Git 项目/工作树基线阶段完整 `verify:ci` 通过：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；两项专属 Electron E2E 与生产依赖审计通过。真实 Git 多子进程用例在全套并发覆盖率下采用有限 30 秒测试预算，产品 Git 命令超时未放宽。最小 DeepSeek Pro Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
 
 ## 已知问题
 

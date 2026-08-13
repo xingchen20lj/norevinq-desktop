@@ -29,6 +29,7 @@ type WorktreeRow = {
   project_id: string
   path: string
   base_ref: string
+  base_oid: string | null
   branch: string | null
   created_at: string
   copied_include_files: number
@@ -261,13 +262,14 @@ export class StateDatabase {
   insertManagedWorktree(worktree: Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>): void {
     this.#database.prepare(`
       INSERT INTO managed_worktrees
-        (id, project_id, path, base_ref, branch, created_at, copied_include_files)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+        (id, project_id, path, base_ref, base_oid, branch, created_at, copied_include_files)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       worktree.id,
       worktree.projectId,
       worktree.path,
       worktree.baseRef,
+      worktree.baseOid,
       worktree.branch,
       worktree.createdAt,
       worktree.copiedIncludeFiles,
@@ -276,7 +278,7 @@ export class StateDatabase {
 
   listManagedWorktrees(projectId: string): Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'>[] {
     const rows = this.#database.prepare(`
-      SELECT id, project_id, path, base_ref, branch, created_at, copied_include_files
+      SELECT id, project_id, path, base_ref, base_oid, branch, created_at, copied_include_files
       FROM managed_worktrees WHERE project_id = ? ORDER BY created_at DESC
     `).all(projectId) as WorktreeRow[]
     return rows.map(toManagedWorktreeRecord)
@@ -284,7 +286,7 @@ export class StateDatabase {
 
   getManagedWorktree(worktreeId: string): Omit<ManagedWorktree, 'headOid' | 'locked' | 'missing'> | null {
     const row = this.#database.prepare(`
-      SELECT id, project_id, path, base_ref, branch, created_at, copied_include_files
+      SELECT id, project_id, path, base_ref, base_oid, branch, created_at, copied_include_files
       FROM managed_worktrees WHERE id = ?
     `).get(worktreeId) as WorktreeRow | undefined
     return row ? toManagedWorktreeRecord(row) : null
@@ -575,6 +577,14 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 10) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        ALTER TABLE managed_worktrees ADD COLUMN base_oid TEXT;
+        PRAGMA user_version = 10;
+        COMMIT;
+      `)
+    }
   }
 }
 
@@ -604,6 +614,7 @@ function toManagedWorktreeRecord(row: WorktreeRow): Omit<ManagedWorktree, 'headO
     projectId: row.project_id,
     path: row.path,
     baseRef: row.base_ref,
+    baseOid: row.base_oid,
     branch: row.branch,
     createdAt: row.created_at,
     copiedIncludeFiles: row.copied_include_files,

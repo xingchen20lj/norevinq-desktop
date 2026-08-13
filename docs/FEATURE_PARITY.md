@@ -12,7 +12,7 @@
 | 桌面基础 | 自动更新 | 部分实现 | electron-updater 6.8.9 状态机、30 秒/6 小时检查、显式下载、退出/重启安装、进度/错误 UI、HTTPS 发布构建和真实 app-update/latest-mac SHA-512 元数据已测试；仓库尚无真实发布域名、macOS/Windows 签名身份，故跨版本安装为外部发布阻塞 |
 | 桌面基础 | 深色/浅色/跟随系统 | 已测试 | system/light/dark 偏好、matchMedia 实时变化、重载恢复和深浅 E2E |
 | 导航 | 项目、任务、计划任务、安全、设置导航 | 已测试 | 项目/任务、计划任务（含未读徽标）、五页安全工作台与提供商/MCP/技能/配置/应用五页设置工作台均经 Electron 回归 |
-| 项目 | 打开真实本地目录 | 已实现 | 系统目录对话框、realpath 校验、SQLite 写入 |
+| 项目 | 打开真实本地目录 | 已测试 | 系统目录对话框、realpath 校验、SQLite 写入；普通非 Git 文件夹可直接运行 Codex，工作树返回 Local-only 空状态而不冒泡 Git fatal，Electron E2E 通过 |
 | 项目 | 最近项目和固定项目 | 已测试 | 最近项目恢复/去重、SQLite 固定、固定优先排序和 Renderer 重载恢复均通过自动测试与 Electron E2E |
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 已测试 | 默认不信任、SQLite 持久化、外部技能根目录信任门；单元与 Electron UI 通过 |
@@ -54,7 +54,7 @@
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
 | Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读私有 Draft PR #1，在线重复调用未创建第二项 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
-| 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根、默认 detached、可选显式分支；真实仓库/E2E 通过 |
+| 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根；枚举 HEAD/本地分支/远端分支/标签，UI 显式选基线并以 commit OID 锁定，ref 移动失败关闭；默认 detached、可选新分支，真实旧分支基线/E2E 通过 |
 | 工作树 | 本地与工作树 Handoff | 已测试 | 任务上下文 SQLite 持久化、后续 turn cwd、确认 UI，以及 staged/unstaged/untracked 的 Local↔worktree 真实 Git 迁移和冲突回滚均通过自动测试；目标脏时失败关闭 |
 | 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
 | 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |

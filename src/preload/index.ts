@@ -35,7 +35,7 @@ import type {
   GitProjectInput,
   GitPushInput,
 } from '../shared/git.js'
-import type { CreateWorktreeInput, ListWorktreesInput, RemoveWorktreeInput, WorktreeActionInput } from '../shared/worktree.js'
+import type { CreateWorktreeInput, ListWorktreeBasesInput, ListWorktreesInput, RemoveWorktreeInput, WorktreeActionInput } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, GetDiffInput } from '../shared/diff.js'
 import type {
   CreateTerminalInput,
@@ -179,6 +179,7 @@ const api: AsterDesktopApi = {
   createGitHubPullRequest: (input: CreateGitHubPullRequestInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.githubPullRequestCreate, input),
   listWorktrees: (input: ListWorktreesInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeList, input),
+  listWorktreeBases: (input: ListWorktreeBasesInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeBases, input),
   createWorktree: (input: CreateWorktreeInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeCreate, input),
   lockWorktree: (input: WorktreeActionInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeLock, input),
   unlockWorktree: (input: WorktreeActionInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeUnlock, input),

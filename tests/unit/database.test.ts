@@ -78,6 +78,11 @@ describe('StateDatabase', () => {
         project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
         thread_id TEXT PRIMARY KEY, last_opened_at TEXT NOT NULL
       );
+      CREATE TABLE managed_worktrees (
+        id TEXT PRIMARY KEY, project_id TEXT NOT NULL, path TEXT NOT NULL UNIQUE,
+        base_ref TEXT NOT NULL, branch TEXT, created_at TEXT NOT NULL,
+        copied_include_files INTEGER NOT NULL DEFAULT 0
+      );
       INSERT INTO projects VALUES ('project-1', 'legacy', '/legacy', 0, '2026-01-01T00:00:00.000Z');
       INSERT INTO project_threads VALUES ('project-1', 'thread-1', '2026-01-01T00:00:00.000Z');
       PRAGMA user_version = 7;
@@ -90,6 +95,9 @@ describe('StateDatabase', () => {
     expect(migrated.getThreadWorktreeId('thread-1')).toBeNull()
     expect(migrated.listPinnedProjectThreadIds('project-1', false)).toEqual([])
     migrated.close()
+    const verified = new DatabaseSync(databasePath)
+    expect((verified.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
+    verified.close()
   })
 
   it('persists conversation worktree context without erasing it during list refreshes', () => {
@@ -104,6 +112,7 @@ describe('StateDatabase', () => {
       projectId: project.id,
       path: worktreePath,
       baseRef: 'HEAD',
+      baseOid: null,
       branch: null,
       createdAt: new Date().toISOString(),
       copiedIncludeFiles: 0,
