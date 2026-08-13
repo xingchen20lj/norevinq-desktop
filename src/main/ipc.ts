@@ -12,6 +12,7 @@ import type {
   ConversationSnapshot,
   ConversationSubscription,
   ForkConversationInput,
+  HandoffConversationInput,
   InterruptTurnInput,
   LoadProjectConversationsInput,
   RenameConversationInput,
@@ -122,6 +123,7 @@ export type AgentController = {
   setThreadPinned: (input: SetConversationPinnedInput) => ConversationSnapshot
   setThreadGoal: (input: SetThreadGoalInput) => Promise<ConversationSnapshot>
   clearThreadGoal: (threadId: string) => Promise<ConversationSnapshot>
+  handoffThread: (input: HandoffConversationInput) => Promise<ConversationSnapshot>
   startConversation: (input: StartConversationInput) => Promise<ConversationSnapshot>
   startTurn: (input: StartTurnInput) => Promise<ConversationSnapshot>
   steerTurn: (input: SteerTurnInput) => Promise<ConversationSnapshot>
@@ -424,6 +426,8 @@ export function registerIpc(
     agent.setThreadGoal(threadGoalSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.conversationGoalClear, (_event, input: unknown) =>
     agent.clearThreadGoal(threadInputSchema.parse(input).threadId))
+  ipcMain.handle(IPC_CHANNELS.conversationHandoff, (_event, input: unknown) =>
+    agent.handoffThread(handoffThreadSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.conversationStart, (_event, input: unknown) =>
     agent.startConversation(startConversationSchema.parse(input) as StartConversationInput))
   ipcMain.handle(IPC_CHANNELS.conversationTurnStart, (_event, input: unknown) =>
@@ -817,6 +821,11 @@ const startConversationSchema = z.object({
   reasoningEffort: z.string().min(1).max(40).optional(),
   approvalPolicy: z.enum(['untrusted', 'on-request', 'never']).optional(),
   sandbox: z.enum(['read-only', 'workspace-write', 'danger-full-access']).optional(),
+})
+const handoffThreadSchema = z.object({
+  threadId: z.string().min(1).max(200),
+  targetWorktreeId: z.uuid().nullable(),
+  moveChanges: z.boolean(),
 })
 const startTurnSchema = z.object({
   threadId: z.string().min(1).max(200),

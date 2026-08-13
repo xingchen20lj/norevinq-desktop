@@ -416,6 +416,85 @@ describe('AgentService', () => {
     service.dispose()
     database.close()
   })
+
+  it('hands an idle conversation and its future turns across persisted worktree contexts', async () => {
+    const { database, projectId, root } = createDatabase()
+    const worktreePath = mkdtempSync(join(root, 'handoff-worktree-'))
+    const worktreeId = randomUUID()
+    database.insertManagedWorktree({
+      id: worktreeId,
+      projectId,
+      path: worktreePath,
+      baseRef: 'HEAD',
+      branch: 'codex/handoff-test',
+      createdAt: new Date().toISOString(),
+      copiedIncludeFiles: 0,
+    })
+    const runtime = new FakeRuntime()
+    const moves: unknown[] = []
+    const service = new AgentService(runtime, database, {
+      moveWorktreeChanges: (input) => {
+        moves.push(input)
+        return Promise.resolve({ moved: true, recoveryStash: null })
+      },
+    })
+    await service.loadProject({ projectId })
+
+    const handedOff = await service.handoffThread({
+      threadId: 'thread-1',
+      targetWorktreeId: worktreeId,
+      moveChanges: true,
+    })
+
+    expect(moves).toEqual([{ projectId, sourceWorktreeId: null, targetWorktreeId: worktreeId }])
+    expect(handedOff.threads[0]).toMatchObject({ worktreeId, projectPath: worktreePath })
+    expect(database.getThreadProjectContext('thread-1')).toEqual({ projectId, worktreeId })
+
+    await service.startTurn({ threadId: 'thread-1', text: 'Continue in the worktree' })
+    const turnRequest = runtime.requests.filter(({ method }) => method === 'turn/start').at(-1)
+    expect(turnRequest?.params).toMatchObject({ threadId: 'thread-1', cwd: worktreePath })
+
+    service.dispose()
+    database.close()
+  })
+
+  it('moves changes back when persisting a handoff context fails', async () => {
+    const { database, projectId, root } = createDatabase()
+    const worktreePath = mkdtempSync(join(root, 'rollback-worktree-'))
+    const worktreeId = randomUUID()
+    database.insertManagedWorktree({
+      id: worktreeId,
+      projectId,
+      path: worktreePath,
+      baseRef: 'HEAD',
+      branch: null,
+      createdAt: new Date().toISOString(),
+      copiedIncludeFiles: 0,
+    })
+    const runtime = new FakeRuntime()
+    const moves: unknown[] = []
+    const service = new AgentService(runtime, database, {
+      moveWorktreeChanges: (input) => {
+        moves.push(input)
+        return Promise.resolve({ moved: true, recoveryStash: null })
+      },
+    })
+    await service.loadProject({ projectId })
+    database.removeThreadAssociation('thread-1')
+
+    await expect(service.handoffThread({
+      threadId: 'thread-1',
+      targetWorktreeId: worktreeId,
+      moveChanges: true,
+    })).rejects.toThrow('worktree changes were restored')
+    expect(moves).toEqual([
+      { projectId, sourceWorktreeId: null, targetWorktreeId: worktreeId },
+      { projectId, sourceWorktreeId: worktreeId, targetWorktreeId: null },
+    ])
+
+    service.dispose()
+    database.close()
+  })
 })
 
 class FakeRuntime {

@@ -354,6 +354,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByRole('button', { name: '锁定', exact: true }).click()
     await expect(window.getByRole('button', { name: '解锁', exact: true })).toBeVisible()
     await window.getByRole('button', { name: '解锁', exact: true }).click()
+    window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByRole('button', { name: /Detached/ }).click()
     await expect(window.getByRole('button', { name: 'Worktree', exact: true })).toBeVisible()
 
@@ -374,6 +375,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
     await expect(window.locator('.activity-card.agentMessage')).not.toContainText('INTERRUPT_FAILED')
     await window.getByRole('button', { name: 'Worktree', exact: true }).click()
+    window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByRole('button', { name: '移除', exact: true }).click()
     await expect(window.getByRole('button', { name: 'Local', exact: true })).toBeVisible()
     await window.screenshot({ path: 'test-results/aster-shell.png' })

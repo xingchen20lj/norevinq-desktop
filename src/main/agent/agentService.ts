@@ -7,6 +7,7 @@ import type {
   ConversationThreadStatus,
   ConversationThreadSummary,
   ForkConversationInput,
+  HandoffConversationInput,
   InterruptTurnInput,
   LoadProjectConversationsInput,
   PendingApproval,
@@ -23,6 +24,7 @@ import type {
 } from '../../shared/conversation.js'
 import type { JsonRpcNotificationHandler, JsonRpcRequestHandler, JsonValue } from '../runtime/jsonlRpc.js'
 import type { StateDatabase } from '../state/database.js'
+import type { MoveWorktreeChangesInput, MoveWorktreeChangesResult } from '../../shared/worktree.js'
 import { createAgentActivityState, reduceAgentActivity } from './activityReducer.js'
 
 type RuntimePort = {
@@ -50,6 +52,10 @@ type ParsedPermissionRequest = {
   globScanMaxDepth: number | null
 }
 
+type AgentServiceOptions = {
+  moveWorktreeChanges?: (input: MoveWorktreeChangesInput) => Promise<MoveWorktreeChangesResult>
+}
+
 const MAX_PERMISSION_OPTIONS = 64
 const MAX_PERMISSION_TEXT = 4_096
 
@@ -59,6 +65,8 @@ export class AgentService {
   readonly #subscriptions = new Set<ConversationSubscription>()
   readonly #approvalResolvers = new Map<string, ApprovalResolver>()
   readonly #activeTurns = new Set<string>()
+  readonly #handoffThreads = new Set<string>()
+  readonly #moveWorktreeChanges: AgentServiceOptions['moveWorktreeChanges']
   readonly #disposeRuntime: (() => void)[]
   #snapshot: ConversationSnapshot = {
     projectId: null,
@@ -73,9 +81,10 @@ export class AgentService {
     error: null,
   }
 
-  constructor(runtime: RuntimePort, database: StateDatabase) {
+  constructor(runtime: RuntimePort, database: StateDatabase, options: AgentServiceOptions = {}) {
     this.#runtime = runtime
     this.#database = database
+    this.#moveWorktreeChanges = options.moveWorktreeChanges
     this.#disposeRuntime = [
       runtime.onNotification((method, params) => this.#handleNotification({ method, params })),
       runtime.registerRequestHandler(
@@ -128,7 +137,8 @@ export class AgentService {
     const pinnedIds = new Set(this.#database.listPinnedProjectThreadIds(input.projectId, archived))
     const page = asArray(result.data).map((value) => {
       const thread = asRecord(value)
-      return toThreadSummary(thread, pinnedIds.has(requireString(thread.id, 'thread.id')))
+      const threadId = requireString(thread.id, 'thread.id')
+      return this.#toThreadSummary(thread, pinnedIds.has(threadId))
     })
     for (const thread of page) this.#database.associateThread(input.projectId, thread.id, archived)
     const pinned = cursor ? [] : await this.#readMissingPinnedThreads(pinnedIds, page, searchTerm)
@@ -234,10 +244,11 @@ export class AgentService {
     const threadId = requireString(thread.id, 'thread.id')
     const projectId = this.#snapshot.projectId
     if (!projectId) throw new Error('No project is loaded.')
-    this.#database.associateThread(projectId, threadId)
+    const worktreeId = this.#database.getThreadWorktreeId(input.threadId)
+    this.#database.associateThread(projectId, threadId, undefined, worktreeId)
     this.#hydrateThread(thread)
     this.#update({
-      threads: [toThreadSummary(thread)],
+      threads: [this.#toThreadSummary(thread, false)],
       selectedThreadId: threadId,
       listArchived: false,
       listSearchTerm: '',
@@ -291,6 +302,62 @@ export class AgentService {
     return this.#snapshot
   }
 
+  async handoffThread(input: HandoffConversationInput): Promise<ConversationSnapshot> {
+    const thread = this.#requireIdleVisibleThread(input.threadId)
+    const projectId = this.#snapshot.projectId
+    if (!projectId) throw new Error('No project is loaded.')
+    const sourceWorktreeId = this.#database.getThreadWorktreeId(input.threadId)
+    if (sourceWorktreeId === input.targetWorktreeId) return this.#snapshot
+    const project = this.#requireProject(projectId)
+    const targetPath = input.targetWorktreeId
+      ? this.#requireWorktreePath(projectId, input.targetWorktreeId)
+      : project.path
+    if (this.#handoffThreads.has(input.threadId)) throw new Error('This conversation is already being handed off.')
+    this.#handoffThreads.add(input.threadId)
+    try {
+      let movedChanges = false
+      if (input.moveChanges) {
+        if (!this.#moveWorktreeChanges) throw new Error('Worktree handoff is unavailable.')
+        const result = await this.#moveWorktreeChanges({
+          projectId,
+          sourceWorktreeId,
+          targetWorktreeId: input.targetWorktreeId,
+        })
+        movedChanges = result.moved
+      }
+      try {
+        this.#database.setThreadWorktree(projectId, input.threadId, input.targetWorktreeId)
+      } catch (persistenceError) {
+        if (!movedChanges || !this.#moveWorktreeChanges) throw persistenceError
+        try {
+          await this.#moveWorktreeChanges({
+            projectId,
+            sourceWorktreeId: input.targetWorktreeId,
+            targetWorktreeId: sourceWorktreeId,
+          })
+        } catch (rollbackError) {
+          throw new AggregateError(
+            [persistenceError, rollbackError],
+            'The worktree changes moved, but the conversation context could not be saved or rolled back.',
+            { cause: rollbackError },
+          )
+        }
+        throw new Error('The conversation context could not be saved; worktree changes were restored.', {
+          cause: persistenceError,
+        })
+      }
+      this.#update({
+        threads: this.#snapshot.threads.map((item) => item.id === thread.id
+          ? { ...item, projectPath: targetPath, worktreeId: input.targetWorktreeId }
+          : item),
+        error: null,
+      })
+      return this.#snapshot
+    } finally {
+      this.#handoffThreads.delete(input.threadId)
+    }
+  }
+
   async startConversation(input: StartConversationInput): Promise<ConversationSnapshot> {
     const project = this.#requireProject(input.projectId)
     const workingPath = input.worktreeId
@@ -308,8 +375,9 @@ export class AgentService {
     const result = asRecord(await this.#runtime.request('thread/start', params))
     const thread = asRecord(result.thread)
     const threadId = requireString(thread.id, 'thread.id')
-    const summary = toThreadSummary(thread)
-    this.#database.associateThread(input.projectId, threadId)
+    const worktreeId = input.worktreeId ?? null
+    this.#database.associateThread(input.projectId, threadId, undefined, worktreeId)
+    const summary = this.#toThreadSummary(thread, false)
     this.#update({
       projectId: input.projectId,
       selectedThreadId: threadId,
@@ -355,8 +423,9 @@ export class AgentService {
     const result = asRecord(await this.#runtime.request('thread/start', params))
     const thread = asRecord(result.thread)
     const threadId = requireString(thread.id, 'thread.id')
-    this.#database.associateThread(input.projectId, threadId)
-    this.#update({ threads: upsertThread(this.#snapshot.threads, toThreadSummary(thread)) })
+    const worktreeId = input.worktreeId ?? null
+    this.#database.associateThread(input.projectId, threadId, undefined, worktreeId)
+    this.#update({ threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(thread, false)) })
     const turnId = await this.#startTurn({
       threadId,
       text,
@@ -367,6 +436,7 @@ export class AgentService {
 
   async startTurn(input: StartTurnInput): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(input.threadId)
+    if (this.#handoffThreads.has(input.threadId)) throw new Error('Wait for the conversation handoff to finish.')
     await this.#runtime.start()
     await this.#startTurn({ ...input, text: requirePrompt(input.text) })
     this.#update({ selectedThreadId: input.threadId, error: null })
@@ -414,6 +484,13 @@ export class AgentService {
       clientUserMessageId: randomUUID(),
       input: [textInput(input.text)],
       threadId: input.threadId,
+    }
+    const context = this.#database.getThreadProjectContext(input.threadId)
+    if (context) {
+      const project = this.#requireProject(context.projectId)
+      params.cwd = context.worktreeId
+        ? this.#requireWorktreePath(context.projectId, context.worktreeId)
+        : project.path
     }
     if (input.reasoningEffort) params.effort = input.reasoningEffort
     this.#runtime.markTurnStarted()
@@ -540,10 +617,14 @@ export class AgentService {
     const visibleIds = new Set(page.map(({ id }) => id))
     const threads = await Promise.all([...pinnedIds]
       .filter((threadId) => !visibleIds.has(threadId))
-      .map(async (threadId): Promise<ConversationThreadSummary | null> => {
+      .map(async (requestedThreadId): Promise<ConversationThreadSummary | null> => {
         try {
-          const result = asRecord(await this.#runtime.request('thread/read', { includeTurns: false, threadId }))
-          return toThreadSummary(asRecord(result.thread), true)
+          const result = asRecord(await this.#runtime.request('thread/read', {
+            includeTurns: false,
+            threadId: requestedThreadId,
+          }))
+          const thread = asRecord(result.thread)
+          return this.#toThreadSummary(thread, true)
         } catch {
           return null
         }
@@ -552,9 +633,17 @@ export class AgentService {
       thread !== null && matchesThreadSearch(thread, searchTerm))
   }
 
-  #toThreadSummary(thread: Record<string, unknown>): ConversationThreadSummary {
+  #toThreadSummary(thread: Record<string, unknown>, pinned?: boolean): ConversationThreadSummary {
     const threadId = requireString(thread.id, 'thread.id')
-    return toThreadSummary(thread, this.#database.isThreadPinned(threadId))
+    const worktreeId = this.#database.getThreadWorktreeId(threadId)
+    const summary = toThreadSummary(
+      thread,
+      pinned ?? this.#database.isThreadPinned(threadId),
+      worktreeId,
+    )
+    if (!worktreeId) return summary
+    const worktree = this.#database.getManagedWorktree(worktreeId)
+    return worktree ? { ...summary, projectPath: worktree.path } : summary
   }
 
   #requestApproval(
@@ -737,7 +826,11 @@ function normalizeSearchTerm(value: string | undefined): string {
   return term
 }
 
-function toThreadSummary(thread: Record<string, unknown>, pinned = false): ConversationThreadSummary {
+function toThreadSummary(
+  thread: Record<string, unknown>,
+  pinned = false,
+  worktreeId: string | null = null,
+): ConversationThreadSummary {
   return {
     id: requireString(thread.id, 'thread.id'),
     sessionId: optionalString(thread.sessionId) ?? requireString(thread.id, 'thread.id'),
@@ -752,6 +845,7 @@ function toThreadSummary(thread: Record<string, unknown>, pinned = false): Conve
     parentThreadId: optionalString(thread.parentThreadId),
     cliVersion: optionalString(thread.cliVersion) ?? '',
     pinned,
+    worktreeId,
   }
 }
 

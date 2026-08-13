@@ -325,6 +325,13 @@ export function App(): React.JSX.Element {
   }, [selectedProject])
 
   useEffect(() => {
+    if (newTask || !selectedThread) return
+    setSelectedWorktree(selectedThread.worktreeId
+      ? worktrees.find(({ id }) => id === selectedThread.worktreeId) ?? null
+      : null)
+  }, [newTask, selectedThread, worktrees])
+
+  useEffect(() => {
     if (!settingsOpen || !selectedProject || runtime?.phase !== 'ready') return
     void window.aster.loadIntegrations({
       projectId: selectedProject.id,
@@ -366,6 +373,36 @@ export function App(): React.JSX.Element {
       setConversations(await window.aster.selectConversation({ threadId }))
     } catch (reason) {
       setError(toErrorMessage(reason))
+    }
+  }
+
+  async function selectWorktreeContext(item: ManagedWorktree | null): Promise<void> {
+    if (!selectedThread || newTask) {
+      setSelectedWorktree(item)
+      setWorktreeOpen(false)
+      return
+    }
+    if (selectedThread.worktreeId === (item?.id ?? null)) {
+      setWorktreeOpen(false)
+      return
+    }
+    const destination = item?.branch ?? (item ? `Detached ${item.headOid?.slice(0, 7) ?? ''}` : 'Local')
+    if (!window.confirm(`将当前任务交接到 ${destination}？源目录的已暂存、未暂存和未跟踪修改会一起迁移；目标必须保持干净。`)) return
+    setThreadActionBusy(true)
+    setError(null)
+    try {
+      const snapshot = await window.aster.handoffConversation({
+        threadId: selectedThread.id,
+        targetWorktreeId: item?.id ?? null,
+        moveChanges: true,
+      })
+      setConversations(snapshot)
+      setSelectedWorktree(item)
+      setWorktreeOpen(false)
+    } catch (reason) {
+      setError(toErrorMessage(reason))
+    } finally {
+      setThreadActionBusy(false)
     }
   }
 
@@ -808,7 +845,7 @@ export function App(): React.JSX.Element {
           selected={selectedWorktree}
           close={() => setWorktreeOpen(false)}
           update={setWorktrees}
-          select={(item) => { setSelectedWorktree(item); setWorktreeOpen(false) }}
+          select={selectWorktreeContext}
           onError={setError}
         />}
         {terminalOpen && selectedProject && <Suspense fallback={<WorkbenchLoading label="正在加载终端…" />}><TerminalPanel
@@ -909,7 +946,7 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
   selected: ManagedWorktree | null
   close: () => void
   update: (items: ManagedWorktree[]) => void
-  select: (item: ManagedWorktree | null) => void
+  select: (item: ManagedWorktree | null) => Promise<void>
   onError: (message: string | null) => void
 }): React.JSX.Element {
   const [branch, setBranch] = useState('')
@@ -944,15 +981,14 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     <header><div><p className="eyebrow">MANAGED WORKTREES</p><h2>隔离工作区</h2></div><button className="icon-button" onClick={close} aria-label="关闭工作树"><X size={16} /></button></header>
     <p className="worktree-note">默认从 HEAD 创建 detached worktree。填写分支名时才创建分支；`.worktreeinclude` 只复制显式匹配的已忽略普通文件。</p>
     <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选：codex/feature-name" /><button disabled={busy} onClick={() => void create()}><Plus size={13} />创建</button></div>
-    <button className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
+    <button disabled={busy} className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => void select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
     {items.map((item) => <div className={`worktree-row ${selected?.id === item.id ? 'selected' : ''}`} key={item.id}>
-      <button className="worktree-select" onClick={() => select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small>{item.path}</small></span></button>
+      <button disabled={busy || item.missing} className="worktree-select" onClick={() => void select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small>{item.path}</small></span></button>
       <div className="worktree-actions">
         <button disabled={busy || item.missing} onClick={() => void act(() => item.locked ? window.aster.unlockWorktree({ worktreeId: item.id }) : window.aster.lockWorktree({ worktreeId: item.id }))}>{item.locked ? '解锁' : '锁定'}</button>
         <button disabled={busy || item.locked} onClick={() => void act(async () => {
-          const next = await window.aster.removeWorktree({ worktreeId: item.id })
-          if (selected?.id === item.id) select(null)
-          return next
+          if (selected?.id === item.id) await select(null)
+          return window.aster.removeWorktree({ worktreeId: item.id })
         })}>移除</button>
       </div>
     </div>)}

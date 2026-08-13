@@ -13,6 +13,8 @@ import { promisify } from 'node:util'
 import type {
   CreateWorktreeInput,
   ManagedWorktree,
+  MoveWorktreeChangesInput,
+  MoveWorktreeChangesResult,
   RemoveWorktreeInput,
   WorktreeActionInput,
 } from '../../shared/worktree.js'
@@ -25,6 +27,7 @@ const MAX_INCLUDE_TOTAL_BYTES = 100 * 1024 * 1024
 export class WorktreeService {
   readonly #database: StateDatabase
   readonly #managedRoot: string
+  #handoffInProgress = false
 
   constructor(database: StateDatabase, managedRoot: string) {
     this.#database = database
@@ -90,12 +93,56 @@ export class WorktreeService {
 
   async remove(input: RemoveWorktreeInput): Promise<ManagedWorktree[]> {
     const { project, worktree } = this.#requireManaged(input.worktreeId)
+    const associatedThreads = this.#database.countThreadsForWorktree(worktree.id)
+    if (associatedThreads > 0) {
+      throw new Error(`Hand off ${String(associatedThreads)} conversation${associatedThreads === 1 ? '' : 's'} before removing this worktree.`)
+    }
     const args = ['worktree', 'remove']
     if (input.force) args.push('--force')
     args.push(worktree.path)
     if (existsSync(worktree.path)) await runGit(project.path, args, 120_000)
     this.#database.deleteManagedWorktree(worktree.id)
     return this.list(project.id)
+  }
+
+  async moveChanges(input: MoveWorktreeChangesInput): Promise<MoveWorktreeChangesResult> {
+    if (this.#handoffInProgress) throw new Error('Another worktree handoff is already running.')
+    if (input.sourceWorktreeId === input.targetWorktreeId) return { moved: false, recoveryStash: null }
+    const project = this.#requireProject(input.projectId)
+    const source = this.#contextPath(project.id, project.path, input.sourceWorktreeId)
+    const target = this.#contextPath(project.id, project.path, input.targetWorktreeId)
+    this.#handoffInProgress = true
+    try {
+      if (!(await hasChanges(source))) return { moved: false, recoveryStash: null }
+      if (await hasUnmergedChanges(source)) throw new Error('Resolve source merge conflicts before handing off changes.')
+      if (await hasChanges(target)) throw new Error('The handoff target must be clean before receiving changes.')
+
+      const marker = `aster-handoff-${randomUUID()}`
+      await runGit(source, ['stash', 'push', '--include-untracked', '--message', marker, '--'], 120_000)
+      const stashOid = (await runGit(source, ['rev-parse', '--verify', 'refs/stash'])).stdout.trim()
+      if (!stashOid || await hasChanges(source)) {
+        throw new Error('Git could not create a clean handoff recovery stash.')
+      }
+
+      try {
+        await runGit(target, ['stash', 'apply', '--index', stashOid], 120_000)
+      } catch (applyError) {
+        const rollbackErrors: string[] = []
+        await runGit(target, ['reset', '--hard', 'HEAD'], 120_000).catch((error: unknown) => rollbackErrors.push(errorMessage(error)))
+        await runGit(target, ['clean', '-fd'], 120_000).catch((error: unknown) => rollbackErrors.push(errorMessage(error)))
+        await runGit(source, ['stash', 'apply', '--index', stashOid], 120_000)
+          .catch((error: unknown) => rollbackErrors.push(errorMessage(error)))
+        const recoveryStash = await dropTopStashIf(source, stashOid) ? null : stashOid
+        const detail = rollbackErrors.length > 0 ? ` Rollback warnings: ${rollbackErrors.join('; ')}` : ''
+        throw new Error(`Changes could not be applied to the target; the source was restored.${detail}${recoveryStash ? ` Recovery stash: ${recoveryStash}` : ''}`, { cause: applyError })
+      }
+
+      if (!(await hasChanges(target))) throw new Error('Git applied the handoff without producing target changes.')
+      const dropped = await dropTopStashIf(source, stashOid)
+      return { moved: true, recoveryStash: dropped ? null : stashOid }
+    } finally {
+      this.#handoffInProgress = false
+    }
   }
 
   #requireProject(projectId: string) {
@@ -112,6 +159,35 @@ export class WorktreeService {
     if (!worktree.path.startsWith(expectedPrefix)) throw new Error('Managed worktree path failed its ownership check.')
     return { project, worktree }
   }
+
+  #contextPath(projectId: string, projectPath: string, worktreeId: string | null): string {
+    if (!worktreeId) return projectPath
+    const worktree = this.#database.getManagedWorktree(worktreeId)
+    if (worktree?.projectId !== projectId) throw new Error('Managed worktree not found for this project.')
+    if (!existsSync(worktree.path)) throw new Error('Managed worktree is missing.')
+    return worktree.path
+  }
+}
+
+async function hasChanges(cwd: string): Promise<boolean> {
+  const result = await runGit(cwd, ['status', '--porcelain=v1', '-z', '--untracked-files=all'])
+  return result.stdout.length > 0
+}
+
+async function hasUnmergedChanges(cwd: string): Promise<boolean> {
+  const result = await runGit(cwd, ['diff', '--name-only', '--diff-filter=U', '-z'])
+  return result.stdout.length > 0
+}
+
+async function dropTopStashIf(cwd: string, expectedOid: string): Promise<boolean> {
+  const current = await runGit(cwd, ['rev-parse', '--verify', 'refs/stash']).catch(() => null)
+  if (current?.stdout.trim() !== expectedOid) return false
+  await runGit(cwd, ['stash', 'drop', 'stash@{0}'])
+  return true
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 async function copyWorktreeIncludes(sourceRoot: string, targetRoot: string): Promise<number> {
