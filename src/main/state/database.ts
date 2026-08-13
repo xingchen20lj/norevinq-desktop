@@ -5,7 +5,11 @@ import { DatabaseSync } from 'node:sqlite'
 import type { ProjectSummary } from '../../shared/contracts.js'
 import type { SecurityScanRecord } from '../../shared/security.js'
 import type { ScheduledRun, ScheduledTask } from '../../shared/scheduler.js'
-import type { ManagedWorktree } from '../../shared/worktree.js'
+import type {
+  ManagedWorktree,
+  WorktreeHandoffPhase,
+  WorktreeHandoffRecovery,
+} from '../../shared/worktree.js'
 
 type ProjectRow = {
   id: string
@@ -33,6 +37,27 @@ type WorktreeRow = {
   branch: string | null
   created_at: string
   copied_include_files: number
+}
+
+type WorktreeHandoffRow = {
+  id: string
+  project_id: string
+  thread_id: string
+  source_worktree_id: string | null
+  target_worktree_id: string | null
+  recovery_ref: string
+  stash_oid: string | null
+  source_head_oid: string
+  source_tree_oid: string
+  source_index_oid: string
+  target_head_oid: string
+  target_clean_tree_oid: string
+  target_tree_oid: string | null
+  target_index_oid: string | null
+  phase: WorktreeHandoffPhase
+  created_at: string
+  updated_at: string
+  error: string | null
 }
 
 type SecurityScanRow = {
@@ -295,6 +320,107 @@ export class StateDatabase {
   deleteManagedWorktree(worktreeId: string): void {
     this.#database.prepare('UPDATE project_threads SET worktree_id = NULL WHERE worktree_id = ?').run(worktreeId)
     this.#database.prepare('DELETE FROM managed_worktrees WHERE id = ?').run(worktreeId)
+  }
+
+  insertWorktreeHandoff(operation: WorktreeHandoffRecovery): void {
+    this.#database.prepare(`
+      INSERT INTO worktree_handoffs
+        (id, project_id, thread_id, source_worktree_id, target_worktree_id,
+         recovery_ref, stash_oid, source_head_oid, source_tree_oid, source_index_oid,
+         target_head_oid, target_clean_tree_oid, target_tree_oid, target_index_oid,
+         phase, created_at, updated_at, error)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      operation.id,
+      operation.projectId,
+      operation.threadId,
+      operation.sourceWorktreeId,
+      operation.targetWorktreeId,
+      operation.recoveryRef,
+      operation.stashOid,
+      operation.sourceHeadOid,
+      operation.sourceTreeOid,
+      operation.sourceIndexOid,
+      operation.targetHeadOid,
+      operation.targetCleanTreeOid,
+      operation.targetTreeOid,
+      operation.targetIndexOid,
+      operation.phase,
+      operation.createdAt,
+      operation.updatedAt,
+      operation.error,
+    )
+  }
+
+  updateWorktreeHandoff(
+    id: string,
+    input: {
+      phase: WorktreeHandoffPhase
+      stashOid?: string | null
+      targetTreeOid?: string | null
+      targetIndexOid?: string | null
+      error?: string | null
+    },
+  ): WorktreeHandoffRecovery {
+    const current = this.getWorktreeHandoff(id)
+    if (!current) throw new Error('Worktree handoff recovery record not found.')
+    const next: WorktreeHandoffRecovery = {
+      ...current,
+      phase: input.phase,
+      stashOid: input.stashOid === undefined ? current.stashOid : input.stashOid,
+      targetTreeOid: input.targetTreeOid === undefined ? current.targetTreeOid : input.targetTreeOid,
+      targetIndexOid: input.targetIndexOid === undefined ? current.targetIndexOid : input.targetIndexOid,
+      error: input.error === undefined ? current.error : input.error,
+      updatedAt: new Date().toISOString(),
+    }
+    this.#database.prepare(`
+      UPDATE worktree_handoffs
+      SET stash_oid = ?, target_tree_oid = ?, target_index_oid = ?, phase = ?, updated_at = ?, error = ?
+      WHERE id = ?
+    `).run(next.stashOid, next.targetTreeOid, next.targetIndexOid, next.phase, next.updatedAt, next.error, id)
+    return next
+  }
+
+  getWorktreeHandoff(id: string): WorktreeHandoffRecovery | null {
+    const row = this.#database.prepare(`
+      SELECT id, project_id, thread_id, source_worktree_id, target_worktree_id,
+        recovery_ref, stash_oid, source_head_oid, source_tree_oid, source_index_oid,
+        target_head_oid, target_clean_tree_oid, target_tree_oid, target_index_oid,
+        phase, created_at, updated_at, error
+      FROM worktree_handoffs WHERE id = ?
+    `).get(id) as WorktreeHandoffRow | undefined
+    return row ? toWorktreeHandoff(row) : null
+  }
+
+  listWorktreeHandoffs(projectId?: string): WorktreeHandoffRecovery[] {
+    const rows = (projectId
+      ? this.#database.prepare(`
+          SELECT id, project_id, thread_id, source_worktree_id, target_worktree_id,
+            recovery_ref, stash_oid, source_head_oid, source_tree_oid, source_index_oid,
+            target_head_oid, target_clean_tree_oid, target_tree_oid, target_index_oid,
+            phase, created_at, updated_at, error
+          FROM worktree_handoffs WHERE project_id = ? ORDER BY created_at ASC
+        `).all(projectId)
+      : this.#database.prepare(`
+          SELECT id, project_id, thread_id, source_worktree_id, target_worktree_id,
+            recovery_ref, stash_oid, source_head_oid, source_tree_oid, source_index_oid,
+            target_head_oid, target_clean_tree_oid, target_tree_oid, target_index_oid,
+            phase, created_at, updated_at, error
+          FROM worktree_handoffs ORDER BY created_at ASC
+        `).all()) as WorktreeHandoffRow[]
+    return rows.map(toWorktreeHandoff)
+  }
+
+  countWorktreeHandoffsForWorktree(worktreeId: string): number {
+    const row = this.#database.prepare(`
+      SELECT COUNT(*) AS count FROM worktree_handoffs
+      WHERE source_worktree_id = ? OR target_worktree_id = ?
+    `).get(worktreeId, worktreeId) as { count: number }
+    return row.count
+  }
+
+  deleteWorktreeHandoff(id: string): void {
+    this.#database.prepare('DELETE FROM worktree_handoffs WHERE id = ?').run(id)
   }
 
   upsertSecurityScan(scan: SecurityScanRecord): void {
@@ -585,6 +711,39 @@ export class StateDatabase {
         COMMIT;
       `)
     }
+    if (version.user_version < 11) {
+      this.#database.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE IF NOT EXISTS worktree_handoffs (
+          id TEXT PRIMARY KEY,
+          project_id TEXT NOT NULL REFERENCES projects(id) ON DELETE CASCADE,
+          thread_id TEXT NOT NULL,
+          source_worktree_id TEXT,
+          target_worktree_id TEXT,
+          recovery_ref TEXT NOT NULL UNIQUE,
+          stash_oid TEXT,
+          source_head_oid TEXT NOT NULL,
+          source_tree_oid TEXT NOT NULL,
+          source_index_oid TEXT NOT NULL,
+          target_head_oid TEXT NOT NULL,
+          target_clean_tree_oid TEXT NOT NULL,
+          target_tree_oid TEXT,
+          target_index_oid TEXT,
+          phase TEXT NOT NULL CHECK (phase IN (
+            'preparing', 'stashed', 'applying', 'applied', 'rollingBack', 'needsAttention'
+          )),
+          created_at TEXT NOT NULL,
+          updated_at TEXT NOT NULL,
+          error TEXT
+        );
+        CREATE INDEX IF NOT EXISTS worktree_handoffs_project_idx
+          ON worktree_handoffs(project_id, created_at ASC);
+        CREATE INDEX IF NOT EXISTS worktree_handoffs_worktrees_idx
+          ON worktree_handoffs(source_worktree_id, target_worktree_id);
+        PRAGMA user_version = 11;
+        COMMIT;
+      `)
+    }
   }
 }
 
@@ -618,6 +777,29 @@ function toManagedWorktreeRecord(row: WorktreeRow): Omit<ManagedWorktree, 'headO
     branch: row.branch,
     createdAt: row.created_at,
     copiedIncludeFiles: row.copied_include_files,
+  }
+}
+
+function toWorktreeHandoff(row: WorktreeHandoffRow): WorktreeHandoffRecovery {
+  return {
+    id: row.id,
+    projectId: row.project_id,
+    threadId: row.thread_id,
+    sourceWorktreeId: row.source_worktree_id,
+    targetWorktreeId: row.target_worktree_id,
+    recoveryRef: row.recovery_ref,
+    stashOid: row.stash_oid,
+    sourceHeadOid: row.source_head_oid,
+    sourceTreeOid: row.source_tree_oid,
+    sourceIndexOid: row.source_index_oid,
+    targetHeadOid: row.target_head_oid,
+    targetCleanTreeOid: row.target_clean_tree_oid,
+    targetTreeOid: row.target_tree_oid,
+    targetIndexOid: row.target_index_oid,
+    phase: row.phase,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    error: row.error,
   }
 }
 

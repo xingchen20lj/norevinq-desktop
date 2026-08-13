@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { afterEach, describe, expect, it } from 'vitest'
 import { StateDatabase } from '../../src/main/state/database.js'
 import type { ScheduledRun } from '../../src/shared/scheduler.js'
+import type { WorktreeHandoffRecovery } from '../../src/shared/worktree.js'
 
 const temporaryPaths: string[] = []
 
@@ -96,7 +97,7 @@ describe('StateDatabase', () => {
     expect(migrated.listPinnedProjectThreadIds('project-1', false)).toEqual([])
     migrated.close()
     const verified = new DatabaseSync(databasePath)
-    expect((verified.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(10)
+    expect((verified.prepare('PRAGMA user_version').get() as { user_version: number }).user_version).toBe(11)
     verified.close()
   })
 
@@ -131,6 +132,59 @@ describe('StateDatabase', () => {
     expect(() => database.setThreadWorktree(project.id, 'missing-thread', 'worktree-1'))
       .toThrow('Conversation association not found')
     database.close()
+  })
+
+  it('persists durable worktree handoff recovery metadata across restart', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-db-handoff-recovery-'))
+    temporaryPaths.push(root)
+    const databasePath = join(root, 'state.sqlite3')
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const database = new StateDatabase(databasePath)
+    const project = database.upsertProject(projectPath)
+    database.associateThread(project.id, 'thread-recovery')
+    const operation: WorktreeHandoffRecovery = {
+      id: '11111111-1111-7111-8111-111111111111',
+      projectId: project.id,
+      threadId: 'thread-recovery',
+      sourceWorktreeId: null,
+      targetWorktreeId: '22222222-2222-7222-8222-222222222222',
+      recoveryRef: 'refs/aster/handoffs/11111111-1111-7111-8111-111111111111',
+      stashOid: 'a'.repeat(40),
+      sourceHeadOid: 'b'.repeat(40),
+      sourceTreeOid: 'c'.repeat(40),
+      sourceIndexOid: 'd'.repeat(40),
+      targetHeadOid: 'e'.repeat(40),
+      targetCleanTreeOid: 'f'.repeat(40),
+      targetTreeOid: null,
+      targetIndexOid: null,
+      phase: 'stashed',
+      createdAt: '2026-08-13T00:00:00.000Z',
+      updatedAt: '2026-08-13T00:00:00.000Z',
+      error: null,
+    }
+    database.insertWorktreeHandoff(operation)
+    database.updateWorktreeHandoff(operation.id, {
+      phase: 'needsAttention',
+      targetTreeOid: '1'.repeat(40),
+      targetIndexOid: '2'.repeat(40),
+      error: 'safe recovery required',
+    })
+    database.close()
+
+    const reopened = new StateDatabase(databasePath)
+    expect(reopened.listWorktreeHandoffs(project.id)).toEqual([
+      expect.objectContaining({
+        id: operation.id,
+        phase: 'needsAttention',
+        targetTreeOid: '1'.repeat(40),
+        targetIndexOid: '2'.repeat(40),
+        error: 'safe recovery required',
+      }),
+    ])
+    expect(reopened.countWorktreeHandoffsForWorktree(operation.targetWorktreeId ?? '')).toBe(1)
+    reopened.deleteWorktreeHandoff(operation.id)
+    expect(reopened.listWorktreeHandoffs(project.id)).toEqual([])
+    reopened.close()
   })
 
   it('bounds pinned conversation hydration to twenty records per project', () => {

@@ -35,7 +35,15 @@ import type {
   GitProjectInput,
   GitPushInput,
 } from '../shared/git.js'
-import type { CreateWorktreeInput, ListWorktreeBasesInput, ListWorktreesInput, RemoveWorktreeInput, WorktreeActionInput } from '../shared/worktree.js'
+import type {
+  CreateWorktreeInput,
+  ListWorktreeBasesInput,
+  ListWorktreeRecoveriesInput,
+  ListWorktreesInput,
+  RemoveWorktreeInput,
+  RetryWorktreeRecoveryInput,
+  WorktreeActionInput,
+} from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, GetDiffInput } from '../shared/diff.js'
 import type {
   CreateTerminalInput,
@@ -184,6 +192,10 @@ const api: AsterDesktopApi = {
   lockWorktree: (input: WorktreeActionInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeLock, input),
   unlockWorktree: (input: WorktreeActionInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeUnlock, input),
   removeWorktree: (input: RemoveWorktreeInput) => ipcRenderer.invoke(IPC_CHANNELS.worktreeRemove, input),
+  listWorktreeRecoveries: (input: ListWorktreeRecoveriesInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.worktreeRecoveries, input),
+  retryWorktreeRecovery: (input: RetryWorktreeRecoveryInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.worktreeRecoveryRetry, input),
   getDiff: (input: GetDiffInput) => ipcRenderer.invoke(IPC_CHANNELS.diffGet, input),
   applyDiffHunk: (input: ApplyDiffHunkInput) => ipcRenderer.invoke(IPC_CHANNELS.diffHunkApply, input),
   getTerminalState: () => ipcRenderer.invoke(IPC_CHANNELS.terminalState),

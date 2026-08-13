@@ -58,7 +58,7 @@
 | 工作树 | 本地与工作树 Handoff | 已测试 | 任务上下文 SQLite 持久化、后续 turn cwd、确认 UI，以及 staged/unstaged/untracked 的 Local↔worktree 真实 Git 迁移和冲突回滚均通过自动测试；目标脏时失败关闭 |
 | 工作树 | 分支占用冲突检测 | 已测试 | 显式分支被其他 worktree 占用时真实 Git 拒绝，错误返回 UI |
 | 工作树 | `.worktreeinclude` | 已测试 | 仅 ignored+glob 匹配+普通文件；排除规则、10/100 MiB 边界与路径约束 |
-| 工作树 | 快照、恢复和清理策略 | 部分实现 | SQLite 恢复、missing、lock/unlock、引用保护 remove、Handoff recovery stash 与冲突回滚已测试；进程在 stash/apply 窗口崩溃后的自动恢复元数据待补 |
+| 工作树 | 快照、恢复和清理策略 | 已测试 | SQLite v11 持久化 Handoff 状态机、独立 Git recovery ref、源/目标 HEAD+worktree tree+index tree、启动自动恢复、人工修改失败关闭、恢复 UI/重试、missing/lock/unlock/引用保护 remove 均经真实 Git 与 Electron E2E；不占用用户 stash |
 | 差异 | 文件树和 unified/split diff | 已测试 | working/staged、准确新旧行号、unified/split 及浅色真实桌面截图通过 |
 | 差异 | 大 diff 虚拟化 | 部分实现 | 200 文件、2 MiB/文件、16 MiB 总量、截断禁用操作与离屏 hunk `content-visibility`；单个超长 hunk 行窗口待性能阶段 |
 | 差异 | 行内评论并发送给智能体 | 已测试 | E2E 选择新增行，携带文件/行号/hunk/代码上下文真实追加并收到 `ASTER_REVIEW_OK` |

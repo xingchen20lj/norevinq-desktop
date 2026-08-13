@@ -434,11 +434,13 @@ describe('AgentService', () => {
     })
     const runtime = new FakeRuntime()
     const moves: unknown[] = []
+    const completed: string[] = []
     const service = new AgentService(runtime, database, {
       moveWorktreeChanges: (input) => {
         moves.push(input)
-        return Promise.resolve({ moved: true, recoveryStash: null })
+        return Promise.resolve({ moved: true, operationId: 'handoff-1' })
       },
+      completeWorktreeHandoff: (operationId) => { completed.push(operationId); return Promise.resolve() },
     })
     await service.loadProject({ projectId })
 
@@ -448,7 +450,8 @@ describe('AgentService', () => {
       moveChanges: true,
     })
 
-    expect(moves).toEqual([{ projectId, sourceWorktreeId: null, targetWorktreeId: worktreeId }])
+    expect(moves).toEqual([{ projectId, threadId: 'thread-1', sourceWorktreeId: null, targetWorktreeId: worktreeId }])
+    expect(completed).toEqual(['handoff-1'])
     expect(handedOff.threads[0]).toMatchObject({ worktreeId, projectPath: worktreePath })
     expect(database.getThreadProjectContext('thread-1')).toEqual({ projectId, worktreeId })
 
@@ -476,11 +479,13 @@ describe('AgentService', () => {
     })
     const runtime = new FakeRuntime()
     const moves: unknown[] = []
+    const rollbacks: string[] = []
     const service = new AgentService(runtime, database, {
       moveWorktreeChanges: (input) => {
         moves.push(input)
-        return Promise.resolve({ moved: true, recoveryStash: null })
+        return Promise.resolve({ moved: true, operationId: 'handoff-rollback' })
       },
+      rollbackWorktreeHandoff: (operationId) => { rollbacks.push(operationId); return Promise.resolve() },
     })
     await service.loadProject({ projectId })
     database.removeThreadAssociation('thread-1')
@@ -491,9 +496,9 @@ describe('AgentService', () => {
       moveChanges: true,
     })).rejects.toThrow('worktree changes were restored')
     expect(moves).toEqual([
-      { projectId, sourceWorktreeId: null, targetWorktreeId: worktreeId },
-      { projectId, sourceWorktreeId: worktreeId, targetWorktreeId: null },
+      { projectId, threadId: 'thread-1', sourceWorktreeId: null, targetWorktreeId: worktreeId },
     ])
+    expect(rollbacks).toEqual(['handoff-rollback'])
 
     service.dispose()
     database.close()

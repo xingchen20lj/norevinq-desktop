@@ -51,7 +51,11 @@ import type {
 import type { CodexRuntimeSnapshot } from '../../shared/runtime'
 import type { ProviderStatus } from '../../shared/providers'
 import type { GitHubRepositoryStatus, GitRepositorySnapshot } from '../../shared/git'
-import type { ManagedWorktree, WorktreeBaseCatalog } from '../../shared/worktree'
+import type {
+  ManagedWorktree,
+  WorktreeBaseCatalog,
+  WorktreeHandoffRecoverySummary,
+} from '../../shared/worktree'
 import type { DiffHunk, DiffLine, DiffSnapshot } from '../../shared/diff'
 import type { TerminalEvent, TerminalState } from '../../shared/terminal'
 import type { IntegrationJson, IntegrationSnapshot, PendingIntegrationRequest } from '../../shared/integrations'
@@ -952,6 +956,7 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
 }): React.JSX.Element {
   const [branch, setBranch] = useState('')
   const [baseCatalog, setBaseCatalog] = useState<WorktreeBaseCatalog | null>(null)
+  const [recoveries, setRecoveries] = useState<WorktreeHandoffRecoverySummary[]>([])
   const [baseRef, setBaseRef] = useState('HEAD')
   const [busy, setBusy] = useState(false)
 
@@ -961,6 +966,11 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     setBaseRef('HEAD')
     void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => {
       if (!cancelled) setBaseCatalog(catalog)
+    }).catch((reason: unknown) => {
+      if (!cancelled) onError(toErrorMessage(reason))
+    })
+    void window.aster.listWorktreeRecoveries({ projectId: project.id }).then((items) => {
+      if (!cancelled) setRecoveries(items)
     }).catch((reason: unknown) => {
       if (!cancelled) onError(toErrorMessage(reason))
     })
@@ -996,9 +1006,29 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     }
   }
 
+  async function retryRecovery(recoveryId: string): Promise<void> {
+    setBusy(true)
+    onError(null)
+    try {
+      setRecoveries(await window.aster.retryWorktreeRecovery({ recoveryId }))
+      update(await window.aster.listWorktrees({ projectId: project.id }))
+    } catch (reason) {
+      onError(toErrorMessage(reason))
+      setRecoveries(await window.aster.listWorktreeRecoveries({ projectId: project.id }).catch(() => recoveries))
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return <aside className="git-panel worktree-panel" aria-label="工作树">
     <header><div><p className="eyebrow">MANAGED WORKTREES</p><h2>隔离工作区</h2></div><button className="icon-button" onClick={close} aria-label="关闭工作树"><X size={16} /></button></header>
     <p className="worktree-note">从明确的提交基线创建 detached worktree。填写新分支名时才创建分支；创建前若所选 ref 移动会要求刷新。</p>
+    {recoveries.map((recovery) => <div className="worktree-recovery" role="status" key={recovery.id}>
+      <strong>工作树交接需要恢复</strong>
+      <span>{worktreeContextLabel(recovery.sourceWorktreeId, items)} → {worktreeContextLabel(recovery.targetWorktreeId, items)} · {handoffPhaseLabel(recovery.phase)}</span>
+      {recovery.error && <small>{recovery.error}</small>}
+      <button disabled={busy} onClick={() => void retryRecovery(recovery.id)}>安全重试</button>
+    </div>)}
     {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Codex 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
       {baseCatalog?.repositoryInitialized && baseCatalog.bases.length === 0 && <div className="worktree-init-note"><strong>Git 仓库还没有提交</strong><span>请先创建首次提交，再从提交基线建立隔离工作树。</span></div>}
       <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
@@ -1025,6 +1055,21 @@ function baseKindLabel(kind: WorktreeBaseCatalog['bases'][number]['kind']): stri
   if (kind === 'localBranch') return '本地分支'
   if (kind === 'remoteBranch') return '远端分支'
   return '标签'
+}
+
+function worktreeContextLabel(worktreeId: string | null, worktrees: ManagedWorktree[]): string {
+  if (!worktreeId) return 'Local'
+  const worktree = worktrees.find(({ id }) => id === worktreeId)
+  return worktree?.branch ?? `Detached ${worktree?.headOid?.slice(0, 7) ?? '未知'}`
+}
+
+function handoffPhaseLabel(phase: WorktreeHandoffRecoverySummary['phase']): string {
+  if (phase === 'preparing') return '正在准备快照'
+  if (phase === 'stashed') return '源端已安全保存'
+  if (phase === 'applying') return '目标应用中断'
+  if (phase === 'applied') return '等待任务上下文确认'
+  if (phase === 'rollingBack') return '源端恢复中断'
+  return '需要安全检查'
 }
 
 function GitPanel({ project, snapshot, close, update, onError, onComment }: {

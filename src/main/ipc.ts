@@ -33,7 +33,7 @@ import type {
   GitHubStatusInput,
   GitRepositorySnapshot,
 } from '../shared/git.js'
-import type { ManagedWorktree, WorktreeBaseCatalog } from '../shared/worktree.js'
+import type { ManagedWorktree, WorktreeBaseCatalog, WorktreeHandoffRecoverySummary } from '../shared/worktree.js'
 import type { ApplyDiffHunkInput, DiffMode, DiffSnapshot } from '../shared/diff.js'
 import type {
   CreateTerminalInput,
@@ -172,6 +172,8 @@ export type WorktreeController = {
   lock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
   unlock: (input: { worktreeId: string }) => Promise<ManagedWorktree[]>
   remove: (input: { worktreeId: string; force?: boolean }) => Promise<ManagedWorktree[]>
+  listRecoveries: (projectId: string) => WorktreeHandoffRecoverySummary[]
+  retryRecovery: (operationId: string) => Promise<WorktreeHandoffRecoverySummary[]>
 }
 
 export type DiffController = {
@@ -522,6 +524,14 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.worktreeUnlock, (_event, input: unknown) => worktrees.unlock(worktreeActionSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.worktreeRemove, (_event, input: unknown) =>
     worktrees.remove(worktreeRemoveSchema.parse(input) as { worktreeId: string; force?: boolean }))
+  ipcMain.handle(IPC_CHANNELS.worktreeRecoveries, (_event, input: unknown) => {
+    const parsed = projectInputSchema.parse(input)
+    return worktrees.listRecoveries(parsed.projectId)
+  })
+  ipcMain.handle(IPC_CHANNELS.worktreeRecoveryRetry, (_event, input: unknown) => {
+    const parsed = worktreeRecoverySchema.parse(input)
+    return worktrees.retryRecovery(parsed.recoveryId)
+  })
   ipcMain.handle(IPC_CHANNELS.diffGet, (_event, input: unknown) => {
     const parsed = diffGetSchema.parse(input)
     return diffs.getDiff(parsed.projectId, parsed.mode)
@@ -894,6 +904,7 @@ const worktreeCreateSchema = z.object({
 })
 const worktreeActionSchema = z.object({ worktreeId: z.uuid() })
 const worktreeRemoveSchema = z.object({ worktreeId: z.uuid(), force: z.boolean().optional() })
+const worktreeRecoverySchema = z.object({ recoveryId: z.uuid() })
 const diffGetSchema = z.object({ projectId: z.uuid(), mode: z.enum(['working', 'staged']) })
 const diffHunkApplySchema = z.object({
   projectId: z.uuid(),

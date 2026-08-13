@@ -11,7 +11,7 @@
 | 活动时间线 | agent 消息、推理摘要、命令、文件变更、工具、审批、子任务 | 部分实现：真实文本、命令、文件与中断状态已视觉验证；MCP/子任务和大型活动待压测 |
 | 差异面板 | 文件列表、统计、行内评论、stage/revert、unified/split | 已测试：真实 working/staged、unified/split、行号、评论→Codex、区块 stage/unstage/revert，以及跨重启可恢复的整文件丢弃 |
 | 终端面板 | 多会话、PTY、搜索/清屏、尺寸同步、长输出 | 已测试：app-server PTY、xterm、多会话标签、搜索、清屏、resize、4 MiB 缓冲、terminate 与输出→Codex E2E |
-| 工作树 | 基线分支选择、创建进度、分支占用、Handoff、恢复 | 部分实现：HEAD/本地/远端/标签基线选择、OID 防竞态、detached/显式分支创建、Local/Worktree Handoff、未提交修改迁移、冲突回滚、锁定和引用保护移除已测试；仅 stash/apply 崩溃窗口自动恢复元数据待补 |
+| 工作树 | 基线分支选择、创建进度、分支占用、Handoff、恢复 | 已测试：HEAD/本地/远端/标签基线选择、OID 防竞态、detached/显式分支创建、Local/Worktree Handoff、未提交修改迁移、跨进程崩溃恢复、人工修改保护、可见恢复状态/安全重试、锁定和引用保护移除均经真实 Git 与 Electron E2E |
 | 审批 | 明确动作、理由、影响范围、允许一次/会话/拒绝 | 已测试：真实文件审批、MCP/用户输入挂起及网络/路径逐项权限面板均已验证；权限可按 turn/session 授予并精确回传所选子集 |
 | 设置 | 外观、模型/提供商、权限、工作树、MCP、技能、插件、快捷键、日志 | 部分实现：OpenAI/ChatGPT/DeepSeek 账户、用量、MCP/技能/配置/权限 profile/应用更新/本地诊断导出、system/light/dark、固定核心快捷键与命令面板已验证；插件稳定 API、快捷键重映射和日志级别设置待补 |
 | 命令面板 | 搜索、键盘选择、真实动作、平台快捷键和焦点 | 已测试：⌘/Ctrl+K、上下/Enter/Escape、禁用态、12 项真实动作；统一 focus-visible |
