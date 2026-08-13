@@ -198,7 +198,7 @@ if (!gotLock) {
     for (const url of extractAsterDeepLinks(commandLine)) routeDeepLink(url)
   })
 
-  void app.whenReady().then(() => {
+  void app.whenReady().then(async () => {
     const userData = app.getPath('userData')
     const codexHome = prepareAsterCodexHome(userData, process.env.ASTER_CODEX_HOME)
     process.env.CODEX_HOME = codexHome
@@ -243,11 +243,14 @@ if (!gotLock) {
     gitService = new GitService(database)
     githubService = new GitHubService(database, gitService)
     const createdWorktreeService = new WorktreeService(database, join(userData, 'worktrees'))
+    await createdWorktreeService.recoverInterruptedHandoffs()
     worktreeService = createdWorktreeService
     diffService = new DiffService(database, gitService)
     terminalService = new TerminalService(runtime, database)
     const createdAgentService = new AgentService(runtime, database, {
       moveWorktreeChanges: (input) => createdWorktreeService.moveChanges(input),
+      completeWorktreeHandoff: (operationId) => createdWorktreeService.completeHandoff(operationId),
+      rollbackWorktreeHandoff: (operationId) => createdWorktreeService.rollbackHandoff(operationId),
     })
     agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)

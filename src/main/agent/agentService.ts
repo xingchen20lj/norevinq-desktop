@@ -54,6 +54,8 @@ type ParsedPermissionRequest = {
 
 type AgentServiceOptions = {
   moveWorktreeChanges?: (input: MoveWorktreeChangesInput) => Promise<MoveWorktreeChangesResult>
+  completeWorktreeHandoff?: (operationId: string) => Promise<void>
+  rollbackWorktreeHandoff?: (operationId: string) => Promise<void>
 }
 
 const MAX_PERMISSION_OPTIONS = 64
@@ -67,6 +69,8 @@ export class AgentService {
   readonly #activeTurns = new Set<string>()
   readonly #handoffThreads = new Set<string>()
   readonly #moveWorktreeChanges: AgentServiceOptions['moveWorktreeChanges']
+  readonly #completeWorktreeHandoff: AgentServiceOptions['completeWorktreeHandoff']
+  readonly #rollbackWorktreeHandoff: AgentServiceOptions['rollbackWorktreeHandoff']
   readonly #disposeRuntime: (() => void)[]
   #snapshot: ConversationSnapshot = {
     projectId: null,
@@ -85,6 +89,8 @@ export class AgentService {
     this.#runtime = runtime
     this.#database = database
     this.#moveWorktreeChanges = options.moveWorktreeChanges
+    this.#completeWorktreeHandoff = options.completeWorktreeHandoff
+    this.#rollbackWorktreeHandoff = options.rollbackWorktreeHandoff
     this.#disposeRuntime = [
       runtime.onNotification((method, params) => this.#handleNotification({ method, params })),
       runtime.registerRequestHandler(
@@ -315,26 +321,23 @@ export class AgentService {
     if (this.#handoffThreads.has(input.threadId)) throw new Error('This conversation is already being handed off.')
     this.#handoffThreads.add(input.threadId)
     try {
-      let movedChanges = false
+      let handoffOperationId: string | null = null
       if (input.moveChanges) {
         if (!this.#moveWorktreeChanges) throw new Error('Worktree handoff is unavailable.')
         const result = await this.#moveWorktreeChanges({
           projectId,
+          threadId: input.threadId,
           sourceWorktreeId,
           targetWorktreeId: input.targetWorktreeId,
         })
-        movedChanges = result.moved
+        handoffOperationId = result.operationId
       }
       try {
         this.#database.setThreadWorktree(projectId, input.threadId, input.targetWorktreeId)
       } catch (persistenceError) {
-        if (!movedChanges || !this.#moveWorktreeChanges) throw persistenceError
+        if (!handoffOperationId || !this.#rollbackWorktreeHandoff) throw persistenceError
         try {
-          await this.#moveWorktreeChanges({
-            projectId,
-            sourceWorktreeId: input.targetWorktreeId,
-            targetWorktreeId: sourceWorktreeId,
-          })
+          await this.#rollbackWorktreeHandoff(handoffOperationId)
         } catch (rollbackError) {
           throw new AggregateError(
             [persistenceError, rollbackError],
@@ -345,6 +348,12 @@ export class AgentService {
         throw new Error('The conversation context could not be saved; worktree changes were restored.', {
           cause: persistenceError,
         })
+      }
+      if (handoffOperationId) {
+        if (!this.#completeWorktreeHandoff) {
+          throw new Error('The worktree handoff committed, but its recovery transaction could not be finalized.')
+        }
+        await this.#completeWorktreeHandoff(handoffOperationId)
       }
       this.#update({
         threads: this.#snapshot.threads.map((item) => item.id === thread.id

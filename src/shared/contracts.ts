@@ -33,10 +33,13 @@ import type {
   CreateWorktreeInput,
   ListWorktreesInput,
   ListWorktreeBasesInput,
+  ListWorktreeRecoveriesInput,
   ManagedWorktree,
   RemoveWorktreeInput,
+  RetryWorktreeRecoveryInput,
   WorktreeActionInput,
   WorktreeBaseCatalog,
+  WorktreeHandoffRecoverySummary,
 } from './worktree.js'
 import type { ApplyDiffHunkInput, DiffSnapshot, GetDiffInput } from './diff.js'
 import type {
@@ -160,6 +163,8 @@ export const IPC_CHANNELS = {
   worktreeLock: 'worktree:lock',
   worktreeUnlock: 'worktree:unlock',
   worktreeRemove: 'worktree:remove',
+  worktreeRecoveries: 'worktree:recoveries',
+  worktreeRecoveryRetry: 'worktree:recovery-retry',
   diffGet: 'diff:get',
   diffHunkApply: 'diff:hunk-apply',
   terminalState: 'terminal:state',
@@ -318,6 +323,8 @@ export type AsterDesktopApi = {
   lockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
   unlockWorktree: (input: WorktreeActionInput) => Promise<ManagedWorktree[]>
   removeWorktree: (input: RemoveWorktreeInput) => Promise<ManagedWorktree[]>
+  listWorktreeRecoveries: (input: ListWorktreeRecoveriesInput) => Promise<WorktreeHandoffRecoverySummary[]>
+  retryWorktreeRecovery: (input: RetryWorktreeRecoveryInput) => Promise<WorktreeHandoffRecoverySummary[]>
   getDiff: (input: GetDiffInput) => Promise<DiffSnapshot>
   applyDiffHunk: (input: ApplyDiffHunkInput) => Promise<DiffSnapshot>
   getTerminalState: () => Promise<TerminalState>

@@ -132,22 +132,33 @@ describe('WorktreeService', () => {
       runGit(setup.projectPath, ['add', 'README.md'])
       writeFileSync(join(setup.projectPath, 'README.md'), '# staged\nunstaged\n')
       writeFileSync(join(setup.projectPath, 'new file.txt'), 'untracked\n')
+      setup.database.associateThread(setup.projectId, 'thread-move')
 
-      await expect(service.moveChanges({
+      const firstMove = await service.moveChanges({
         projectId: setup.projectId,
+        threadId: 'thread-move',
         sourceWorktreeId: null,
         targetWorktreeId: target.id,
-      })).resolves.toEqual({ moved: true, recoveryStash: null })
+      })
+      expect(firstMove.moved).toBe(true)
+      expect(firstMove.operationId).toMatch(/^[0-9a-f-]{36}$/u)
       expect(runGit(setup.projectPath, ['status', '--porcelain'])).toBe('')
       expect(readFileSync(join(target.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# staged\nunstaged\n')
       expect(readFileSync(join(target.path, 'new file.txt'), 'utf8')).toBe('untracked\n')
       expect(runGit(target.path, ['status', '--porcelain'])).toContain('MM README.md')
+      setup.database.setThreadWorktree(setup.projectId, 'thread-move', target.id)
+      if (!firstMove.operationId) throw new Error('Expected a recovery transaction.')
+      await service.completeHandoff(firstMove.operationId)
 
-      await service.moveChanges({
+      const secondMove = await service.moveChanges({
         projectId: setup.projectId,
+        threadId: 'thread-move',
         sourceWorktreeId: target.id,
         targetWorktreeId: null,
       })
+      setup.database.setThreadWorktree(setup.projectId, 'thread-move', null)
+      if (!secondMove.operationId) throw new Error('Expected a recovery transaction.')
+      await service.completeHandoff(secondMove.operationId)
       expect(runGit(target.path, ['status', '--porcelain'])).toBe('')
       expect(readFileSync(join(setup.projectPath, 'new file.txt'), 'utf8')).toBe('untracked\n')
       await service.remove({ worktreeId: target.id })
@@ -165,9 +176,11 @@ describe('WorktreeService', () => {
       runGit(target.path, ['add', 'README.md'])
       runGit(target.path, ['commit', '-m', 'target divergence'])
       writeFileSync(join(setup.projectPath, 'README.md'), '# source changes\n')
+      setup.database.associateThread(setup.projectId, 'thread-conflict')
 
       await expect(service.moveChanges({
         projectId: setup.projectId,
+        threadId: 'thread-conflict',
         sourceWorktreeId: null,
         targetWorktreeId: target.id,
       })).rejects.toThrow('source was restored')
@@ -175,6 +188,108 @@ describe('WorktreeService', () => {
       expect(readFileSync(join(target.path, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# target commit\n')
       expect(runGit(target.path, ['status', '--porcelain'])).toBe('')
       await service.remove({ worktreeId: target.id })
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
+  it('recovers an interruption after Git created the stash but before the recovery ref was secured', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot, {
+        afterHandoffStep: (step) => { if (step === 'stashCreated') throw new Error('simulated crash') },
+      })
+      const target = await service.create({ projectId: setup.projectId })
+      setup.database.associateThread(setup.projectId, 'thread-preparing')
+      writeFileSync(join(setup.projectPath, 'README.md'), '# interrupted preparing\n')
+      writeFileSync(join(setup.projectPath, 'preparing.txt'), 'recover untracked\n')
+
+      await expect(service.moveChanges({
+        projectId: setup.projectId,
+        threadId: 'thread-preparing',
+        sourceWorktreeId: null,
+        targetWorktreeId: target.id,
+      })).rejects.toThrow('simulated crash')
+      const operation = setup.database.listWorktreeHandoffs(setup.projectId)[0]
+      if (!operation) throw new Error('Expected interrupted handoff metadata.')
+      expect(runGit(setup.projectPath, ['status', '--porcelain'])).toBe('')
+      expect(runGit(setup.projectPath, ['stash', 'list'])).toContain(operation.id)
+
+      const restarted = new WorktreeService(setup.database, setup.managedRoot)
+      await expect(restarted.recoverInterruptedHandoffs()).resolves.toEqual([])
+      expect(readFileSync(join(setup.projectPath, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# interrupted preparing\n')
+      expect(readFileSync(join(setup.projectPath, 'preparing.txt'), 'utf8')).toBe('recover untracked\n')
+      expect(runGit(setup.projectPath, ['stash', 'list'])).toBe('')
+      expect(runGitStatus(setup.projectPath, ['show-ref', operation.recoveryRef])).toBe(1)
+      await restarted.remove({ worktreeId: target.id })
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
+  it('rolls an applied handoff back after restart when the conversation still points at the source', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot, {
+        afterHandoffStep: (step) => { if (step === 'targetRecorded') throw new Error('simulated crash') },
+      })
+      const target = await service.create({ projectId: setup.projectId })
+      setup.database.associateThread(setup.projectId, 'thread-applied')
+      writeFileSync(join(setup.projectPath, 'README.md'), '# applied then crashed\n')
+      runGit(setup.projectPath, ['add', 'README.md'])
+      writeFileSync(join(setup.projectPath, 'README.md'), '# applied then crashed\nunstaged\n')
+
+      await expect(service.moveChanges({
+        projectId: setup.projectId,
+        threadId: 'thread-applied',
+        sourceWorktreeId: null,
+        targetWorktreeId: target.id,
+      })).rejects.toThrow('simulated crash')
+      const operation = setup.database.listWorktreeHandoffs(setup.projectId)[0]
+      if (!operation) throw new Error('Expected interrupted handoff metadata.')
+      expect(runGit(setup.projectPath, ['status', '--porcelain'])).toBe('')
+      expect(runGit(target.path, ['status', '--porcelain'])).toContain('MM README.md')
+
+      const restarted = new WorktreeService(setup.database, setup.managedRoot)
+      await expect(restarted.recoverInterruptedHandoffs()).resolves.toEqual([])
+      expect(runGit(target.path, ['status', '--porcelain'])).toBe('')
+      expect(runGit(setup.projectPath, ['status', '--porcelain'])).toContain('MM README.md')
+      expect(readFileSync(join(setup.projectPath, 'README.md'), 'utf8').replace(/\r\n?/gu, '\n')).toBe('# applied then crashed\nunstaged\n')
+      expect(runGitStatus(setup.projectPath, ['show-ref', operation.recoveryRef])).toBe(1)
+      await restarted.remove({ worktreeId: target.id })
+    } finally {
+      setup.database.close()
+    }
+  }, 30_000)
+
+  it('keeps the recovery ref when the target changed after an interrupted handoff', async () => {
+    const setup = createRepository()
+    try {
+      const service = new WorktreeService(setup.database, setup.managedRoot, {
+        afterHandoffStep: (step) => { if (step === 'targetRecorded') throw new Error('simulated crash') },
+      })
+      const target = await service.create({ projectId: setup.projectId })
+      setup.database.associateThread(setup.projectId, 'thread-attention')
+      writeFileSync(join(setup.projectPath, 'README.md'), '# recovery snapshot\n')
+      await expect(service.moveChanges({
+        projectId: setup.projectId,
+        threadId: 'thread-attention',
+        sourceWorktreeId: null,
+        targetWorktreeId: target.id,
+      })).rejects.toThrow('simulated crash')
+      const operation = setup.database.listWorktreeHandoffs(setup.projectId)[0]
+      if (!operation) throw new Error('Expected interrupted handoff metadata.')
+      writeFileSync(join(target.path, 'after-crash.txt'), 'user edit after crash\n')
+
+      const restarted = new WorktreeService(setup.database, setup.managedRoot)
+      const recoveries = await restarted.recoverInterruptedHandoffs()
+      expect(recoveries).toEqual([
+        expect.objectContaining({ id: operation.id, phase: 'needsAttention' }),
+      ])
+      expect(recoveries[0]?.error).toContain('after the interruption')
+      expect(readFileSync(join(target.path, 'after-crash.txt'), 'utf8')).toBe('user edit after crash\n')
+      expect(runGit(setup.projectPath, ['show-ref', operation.recoveryRef])).toContain(operation.stashOid)
+      await expect(restarted.remove({ worktreeId: target.id })).rejects.toThrow('pending handoff recovery')
     } finally {
       setup.database.close()
     }
@@ -221,4 +336,13 @@ function createRepository(): {
 
 function runGit(cwd: string, args: string[]): string {
   return execFileSync('git', args, { cwd, encoding: 'utf8', env: { ...process.env, LC_ALL: 'C' } })
+}
+
+function runGitStatus(cwd: string, args: string[]): number {
+  try {
+    runGit(cwd, args)
+    return 0
+  } catch (error) {
+    return (error as { status?: number }).status ?? -1
+  }
 }

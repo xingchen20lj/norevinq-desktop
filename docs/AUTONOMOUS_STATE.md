@@ -8,8 +8,8 @@
 
 ## 当前任务
 
-- 修复普通非 Git 项目触发 `worktree:list` fatal，并完成工作树基线选择器的完整质量门。
-- 随后继续逐项审计剩余“部分实现”的工作树崩溃恢复和提供商错误体验缺口。
+- 完成工作树 Handoff 跨进程崩溃恢复状态机及安全恢复 UI 的完整质量门。
+- 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
 
@@ -231,10 +231,14 @@
 - 完成工作树基线目录与选择器：最多 500 个 HEAD/本地分支/远端分支/标签，annotated tag 解析到 commit；UI 显示类型/ref/短 OID，创建时再次解析并匹配 expected OID，ref 移动失败关闭。
 - SQLite migration v10 持久化所选 `base_ref` 与实际 `base_oid`；真实仓库从非当前 `release/base` 创建 detached worktree，实际 HEAD、旧版本文件和 UI 闭环均经自动测试。
 - 本阶段完整 `verify:ci`：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建与 bundle 预算全部通过；两项专属 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
+- SQLite migration v11 增加持久化工作树交接事务；事务保存源/目标上下文、HEAD、工作树 tree、index tree、独立 `refs/aster/handoffs/<uuid>` 与阶段，不依赖或占用用户 stash 栈。
+- Handoff 修改只有在任务→工作树关联落库成功后才清理恢复 ref；进程重启依据真实任务关联决定回滚源端或提交清理，不盲目重复 apply。
+- 恢复前逐项核对源/目标 HEAD、工作树 tree 与 index tree；崩溃后的人工修改进入 `needsAttention`，保留恢复 ref、阻止工作树移除并在工作树面板提供安全重试，不执行破坏性清理。
+- 真实 Git 测试覆盖 stash marker 尚未固化、目标已 apply 但任务仍在源端、目标在崩溃后又被人工修改三类窗口；Electron E2E 与 1320×840 截图验证恢复提示和重试不删除人工文件。
 
 ## 下一任务
 
-1. 完成本轮非 Git/基线选择的质量门与跨平台 CI，随后审计工作树 stash/apply 崩溃恢复窗口。
+1. 完成本轮工作树 Handoff 恢复的完整质量门与跨平台 CI。
 2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
 3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
 
@@ -266,7 +270,7 @@
 
 ## 当前失败测试
 
-当前无失败测试。非 Git 项目/工作树基线阶段完整 `verify:ci` 通过：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；两项专属 Electron E2E 与生产依赖审计通过。真实 Git 多子进程用例在全套并发覆盖率下采用有限 30 秒测试预算，产品 Git 命令超时未放宽。最小 DeepSeek Pro Responses 请求和专属在线 Electron/app-server 工具闭环也已通过。显式使用既有 OpenAI 认证 home 的长综合在线 E2E 曾在 MCP inventory 外部服务处超时，隔离默认与 DeepSeek 专属闭环不受影响。
+当前无失败测试。工作树 Handoff 恢复阶段完整 `verify:ci` 通过：36 个测试文件 181 项、2 项性能基准，覆盖率 80.96/69.49/86.10/87.82，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；恢复/生命周期/非 Git 三项真实 Electron E2E 通过，生产依赖审计为 0 已知漏洞。上一 `main` 的 macOS 15/Windows 2025 CI 均绿色，本分支跨平台 CI 待提交后验证。
 
 ## 已知问题
 

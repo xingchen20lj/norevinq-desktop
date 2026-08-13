@@ -36,12 +36,53 @@ export type CreateWorktreeInput = {
 }
 export type WorktreeActionInput = { worktreeId: string }
 export type RemoveWorktreeInput = { worktreeId: string; force?: boolean }
+export type WorktreeHandoffPhase =
+  | 'preparing'
+  | 'stashed'
+  | 'applying'
+  | 'applied'
+  | 'rollingBack'
+  | 'needsAttention'
+export type WorktreeHandoffRecovery = {
+  id: string
+  projectId: string
+  threadId: string
+  sourceWorktreeId: string | null
+  targetWorktreeId: string | null
+  recoveryRef: string
+  stashOid: string | null
+  sourceHeadOid: string
+  sourceTreeOid: string
+  sourceIndexOid: string
+  targetHeadOid: string
+  targetCleanTreeOid: string
+  targetTreeOid: string | null
+  targetIndexOid: string | null
+  phase: WorktreeHandoffPhase
+  createdAt: string
+  updatedAt: string
+  error: string | null
+}
+export type WorktreeHandoffRecoverySummary = Pick<WorktreeHandoffRecovery,
+  | 'id'
+  | 'projectId'
+  | 'threadId'
+  | 'sourceWorktreeId'
+  | 'targetWorktreeId'
+  | 'phase'
+  | 'createdAt'
+  | 'updatedAt'
+  | 'error'
+>
+export type ListWorktreeRecoveriesInput = { projectId: string }
+export type RetryWorktreeRecoveryInput = { recoveryId: string }
 export type MoveWorktreeChangesInput = {
   projectId: string
+  threadId: string
   sourceWorktreeId: string | null
   targetWorktreeId: string | null
 }
 export type MoveWorktreeChangesResult = {
   moved: boolean
-  recoveryStash: string | null
+  operationId: string | null
 }
