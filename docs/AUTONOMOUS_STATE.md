@@ -255,7 +255,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：Codex home 隔离后本地 `verify:ci` 有 36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow 守门、93 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/只读挂载 DMG packaged E2E 通过。PR #2 已合并且最近远端 `main` macOS/Windows CI 为绿色；当前分支尚待新一轮远端 CI。显式使用既有认证 home 的长在线 E2E 在 MCP inventory 外部服务处超时，隔离默认与离线闭环不受影响。
+离线工程检查无失败：Codex home 隔离后本地 `verify:ci` 有 36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow 守门、93 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/只读挂载 DMG packaged E2E 通过。PR #2 已合并且最近远端 `main` macOS/Windows CI 为绿色；PR #3 的 Windows runner 唯一失败为 SQLite 持久化测试超过 Vitest 默认 5 秒，产品代码与同套件其余测试均通过，现已为该非性能集成测试设置有限的 15 秒上限并通过定向测试、类型和规范检查，等待远端复验。显式使用既有认证 home 的长在线 E2E 在 MCP inventory 外部服务处超时，隔离默认与离线闭环不受影响。
 
 ## 已知问题
 
@@ -286,4 +286,4 @@
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的真实进程重新 resume 与订阅恢复语义（替身层已测试）。
-- 打包清理分支的 macOS/Windows 远端 CI；本地 macOS 全量回归和体验包验证已通过。
+- PR #3 数据库测试超时边界修复后的 macOS/Windows 远端 CI；本地 macOS 全量回归和体验包验证已通过。

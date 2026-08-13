@@ -13,7 +13,7 @@ afterEach(() => {
 })
 
 describe('StateDatabase', () => {
-  it('persists and deduplicates recent projects', () => {
+  it('persists and deduplicates recent projects', { timeout: 15_000 }, () => {
     const root = mkdtempSync(join(tmpdir(), 'aster-db-test-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
