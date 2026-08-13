@@ -17,3 +17,5 @@ Aster Code 是一款面向 macOS 和 Windows 的开源桌面智能编程客户�
 开发验证命令与在线测试边界见 [测试策略](docs/TESTING.md)。当前 Intel macOS 的无签名 DMG/ZIP 已完成真实构建、校验和挂载启动；签名、公证和 Windows 真机安装仍必须在持有相应凭据/系统的发布环境完成。
 
 GitHub Pull Request 功能需要本机安装并登录 `gh`；Aster 不读取 token，而通过 GitHub CLI 的系统凭据存储完成认证。完整安全边界和验证证据见 [Git 工作流](docs/GIT.md)。
+
+Aster 的 SQLite、工作树、日志、凭据和 Codex home 全部位于独立 Electron `userData` 目录。它不会复用官方 Codex 桌面客户端的 `~/.codex`，因此登录、任务和技能设置互不覆盖；首次运行需在 Aster 内单独登录。项目仓库内的 `.codex` 与 `AGENTS.md` 仍按 Codex 项目配置规则共享。

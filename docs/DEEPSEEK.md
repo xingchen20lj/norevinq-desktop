@@ -2,7 +2,7 @@
 
 ## 运行方式
 
-Aster 不修改用户的全局 `~/.codex/config.toml`。启动 app-server 时使用进程级 `-c` 参数注册 `model_providers.deepseek`：
+Aster 使用独立的 `userData/codex-home`，不读取或修改官方客户端的 `~/.codex/config.toml`。启动 app-server 时使用进程级 `-c` 参数注册 `model_providers.deepseek`：
 
 - `base_url="https://api.deepseek.com"`
 - `env_key="DEEPSEEK_API_KEY"`

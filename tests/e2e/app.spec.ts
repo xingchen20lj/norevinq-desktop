@@ -2,7 +2,7 @@ import { _electron as electron, expect, test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
-import { tmpdir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
 
@@ -34,7 +34,13 @@ test('starts with a sandboxed renderer and real project action', async () => {
   const previewAddress = previewServer.address()
   if (!previewAddress || typeof previewAddress === 'string') throw new Error('Local preview server did not bind a TCP port.')
   const previewUrl = `http://127.0.0.1:${String(previewAddress.port)}/`
-  const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
+  const application = await electron.launch({
+    args: ['.', `--user-data-dir=${profile}`],
+    env: {
+      ...process.env,
+      ASTER_CODEX_HOME: process.env.ASTER_TEST_CODEX_HOME ?? join(homedir(), '.codex'),
+    },
+  })
   try {
     const window = await application.firstWindow()
     await expect(window).toHaveTitle('Aster Code')

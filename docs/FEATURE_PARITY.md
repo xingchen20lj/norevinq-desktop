@@ -6,7 +6,7 @@
 
 | 领域 | 功能 | 状态 | 验证/限制 |
 |---|---|---|---|
-| 桌面基础 | macOS 应用启动 | 已测试 | Electron 43 开发 E2E、目录包及只读挂载 DMG 真机启动；包内 Codex 0.147.0 ready |
+| 桌面基础 | macOS 应用启动 | 已测试 | Electron 43 开发 E2E、目录包及 2026-08-13 最新只读挂载 DMG 真机启动；包内官方开源 Codex 0.147.0 ready |
 | 桌面基础 | Windows 应用启动 | 部分实现 | NSIS/图标/包内 runtime/packaged E2E 与 Windows 2025 workflow 已实现；目标系统首次运行待验证 |
 | 桌面基础 | 单实例、深链接、窗口状态恢复 | 部分实现 | 单实例与 SQLite bounds/最大化/全屏安全恢复已测试；`aster-code://project/<uuid>` 与项目关联任务深链接具备严格解析、双重关联校验、冷启动队列、单实例 Electron E2E 和 macOS 包元数据验证；Windows/macOS 外部应用真实唤起待目标系统发布回归 |
 | 桌面基础 | 自动更新 | 部分实现 | electron-updater 6.8.9 状态机、30 秒/6 小时检查、显式下载、退出/重启安装、进度/错误 UI、HTTPS 发布构建和真实 app-update/latest-mac SHA-512 元数据已测试；仓库尚无真实发布域名、macOS/Windows 签名身份，故跨版本安装为外部发布阻塞 |
@@ -23,7 +23,7 @@
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |
 | 对话 | 长上下文压缩 | 已测试 | `thread/compact/start`、活动 turn 保护和确认 UI 经协议替身/Electron E2E；真实模型压缩内容待账户恢复后复验 |
 | 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 与已完成历史 hydration 自动测试通过；真实进程重启 E2E 因账户使用量耗尽待复验 |
-| 智能体 | Codex app-server stdio 生命周期 | 已测试 | 开发与打包 Electron 均真实自动启动；发布包优先使用官方 `@openai/codex` 0.147.0，而非 ChatGPT 私有安装 |
+| 智能体 | Codex app-server stdio 生命周期 | 已测试 | 开发与打包 Electron 均真实自动启动；发布包使用官方 `@openai/codex` 0.147.0，而非 ChatGPT 私有安装；私有 `userData/codex-home` 隔离官方客户端登录、thread 与用户配置 |
 | 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
 | 智能体 | app-server 崩溃检测与恢复 | 已测试 | 真实子进程 JSONL 替身注入 exit 23：空闲连接恢复 ready，活动 turn 失败关闭且不重启/重放 |
 | 智能体 | 流式文本、推理和活动时间线 | 已测试 | 真实在线 Codex 文本流 E2E；reducer 27 项测试覆盖乱序 delta 与 1 MiB 截断 |
@@ -94,12 +94,12 @@
 | 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
 | 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、固定产物路径、2 MiB 预览、CLI JSON/CSV 与 SDK SARIF；自动测试通过 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
-| 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |
+| 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复，extract-zip 高危已替换为 Electron 官方安全兼容实现；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 已测试 | main/Renderer/utility 异常退出本地有界记录；用户明确导出私有 ZIP，只含版本摘要、100 条内崩溃元数据和 1 MiB 二次脱敏日志；不自动上传、不包含对话/项目/密钥/绝对路径 |
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 34 个测试文件 166 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、目标真机与在线账户恢复待验证 |
-| 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 36 个测试文件 172 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、目标真机与完整在线回归待验证 |
+| 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |

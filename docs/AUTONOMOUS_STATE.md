@@ -1,6 +1,6 @@
 # 无人值守开发状态
 
-最后更新：2026-08-11（Asia/Shanghai）
+最后更新：2026-08-13（Asia/Shanghai）
 
 ## 当前阶段
 
@@ -214,6 +214,12 @@
 - Handoff 使用真实 Git stash OID 迁移已暂存、未暂存和未跟踪修改；目标必须干净，冲突时硬恢复原本干净的目标并把源修改还原，无法删除仍被任务引用的 worktree。
 - 真实仓库自动测试完成 Local→worktree→Local、staged/unstaged/untracked 保真和冲突回滚；离线 Electron E2E 通过确认 UI 将已有任务与真实未提交修改交接到 detached worktree。
 - Handoff 阶段本地完整回归为 34 个测试文件 166 项，覆盖率 80.76/69.13/85.28/87.78，类型、规范、workflow、许可证、性能、生产构建与 bundle 守门通过；定向生命周期 Electron E2E 通过。
+- 所有本地/内部打包入口在构建前安全重建 `release`，避免旧包的更新元数据或其他产物污染新包；即使 `release` 被替换为符号链接，也只移除链接本身而不修改外部目标。
+- 默认打包显式禁用 electron-builder 从 Git remote 推断发布渠道；只有 `package:update` 能在受控 HTTPS URL 校验通过后生成 generic 更新元数据，普通体验包保持无更新渠道。
+- 2026-08-13 最新 Intel macOS 隔离体验包 `ba33d79` 真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，私有 `codex-home` 为真实 `0700` 目录，DMG CRC 与 ZIP 全文件校验通过；DMG 为 263 MiB，SHA-256 `fb8e35f4199155432ee001d7a36c41e66ed215afeb9c58057dc66e2a73fbaa79`。
+- Codex home 隔离后完整 `verify:ci`：36 个测试文件 172 项、2 项性能基准、覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
+- GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
+- 将 Aster app-server 的 `CODEX_HOME` 固定到独立 Electron `userData/codex-home`（macOS 实际为 `~/Library/Application Support/aster-code/codex-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界。
 
 ## 下一任务
 
@@ -249,7 +255,7 @@
 
 ## 当前失败测试
 
-离线工程检查无失败：Handoff 后本地 `verify:ci` 有 34 个测试文件 166 项、2 项性能基准，覆盖率 80.76/69.13/85.28/87.78，类型、规范、脚本、workflow 守门、103 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/挂载 DMG packaged E2E 通过。最近远端 `main` macOS/Windows CI 为绿色；本次 Handoff 分支尚未推送。在线智能体 Electron E2E 仍因账户使用量耗尽待复验。
+离线工程检查无失败：Codex home 隔离后本地 `verify:ci` 有 36 个测试文件 172 项、2 项性能基准，覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow 守门、93 个规范化生产组件许可证、构建和 bundle 预算均通过；任务/目标/深链接/更新/诊断/沙箱权限/账户/GitHub PR/Handoff 生命周期、CLI 发现、remote URL 凭据脱敏、固定恢复 Electron E2E、生产漏洞审计、普通无渠道目录包 packaged E2E、既有配置渠道/只读挂载 DMG packaged E2E 通过。PR #2 已合并且最近远端 `main` macOS/Windows CI 为绿色；PR #3 两轮 Windows runner 分别在 SQLite 与文件预览 I/O 测试超过 Vitest 默认 5 秒，产品断言与其余 170 项均通过，现已把普通测试的统一有限上限调整为 15 秒，性能测试仍使用独立配置和严格预算。显式使用既有认证 home 的长在线 E2E 在 MCP inventory 外部服务处超时，隔离默认与离线闭环不受影响。
 
 ## 已知问题
 
@@ -280,4 +286,4 @@
 ## 待验证问题
 
 - app-server 崩溃后 persisted thread 的真实进程重新 resume 与订阅恢复语义（替身层已测试）。
-- Handoff 分支合入前的 macOS/Windows 远端 CI；本地 macOS 和跨平台单元夹具已通过。
+- PR #3 数据库测试超时边界修复后的 macOS/Windows 远端 CI；本地 macOS 全量回归和体验包验证已通过。

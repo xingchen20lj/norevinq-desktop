@@ -28,11 +28,14 @@ pnpm schema:sync
 
 ## 生命周期
 
-1. 发现并探测 Codex 二进制。
-2. 启动 `codex app-server --listen stdio://`。
-3. 完成 initialize/initialized。
-4. 读取 `model/list` 并转换为稳定领域模型。
-5. 发布 `ready` snapshot 到类型化 IPC 和 UI。
+1. 在 Electron `userData/codex-home` 创建私有 `0700` Codex home；开发/E2E 仅允许用绝对 `ASTER_CODEX_HOME` 显式覆盖。
+2. 发现并探测 Codex 二进制。
+3. 启动 `codex app-server --listen stdio://`。
+4. 完成 initialize/initialized。
+5. 读取 `model/list` 并转换为稳定领域模型。
+6. 发布 `ready` snapshot 到类型化 IPC 和 UI。
+
+Aster 不读取或写入官方客户端默认的 `~/.codex`。登录、thread、用户级 MCP/技能设置保存在 Aster 私有 home；项目仓库中的 `.codex` 与 `AGENTS.md` 仍按 Codex 公开层级规则生效。首次运行需要在 Aster 内单独登录，避免退出登录、任务列表或技能切换影响官方 Codex 桌面客户端。
 
 空闲状态异常退出时最多指数退避重启三次。运行中 turn 异常退出时不自动重放，因为命令或文件修改可能已经产生副作用；客户端显示失败并等待显式恢复。
 

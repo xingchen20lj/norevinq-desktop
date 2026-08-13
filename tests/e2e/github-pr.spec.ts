@@ -49,7 +49,7 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
       ...process.env,
       ASTER_UNRELATED_SECRET: 'must-not-reach-gh',
       CODEX_BINARY: codexWrapper,
-      CODEX_HOME: codexHome,
+      ASTER_CODEX_HOME: codexHome,
       GH_CONFIG_DIR: ghConfig,
       PATH: `${binPath}${delimiter}${process.env.PATH ?? ''}`,
     },

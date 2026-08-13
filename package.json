@@ -16,7 +16,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check scripts/prepare-package-output.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
     "check:workflows": "node scripts/check-workflows.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:package": "node scripts/check-packaged-runtime.mjs",
@@ -35,10 +35,10 @@
     "test:e2e:packaged": "pnpm package:dir && pnpm check:package && playwright test tests/e2e/packaged.spec.ts",
     "verify": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm test && pnpm build && pnpm check:bundle",
     "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm notices:check && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
-    "package:dir": "pnpm build && electron-builder --dir --publish never",
-    "package:mac": "pnpm build && electron-builder --mac --publish never",
-    "package:win": "pnpm build && electron-builder --win --publish never",
-    "package:update": "pnpm build && node scripts/package-update-release.mjs"
+    "package:dir": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --dir --publish never",
+    "package:mac": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --mac --publish never",
+    "package:win": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --win --publish never",
+    "package:update": "node scripts/prepare-package-output.mjs && pnpm build && node scripts/package-update-release.mjs"
   },
   "dependencies": {
     "@openai/codex": "0.147.0",
@@ -99,6 +99,7 @@
       "!node_modules/@openai/codex-security/node_modules/@openai/codex-*/**",
       "!node_modules/@openai/codex-sdk/node_modules/@openai/codex-*/**"
     ],
+    "publish": null,
     "mac": {
       "category": "public.app-category.developer-tools",
       "icon": "build/icon.icns",

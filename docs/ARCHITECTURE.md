@@ -28,7 +28,7 @@ flowchart LR
 - `src/preload`：白名单 API；不暴露 `ipcRenderer`、文件系统或进程对象。
 - `src/renderer`：React UI 与展示状态。
 - `src/shared`：IPC schema、领域事件、模型能力和公共类型。
-- `src/main/runtime`：app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
+- `src/main/runtime`：私有 Codex home、app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
 - `src/main/agent`：thread/turn 服务、server request 审批、活动 reducer、状态订阅与历史恢复。
 - `src/main/providers`：provider 生命周期、能力目录和仅进程级 Codex 配置；不写用户全局 Codex 配置。
 - `src/main/account`：稳定 app-server 账户读取、API Key/ChatGPT 托管登录、官方域外链、用量和登录重启状态机；不持有可读 token 库。
@@ -66,6 +66,7 @@ flowchart LR
 18. 内嵌浏览器不含 preload/Node/Aster IPC，只允许 loopback 顶级导航与子资源；所有设备权限、下载和弹窗默认拒绝。
 19. 窗口状态只由主进程写入内部 SQLite；恢复前必须验证数值、最小尺寸和当前显示器交集，损坏状态回退默认值。
 20. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
+21. Aster app-server 固定使用 Electron `userData/codex-home`；不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为仓库指令读取，不属于桌面私有状态。
 
 ## 上游与公开资料
 
