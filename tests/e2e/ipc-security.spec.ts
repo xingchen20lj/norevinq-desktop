@@ -34,6 +34,37 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
     const schedulerWorkbench = window.getByRole('dialog', { name: '计划任务工作台' })
     await expect(schedulerWorkbench.getByRole('heading', { name: '计划任务' })).toBeVisible()
     await window.getByRole('button', { name: '关闭计划任务' }).click()
+    await window.setViewportSize({ width: 1_200, height: 760 })
+    await window.getByRole('button', { name: '本地网页预览' }).click()
+    const browser = window.getByRole('region', { name: '本地网页预览' })
+    await expect(browser).toBeVisible()
+    await expect.poll(async () => {
+      const [composerBounds, browserBounds] = await Promise.all([
+        window.locator('.composer-shell').boundingBox(),
+        browser.boundingBox(),
+      ])
+      if (!composerBounds || !browserBounds) return false
+      return composerBounds.x + composerBounds.width <= browserBounds.x + 1
+    }).toBe(true)
+    const separator = browser.getByRole('separator', { name: '调整网页预览宽度' })
+    await expect(separator).toHaveAttribute('aria-valuenow', /\d+/u)
+    const widthBeforeKeyboardResize = (await browser.boundingBox())?.width ?? 0
+    await separator.focus()
+    await window.keyboard.press('ArrowRight')
+    await expect.poll(async () => (await browser.boundingBox())?.width ?? 0).toBeLessThan(widthBeforeKeyboardResize)
+    await window.screenshot({ path: 'test-results/aster-browser-split.png' })
+    await window.setViewportSize({ width: 800, height: 640 })
+    await expect.poll(async () => {
+      const [composerBounds, browserBounds] = await Promise.all([
+        window.locator('.composer-shell').boundingBox(),
+        browser.boundingBox(),
+      ])
+      if (!composerBounds || !browserBounds) return false
+      return composerBounds.y + composerBounds.height <= browserBounds.y + 1
+    }).toBe(true)
+    await window.screenshot({ path: 'test-results/aster-browser-bottom.png' })
+    await browser.getByRole('button', { name: '关闭网页预览' }).click()
+    await expect(browser).toHaveCount(0)
     await window.getByRole('button', { name: '命令面板' }).click()
     await expect(window.getByRole('dialog', { name: '命令面板' })).toBeVisible()
     await window.keyboard.press('Escape')

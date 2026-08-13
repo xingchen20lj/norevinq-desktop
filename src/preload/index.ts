@@ -27,6 +27,8 @@ import type { CodexRuntimeSnapshot, RuntimeSubscription } from '../shared/runtim
 import type { SaveDeepSeekCredentialInput } from '../shared/providers.js'
 import type {
   CreateGitHubPullRequestInput,
+  GitDiscardInput,
+  GitDiscardRestoreInput,
   GitCommitInput,
   GitHubStatusInput,
   GitPathsInput,
@@ -169,6 +171,8 @@ const api: AsterDesktopApi = {
   initializeGit: (input: GitProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.gitInitialize, input),
   stageGitPaths: (input: GitPathsInput) => ipcRenderer.invoke(IPC_CHANNELS.gitStage, input),
   unstageGitPaths: (input: GitPathsInput) => ipcRenderer.invoke(IPC_CHANNELS.gitUnstage, input),
+  discardGitFile: (input: GitDiscardInput) => ipcRenderer.invoke(IPC_CHANNELS.gitDiscardFile, input),
+  restoreGitDiscard: (input: GitDiscardRestoreInput) => ipcRenderer.invoke(IPC_CHANNELS.gitDiscardRestore, input),
   commitGit: (input: GitCommitInput) => ipcRenderer.invoke(IPC_CHANNELS.gitCommit, input),
   pushGit: (input: GitPushInput) => ipcRenderer.invoke(IPC_CHANNELS.gitPush, input),
   getGitHubStatus: (input: GitHubStatusInput) => ipcRenderer.invoke(IPC_CHANNELS.githubStatus, input),

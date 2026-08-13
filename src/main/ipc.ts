@@ -154,6 +154,8 @@ export type GitController = {
   initialize: (input: { projectId: string }) => Promise<GitRepositorySnapshot>
   stage: (input: { projectId: string; paths: string[] }) => Promise<GitRepositorySnapshot>
   unstage: (input: { projectId: string; paths: string[] }) => Promise<GitRepositorySnapshot>
+  discardFile: (input: { projectId: string; path: string }) => Promise<GitRepositorySnapshot>
+  restoreDiscard: (input: { projectId: string; discardId: string }) => Promise<GitRepositorySnapshot>
   commit: (input: { projectId: string; message: string }) => Promise<GitRepositorySnapshot>
   push: (input: { projectId: string; remote?: string; branch?: string; setUpstream?: boolean }) => Promise<GitRepositorySnapshot>
 }
@@ -469,6 +471,8 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.gitInitialize, (_event, input: unknown) => git.initialize(projectInputSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitStage, (_event, input: unknown) => git.stage(gitPathsSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitUnstage, (_event, input: unknown) => git.unstage(gitPathsSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitDiscardFile, (_event, input: unknown) => git.discardFile(gitDiscardFileSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.gitDiscardRestore, (_event, input: unknown) => git.restoreDiscard(gitDiscardRestoreSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitCommit, (_event, input: unknown) => git.commit(gitCommitSchema.parse(input)))
   ipcMain.handle(IPC_CHANNELS.gitPush, (_event, input: unknown) => git.push(gitPushSchema.parse(input) as {
     projectId: string
@@ -851,6 +855,8 @@ const accountRefreshSchema = z.object({ refreshToken: z.boolean().optional() })
 const accountApiKeySchema = z.object({ apiKey: z.string().trim().min(16).max(512).refine((value) => !/\s/u.test(value)) })
 const gitPathSchema = z.string().min(1).max(4_096).refine((value) => !value.includes('\0'))
 const gitPathsSchema = z.object({ projectId: z.uuid(), paths: z.array(gitPathSchema).min(1).max(10_000) })
+const gitDiscardFileSchema = z.object({ projectId: z.uuid(), path: gitPathSchema })
+const gitDiscardRestoreSchema = z.object({ projectId: z.uuid(), discardId: z.uuid() })
 const gitCommitSchema = z.object({ projectId: z.uuid(), message: z.string().trim().min(1).max(5_000) })
 const gitRefSchema = z.string().regex(/^[A-Za-z0-9._/-]{1,255}$/)
 const gitPushSchema = z.object({

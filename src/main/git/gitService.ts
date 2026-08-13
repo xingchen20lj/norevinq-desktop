@@ -1,8 +1,13 @@
 import { execFile, type ExecException } from 'node:child_process'
-import { isAbsolute, normalize, sep } from 'node:path'
+import { randomUUID } from 'node:crypto'
+import { lstatSync } from 'node:fs'
+import { isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
   GitCommitInput,
+  GitDiscardInput,
+  GitDiscardRestoreInput,
+  GitDiscardSnapshot,
   GitPathsInput,
   GitProjectInput,
   GitPushInput,
@@ -15,9 +20,12 @@ import { parsePorcelainV2Z } from './statusParser.js'
 const execFileAsync = promisify(execFile)
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 const DEFAULT_TIMEOUT_MS = 30_000
+const DISCARD_REF_PREFIX = 'refs/aster/discards/'
+const MAX_DISCARD_SNAPSHOTS = 32
 
 export class GitService {
   readonly #database: StateDatabase
+  readonly #discardOperations = new Set<string>()
 
   constructor(database: StateDatabase) {
     this.#database = database
@@ -28,15 +36,17 @@ export class GitService {
     try {
       const rootResult = await this.#git(project.path, ['rev-parse', '--show-toplevel'])
       const root = rootResult.stdout.trim()
-      const [statusResult, remoteResult] = await Promise.all([
+      const [statusResult, remoteResult, discards] = await Promise.all([
         this.#git(project.path, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']),
         this.#git(project.path, ['remote', '-v']),
+        this.#listDiscards(project.path),
       ])
       return {
         projectId: input.projectId,
         initialized: true,
         root,
         ...parsePorcelainV2Z(statusResult.stdout),
+        discards,
         remotes: parseRemotes(remoteResult.stdout),
         error: null,
       }
@@ -64,6 +74,78 @@ export class GitService {
     const paths = validatePaths(input.paths)
     await this.#git(project.path, ['restore', '--staged', '--', ...paths])
     return this.getStatus(input)
+  }
+
+  async discardFile(input: GitDiscardInput): Promise<GitRepositorySnapshot> {
+    const project = this.#requireProject(input.projectId)
+    return this.#withDiscardLock(project.path, () => this.#discardFile(input, project.path))
+  }
+
+  async #discardFile(input: GitDiscardInput, projectPath: string): Promise<GitRepositorySnapshot> {
+    const [path] = validatePaths([input.path])
+    if (!path) throw new Error('A valid Git path is required.')
+    const status = await this.getStatus({ projectId: input.projectId })
+    const file = status.files.find((candidate) => candidate.path === path)
+    if (!file || file.kind === 'ignored' || file.kind === 'unmerged') {
+      throw new Error('Only a changed, non-conflicted file can be discarded.')
+    }
+    if (status.discards.length >= MAX_DISCARD_SNAPSHOTS) {
+      throw new Error(`Recoverable discard limit reached (${String(MAX_DISCARD_SNAPSHOTS)}). Restore an earlier discard first.`)
+    }
+    const paths = validatePaths([file.path, ...(file.originalPath ? [file.originalPath] : [])])
+    const trackedAtHead = await Promise.all(paths.map(async (candidate) => ({
+      path: candidate,
+      tracked: await this.#isTrackedAtHead(projectPath, candidate),
+    })))
+    const id = randomUUID()
+    const metadata = Buffer.from(JSON.stringify({ path: file.path, paths: trackedAtHead }), 'utf8').toString('base64url')
+    const subject = `aster-discard-v1:${id}:${metadata}`
+    // For a rename, passing both the destination and the now-missing source
+    // makes `git stash` reject the pathspec. Capturing the destination still
+    // records both sides of the rename in the stash commit; Git only leaves
+    // the source deletion behind, which we restore after securing the ref.
+    await this.#git(projectPath, ['stash', 'push', '--include-untracked', '--message', subject, '--', file.path])
+    const stash = await this.#findStashBySubject(projectPath, subject)
+    if (!stash) throw new Error('Git did not create a recoverable discard snapshot.')
+    const discardRef = `${DISCARD_REF_PREFIX}${id}`
+    await this.#git(projectPath, ['update-ref', discardRef, stash.oid])
+    const verified = await this.#resolveOptionalRef(projectPath, stash.selector)
+    if (verified !== stash.oid) throw new Error('Recoverable discard was secured, but its temporary stash entry changed unexpectedly.')
+    await this.#git(projectPath, ['stash', 'drop', stash.selector])
+    const renameSources = trackedAtHead
+      .filter(({ path: candidate, tracked }) => tracked && candidate !== file.path)
+      .map(({ path: candidate }) => candidate)
+    if (renameSources.length > 0) {
+      await this.#git(projectPath, ['restore', '--source=HEAD', '--staged', '--worktree', '--', ...renameSources])
+    }
+    return this.getStatus({ projectId: input.projectId })
+  }
+
+  async restoreDiscard(input: GitDiscardRestoreInput): Promise<GitRepositorySnapshot> {
+    const project = this.#requireProject(input.projectId)
+    return this.#withDiscardLock(project.path, () => this.#restoreDiscard(input, project.path))
+  }
+
+  async #restoreDiscard(input: GitDiscardRestoreInput, projectPath: string): Promise<GitRepositorySnapshot> {
+    const discard = (await this.#listDiscards(projectPath)).find(({ id }) => id === input.discardId)
+    if (!discard || !/^[0-9a-f-]{36}$/u.test(input.discardId)) throw new Error('Recoverable discard not found.')
+    const metadata = await this.#readDiscardMetadata(projectPath, input.discardId)
+    const current = await this.getStatus({ projectId: input.projectId })
+    if (current.files.some((file) => metadata.paths.some(({ path }) => path === file.path || path === file.originalPath))) {
+      throw new Error('Discard target has new changes. Commit, stage elsewhere, or clear them before restoring.')
+    }
+    for (const entry of metadata.paths) {
+      if (!entry.tracked && pathExists(join(projectPath, entry.path))) {
+        throw new Error('Discard target path is occupied. Remove it before restoring.')
+      }
+    }
+    const ref = `${DISCARD_REF_PREFIX}${input.discardId}`
+    // Keep the recovery ref on any apply failure. Git may leave conflict
+    // markers behind; automatically cleaning them could erase a concurrent
+    // edit made outside Aster between the clean-target check and this apply.
+    await this.#git(projectPath, ['stash', 'apply', '--index', ref], 120_000)
+    await this.#git(projectPath, ['update-ref', '-d', ref])
+    return this.getStatus({ projectId: input.projectId })
   }
 
   async commit(input: GitCommitInput): Promise<GitRepositorySnapshot> {
@@ -105,6 +187,83 @@ export class GitService {
       throw toGitError(error)
     }
   }
+
+  async #listDiscards(cwd: string): Promise<GitDiscardSnapshot[]> {
+    const result = await this.#git(cwd, ['for-each-ref', '--format=%(refname:short)%00%(creatordate:iso-strict)%00%(subject)', DISCARD_REF_PREFIX])
+    const snapshots: GitDiscardSnapshot[] = []
+    for (const line of result.stdout.split('\n')) {
+      if (!line) continue
+      const [shortRef, createdAt, subject] = line.split('\0')
+      const id = shortRef?.slice('aster/discards/'.length)
+      const match = subject ? /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(subject) : null
+      const encoded = match?.[1]
+      if (!id || !createdAt || !encoded || !/^[0-9a-f-]{36}$/u.test(id)) continue
+      try {
+        const parsed = parseDiscardMetadata(encoded)
+        snapshots.push({ id, path: parsed.path, createdAt })
+      } catch { /* Ignore malformed refs outside Aster's format. */ }
+    }
+    return snapshots.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  }
+
+  async #readDiscardMetadata(cwd: string, id: string): Promise<DiscardMetadata> {
+    const result = await this.#git(cwd, ['show', '-s', '--format=%s', `${DISCARD_REF_PREFIX}${id}`])
+    const encoded = /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(result.stdout.trim())?.[1]
+    if (!encoded) throw new Error('Recoverable discard metadata is invalid.')
+    return parseDiscardMetadata(encoded)
+  }
+
+  async #resolveOptionalRef(cwd: string, ref: string): Promise<string | null> {
+    try { return (await this.#git(cwd, ['rev-parse', '--verify', ref])).stdout.trim() || null }
+    catch { return null }
+  }
+
+  async #isTrackedAtHead(cwd: string, path: string): Promise<boolean> {
+    try { await this.#git(cwd, ['cat-file', '-e', `HEAD:${path}`]); return true }
+    catch { return false }
+  }
+
+  async #findStashBySubject(cwd: string, subject: string): Promise<{ selector: string; oid: string } | null> {
+    const result = await this.#git(cwd, ['stash', 'list', '--format=%gd%x00%H%x00%gs'])
+    for (const line of result.stdout.split('\n')) {
+      const [selector, oid, candidateSubject] = line.split('\0')
+      if (selector && oid && candidateSubject?.endsWith(subject)) return { selector, oid }
+    }
+    return null
+  }
+
+  async #withDiscardLock<T>(projectPath: string, operation: () => Promise<T>): Promise<T> {
+    if (this.#discardOperations.has(projectPath)) throw new Error('Another recoverable discard operation is already running.')
+    this.#discardOperations.add(projectPath)
+    try { return await operation() }
+    finally { this.#discardOperations.delete(projectPath) }
+  }
+}
+
+type DiscardPathMetadata = { path: string; tracked: boolean }
+type DiscardMetadata = { path: string; paths: DiscardPathMetadata[] }
+
+function pathExists(path: string): boolean {
+  try { lstatSync(path); return true }
+  catch { return false }
+}
+
+function parseDiscardMetadata(encoded: string): DiscardMetadata {
+  const value: unknown = JSON.parse(Buffer.from(encoded, 'base64url').toString('utf8'))
+  if (!value || typeof value !== 'object') throw new Error('Invalid discard metadata.')
+  const record = value as { path?: unknown; paths?: unknown }
+  if (typeof record.path !== 'string' || !Array.isArray(record.paths)) throw new Error('Invalid discard metadata.')
+  const [path] = validatePaths([record.path])
+  const paths = record.paths.map((entry) => {
+    if (!entry || typeof entry !== 'object') throw new Error('Invalid discard metadata.')
+    const candidate = entry as { path?: unknown; tracked?: unknown }
+    if (typeof candidate.path !== 'string' || typeof candidate.tracked !== 'boolean') throw new Error('Invalid discard metadata.')
+    const [normalizedPath] = validatePaths([candidate.path])
+    if (!normalizedPath) throw new Error('Invalid discard metadata.')
+    return { path: normalizedPath, tracked: candidate.tracked }
+  })
+  if (!path || paths.length === 0 || paths.length > 2) throw new Error('Invalid discard metadata.')
+  return { path, paths }
 }
 
 function validatePaths(paths: string[]): string[] {
@@ -164,6 +323,7 @@ function emptySnapshot(projectId: string): GitRepositorySnapshot {
     ahead: 0,
     behind: 0,
     files: [],
+    discards: [],
     remotes: [],
     error: null,
   }

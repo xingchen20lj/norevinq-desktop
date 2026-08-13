@@ -17,6 +17,8 @@ import type {
 } from './conversation.js'
 import type { ProviderStatus, SaveDeepSeekCredentialInput } from './providers.js'
 import type {
+  GitDiscardInput,
+  GitDiscardRestoreInput,
   GitCommitInput,
   CreateGitHubPullRequestInput,
   CreateGitHubPullRequestResult,
@@ -144,6 +146,8 @@ export const IPC_CHANNELS = {
   gitInitialize: 'git:initialize',
   gitStage: 'git:stage',
   gitUnstage: 'git:unstage',
+  gitDiscardFile: 'git:discard-file',
+  gitDiscardRestore: 'git:discard-restore',
   gitCommit: 'git:commit',
   gitPush: 'git:push',
   githubStatus: 'github:status',
@@ -299,6 +303,8 @@ export type AsterDesktopApi = {
   initializeGit: (input: GitProjectInput) => Promise<GitRepositorySnapshot>
   stageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
   unstageGitPaths: (input: GitPathsInput) => Promise<GitRepositorySnapshot>
+  discardGitFile: (input: GitDiscardInput) => Promise<GitRepositorySnapshot>
+  restoreGitDiscard: (input: GitDiscardRestoreInput) => Promise<GitRepositorySnapshot>
   commitGit: (input: GitCommitInput) => Promise<GitRepositorySnapshot>
   pushGit: (input: GitPushInput) => Promise<GitRepositorySnapshot>
   getGitHubStatus: (input: GitHubStatusInput) => Promise<GitHubRepositoryStatus>

@@ -9,7 +9,7 @@
 | 输入区 | 多行输入、附件、模型、推理强度、Local/Worktree、权限、发送/停止 | 部分实现：真实发送、追加指令、模型/强度和停止；附件/Worktree/权限选择待接入 |
 | 顶栏 | 项目/工作树上下文、任务标题、Handoff、Git/终端/预览入口 | 部分实现：真实重命名、分叉、压缩、归档/恢复/删除、任务 Handoff、分支、变更计数、Git/PR、终端和文件预览入口；GitHub 完成态及 Handoff 确认流已做 Electron 验证，工作树基线选择器待补 |
 | 活动时间线 | agent 消息、推理摘要、命令、文件变更、工具、审批、子任务 | 部分实现：真实文本、命令、文件与中断状态已视觉验证；MCP/子任务和大型活动待压测 |
-| 差异面板 | 文件列表、统计、行内评论、stage/revert、unified/split | 已测试：真实 working/staged、unified/split、行号、评论→Codex、区块 stage/unstage/revert；整文件 recoverable discard 待文件工作台 |
+| 差异面板 | 文件列表、统计、行内评论、stage/revert、unified/split | 已测试：真实 working/staged、unified/split、行号、评论→Codex、区块 stage/unstage/revert，以及跨重启可恢复的整文件丢弃 |
 | 终端面板 | 多会话、PTY、搜索/清屏、尺寸同步、长输出 | 已测试：app-server PTY、xterm、多会话标签、搜索、清屏、resize、4 MiB 缓冲、terminate 与输出→Codex E2E |
 | 工作树 | 基线分支选择、创建进度、分支占用、Handoff、恢复 | 部分实现：detached/显式分支创建、Local/Worktree Handoff、未提交修改迁移、冲突回滚、锁定和引用保护移除已测试；基线选择器与崩溃窗口自动恢复待补 |
 | 审批 | 明确动作、理由、影响范围、允许一次/会话/拒绝 | 已测试：真实文件审批、MCP/用户输入挂起及网络/路径逐项权限面板均已验证；权限可按 turn/session 授予并精确回传所选子集 |
@@ -18,7 +18,7 @@
 | 安全 | 总览、扫描、漏洞、仓库、设置五级工作台 | 已测试：真实 SDK/Python/账户诊断、预检、扫描表单、历史、漏洞详情、报告/SARIF 预览；1320×840 浅色截图无溢出 |
 | 计划任务 | 活动/暂停任务、运行收件箱、历史、未读、调度编辑器 | 已测试：新建/编辑/暂停/立即运行、RRULE/时区/沙箱/项目编辑器、真实运行收件箱和未读；1320×840 浅色截图通过 |
 | 文件与产物 | 目录、文本/代码、媒体、PDF、智能体产物直达、外部打开 | 部分实现：真实文本/PNG与 fileChange 直达已测试；音视频/PDF真实格式矩阵待最终回归 |
-| 本地浏览器 | 地址、前进/后退、刷新/停止、页面、加载错误、开发控制台 | 已测试：隔离原生 view、真实 loopback HTTP、标题、console、导航/后退、公共 URL 拒绝；原生子表面不进入 Playwright Renderer 截图 |
+| 本地浏览器 | 地址、前进/后退、刷新/停止、页面、加载错误、开发控制台 | 已测试：隔离原生 view、真实 loopback HTTP、标题、console、导航/后退、公共 URL 拒绝；宽屏右侧可拖动/键盘缩放，窄屏自动底部停靠，对话和 composer 始终可用；原生子表面不进入 Playwright Renderer 截图 |
 
 ## 必须手工/视觉验证的状态
 
