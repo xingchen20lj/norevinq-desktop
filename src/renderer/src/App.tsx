@@ -8,6 +8,7 @@ import {
   CircleHelp,
   Clock3,
   Code2,
+  Copy,
   FileCode2,
   Files,
   FolderCode,
@@ -1516,14 +1517,28 @@ function ActivityCard({ activity, projectId, worktreeId, openFile }: {
   worktreeId: string | null
   openFile: (path: string) => void
 }): React.JSX.Element {
+  const [copied, setCopied] = useState(false)
   if (activity.type === 'thread' || activity.type === 'turn') return <></>
+  const copyText = activityCopyText(activity)
   const icon = activity.type === 'userMessage' || activity.type === 'agentMessage' ? <MessageSquare size={15} />
     : activity.type === 'reasoning' ? <Brain size={15} />
       : activity.type === 'fileChange' ? <FileCode2 size={15} /> : <Wrench size={15} />
   return <article className={`activity-card ${activity.type}`}>
     <div className="activity-icon">{icon}</div>
     <div className="activity-body">
-      <div className="activity-heading"><strong>{activityLabel(activity)}</strong><span>{activity.status}</span></div>
+      <div className="activity-heading">
+        <strong>{activityLabel(activity)}</strong>
+        <div className="activity-meta">
+          {activityTimestamp(activity) && <time dateTime={new Date(activityTimestamp(activity) ?? 0).toISOString()} title={formatActivityDate(activityTimestamp(activity))}>{formatActivityTime(activityTimestamp(activity))}</time>}
+          <span className={`activity-status ${activity.status}`}>{activityStatusLabel(activity.status)}</span>
+          {copyText && <button className={`activity-copy ${copied ? 'copied' : ''}`} type="button" title={copied ? '已复制' : '复制'} aria-label={copied ? '已复制' : `复制${activityLabel(activity)}`} onClick={() => {
+            void writeClipboard(copyText).then(() => {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1_500)
+            })
+          }}>{copied ? <Check size={13} /> : <Copy size={13} />}</button>}
+        </div>
+      </div>
       <ActivityContent activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} />
     </div>
   </article>
@@ -1537,15 +1552,25 @@ function ActivityContent({ activity, projectId, worktreeId, openFile }: {
 }): React.JSX.Element {
   if (activity.type === 'userMessage') return <p>{activity.content.filter(({ type }) => type === 'text').map((item) => item.type === 'text' ? item.text : '').join('\n')}</p>
   if (activity.type === 'agentMessage') return <AgentMessageContent text={activity.text} projectId={projectId} worktreeId={worktreeId} />
-  if (activity.type === 'reasoning') return <p>{[...activity.summary, ...activity.content].join('\n')}</p>
-  if (activity.type === 'command') return <><code>{activity.command}</code>{activity.output && <pre>{activity.output}</pre>}</>
+  if (activity.type === 'reasoning') return <details className="activity-details reasoning-details" open={activity.status === 'inProgress'}>
+    <summary>{reasoningLabel(activity)}</summary>
+    <p>{[...activity.summary, ...activity.content].filter(Boolean).join('\n') || '暂无可显示的思考摘要。'}</p>
+  </details>
+  if (activity.type === 'command') return <details className="activity-details" open={activity.status === 'inProgress' || activity.status === 'failed'}>
+    <summary><code>{activity.command || '执行命令'}</code></summary>
+    {activity.output && <pre>{activity.output}</pre>}
+  </details>
   if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <button className="artifact-link" onClick={() => openFile(change.path)} key={`${change.path}:${change.kind}`}><FileCode2 size={12} />{change.kind} {change.path}</button>)}</>
-  if (activity.type === 'plan') return <>{activity.steps.map((step) => <p key={step.step}>• {step.step} — {step.status}</p>)}</>
-  if (activity.type === 'error') return <p className="danger-text">{activity.message}</p>
+  if (activity.type === 'imageGeneration') return activity.savedPath
+    ? <Suspense fallback={<div role="status">正在加载图片预览…</div>}><AgentImage alt={activity.revisedPrompt ?? '生成图片'} path={activity.savedPath} projectId={projectId} worktreeId={worktreeId} /></Suspense>
+    : <p>图片已生成，但智能体引擎没有提供可安全预览的本地文件。</p>
+  if (activity.type === 'plan') return <>{activity.steps.map((step) => <p key={step.step}>• {step.step} — {planStepStatusLabel(step.status)}</p>)}</>
+  if (activity.type === 'error') return <p className="danger-text">{humanizeActivityError(activity.message)}</p>
   if (activity.type === 'mcpTool') return <p>{activity.server} / {activity.tool}{activity.progress ? ` · ${activity.progress}` : ''}</p>
   if (activity.type === 'webSearch') return <p>{activity.query}</p>
   if (activity.type === 'dynamicTool') return <p>{activity.namespace ? `${activity.namespace} / ` : ''}{activity.tool}</p>
-  return <p>{activity.type}</p>
+  if (activity.type === 'unknownItem') return <p>暂不支持显示这项智能体活动。</p>
+  return <p>{activityLabel(activity)}</p>
 }
 
 function AgentMessageContent({ text, projectId, worktreeId }: {
@@ -1668,10 +1693,80 @@ function activityLabel(activity: AgentActivity): string {
     case 'mcpTool': return 'MCP 工具'
     case 'dynamicTool': return '工具'
     case 'webSearch': return '网络搜索'
+    case 'imageGeneration': return '生成图片'
     case 'collab': return '协作'
     case 'subagent': return '子智能体'
     default: return '活动'
   }
+}
+
+function activityStatusLabel(status: AgentActivity['status']): string {
+  switch (status) {
+    case 'inProgress': return '进行中'
+    case 'completed': return '已完成'
+    case 'failed': return '失败'
+    case 'interrupted': return '已停止'
+    case 'declined': return '已拒绝'
+    case 'idle': return '等待中'
+    case 'unknown': return '状态未知'
+  }
+}
+
+function planStepStatusLabel(status: 'pending' | 'inProgress' | 'completed' | 'unknown'): string {
+  if (status === 'pending') return '待处理'
+  if (status === 'inProgress') return '进行中'
+  if (status === 'completed') return '已完成'
+  return '状态未知'
+}
+
+function activityTimestamp(activity: AgentActivity): number | null {
+  return activity.completedAtMs ?? activity.startedAtMs
+}
+
+function formatActivityTime(timestamp: number | null): string {
+  if (timestamp === null) return ''
+  return new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false }).format(timestamp)
+}
+
+function formatActivityDate(timestamp: number | null): string {
+  if (timestamp === null) return ''
+  return new Intl.DateTimeFormat('zh-CN', {
+    year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  }).format(timestamp)
+}
+
+function reasoningLabel(activity: Extract<AgentActivity, { type: 'reasoning' }>): string {
+  if (activity.status === 'inProgress') return '正在思考…'
+  if (activity.startedAtMs !== null && activity.completedAtMs !== null) {
+    const seconds = Math.max(0, Math.round((activity.completedAtMs - activity.startedAtMs) / 1_000))
+    return `已思考 ${String(seconds)} 秒`
+  }
+  return '查看思考过程'
+}
+
+function activityCopyText(activity: AgentActivity): string {
+  if (activity.type === 'userMessage') return activity.content.flatMap((item) => item.type === 'text' ? [item.text] : []).join('\n').trim()
+  if (activity.type === 'agentMessage') return activity.text.trim()
+  if (activity.type === 'reasoning') return [...activity.summary, ...activity.content].filter(Boolean).join('\n').trim()
+  if (activity.type === 'command') return [activity.command, activity.output].filter(Boolean).join('\n').trim()
+  if (activity.type === 'error') return humanizeActivityError(activity.message)
+  if (activity.type === 'fileChange') return activity.changes.map(({ path }) => path).join('\n')
+  if (activity.type === 'imageGeneration') return activity.savedPath ?? ''
+  return ''
+}
+
+async function writeClipboard(text: string): Promise<void> {
+  await navigator.clipboard.writeText(text)
+}
+
+function humanizeActivityError(message: string): string {
+  if (/\b(?:thread not found|no rollout found for (?:thread|session)(?: id)?)\b/iu.test(message)) {
+    return '任务会话暂时不可用。请重新打开任务；如果问题持续出现，请创建新任务继续。'
+  }
+  if (/\bis archived\b/iu.test(message)) return '任务已归档，正在等待恢复后继续。'
+  return message
+    .replace(/^Error invoking remote method '[^']+':\s*/iu, '')
+    .replace(/^JsonRpcError:\s*/iu, '')
 }
 
 function goalStatusLabel(status: ThreadGoalStatus): string {
@@ -1713,9 +1808,8 @@ function reduceTerminalEvent(state: TerminalState, event: TerminalEvent): Termin
 }
 
 function toErrorMessage(reason: unknown): string {
-  if (reason instanceof Error) return reason.message
-  if (typeof reason === 'string' && reason) return reason
-  return '发生未知错误。'
+  const message = reason instanceof Error ? reason.message : typeof reason === 'string' ? reason : ''
+  return message ? humanizeActivityError(message) : '发生未知错误。'
 }
 
 function providerForModel(model: string): string {

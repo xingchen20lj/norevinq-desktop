@@ -18,7 +18,9 @@ afterEach(() => {
 describe('SecurityService', () => {
   it('preflights, streams a real-shaped result, persists history, and reads bounded artifacts', async () => {
     const fixture = createFixture()
+    let observedScanPrompt = ''
     const sdk = createSdk((_repository, options = {}) => {
+      observedScanPrompt = options.scanPrompt ?? ''
       options.onAuthentication?.({ method: 'stored_credentials', credentialType: 'chatgpt', verified: false })
       options.onTrustedAccessStatus?.('granted')
       options.onProgress?.({ phase: 'discovery', filesCompleted: 2, filesTotal: 4 })
@@ -52,7 +54,7 @@ describe('SecurityService', () => {
     expect(runtime.runtime.python).toMatchObject({ status: 'ready' })
     expect(runtime.runtime.account).toEqual({ status: 'authenticated', details: 'Logged in using ChatGPT' })
 
-    const request = scanRequest(fixture.projectId)
+    const request = { ...scanRequest(fixture.projectId), reportLanguage: 'zh-CN' as const }
     const preflight = await service.preflight(request)
     expect(preflight).toMatchObject({ outputIsolated: true, targetKind: 'repository', model: 'gpt-test' })
     const initial = service.startScan(request)
@@ -71,6 +73,12 @@ describe('SecurityService', () => {
     expect(await service.exportFindings({ scanId: scan?.id ?? '', format: 'json' })).toMatchObject({
       content: '{"exported":true}', format: 'json', truncated: false,
     })
+    expect(observedScanPrompt).toContain('简体中文')
+    const savedReport = join(fixture.securityRoot, '..', 'saved-security-report.md')
+    expect(await service.saveExport({ scanId: scan?.id ?? '', format: 'report' }, savedReport)).toMatchObject({
+      exported: true, fileName: 'saved-security-report.md', bytes: 17,
+    })
+    expect(readFileSync(savedReport, 'utf8')).toBe('# Security report')
     expect(fixture.database.listSecurityScans()[0]?.status).toBe('completed')
     await service.dispose()
     fixture.database.close()
@@ -126,6 +134,19 @@ describe('SecurityService', () => {
     expect(failed.scans[0]?.error).toMatchObject({ code: 'deep_worker_sandbox' })
     expect(failed.scans[0]?.error?.message).toContain('Deep Scan stopped after 3 workers')
     expect(failed.scans[0]?.error?.message).not.toContain('Only a running scan')
+    await service.dispose()
+    fixture.database.close()
+  })
+
+  it('classifies a missing draft artifact failure separately from model compatibility errors', async () => {
+    const fixture = createFixture()
+    const sdk = createSdk(() => Promise.reject(new Error(
+      'Scan agent did not create required draft artifacts: scan-manifest.json, findings.json, coverage.json.',
+    )))
+    const service = new SecurityService(fixture.database, fixture.securityRoot, { sdkFactory: () => sdk })
+    service.startScan(scanRequest(fixture.projectId))
+    const failed = await waitForScan(service, 'failed')
+    expect(failed.scans[0]?.error?.code).toBe('scan_artifacts_missing')
     await service.dispose()
     fixture.database.close()
   })

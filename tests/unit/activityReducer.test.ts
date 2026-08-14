@@ -157,6 +157,30 @@ describe('agent activity reducer', () => {
     expect(activity).toMatchObject({ startedAtMs: 10, completedAtMs: 30 })
   })
 
+  it('normalizes generated images without exposing the base64 result to the renderer', () => {
+    const state = reduceAll(event('item/completed', {
+      ...ids,
+      completedAtMs: 40,
+      item: {
+        type: 'imageGeneration',
+        id: 'image-1',
+        status: 'completed',
+        revisedPrompt: 'A calm ink landscape',
+        result: 'very-large-base64-payload',
+        savedPath: '/private/generated/image.png',
+        transparentBackground: false,
+      },
+    }))
+    const activity = findActivity(state, 'image-1', 'imageGeneration')
+    expect(activity).toMatchObject({
+      status: 'completed',
+      revisedPrompt: 'A calm ink landscape',
+      savedPath: '/private/generated/image.png',
+      transparentBackground: false,
+    })
+    expect(activity).not.toHaveProperty('result')
+  })
+
   it('creates an agent message placeholder when a delta arrives first', () => {
     const state = reduceAll(event('item/agentMessage/delta', { ...ids, itemId: 'early', delta: 'first' }))
     expect(findActivity(state, 'early', 'agentMessage')).toMatchObject({ text: 'first', status: 'inProgress' })

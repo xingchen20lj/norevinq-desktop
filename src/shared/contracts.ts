@@ -72,6 +72,8 @@ import type {
   SecurityArtifactInput,
   SecurityExportInput,
   SecurityExportResult,
+  SecuritySaveExportInput,
+  SecuritySaveExportResult,
   SecurityFindingActionInput,
   SecurityFindingActionResult,
   SecurityPreflight,
@@ -198,6 +200,7 @@ export const IPC_CHANNELS = {
   securityArtifactRead: 'security:artifact-read',
   securityFindingAction: 'security:finding-action',
   securityExport: 'security:export',
+  securityExportSave: 'security:export-save',
   securityChanged: 'security:changed',
   schedulerState: 'scheduler:state',
   schedulerSave: 'scheduler:save',
@@ -359,6 +362,7 @@ export type NorevinqDesktopApi = {
   readSecurityArtifact: (input: SecurityArtifactInput) => Promise<SecurityArtifact>
   runSecurityFindingAction: (input: SecurityFindingActionInput) => Promise<SecurityFindingActionResult>
   exportSecurityFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
+  saveSecurityExport: (input: SecuritySaveExportInput) => Promise<SecuritySaveExportResult>
   onSecurityChanged: (subscription: SecuritySubscription) => () => void
   getSchedulerState: () => Promise<SchedulerSnapshot>
   saveScheduledTask: (input: ScheduledTaskInput) => Promise<SchedulerSnapshot>

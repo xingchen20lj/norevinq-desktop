@@ -358,6 +358,14 @@ function itemToActivity(
         action: item.action == null ? null : toSerializable(item.action),
         results: arrayValue(item.results).map((value) => toSerializable(value)),
       }, budget)
+    case 'imageGeneration':
+      return withBudget({
+        ...common,
+        type: 'imageGeneration',
+        revisedPrompt: nullableBudgetText(item.revisedPrompt, budget),
+        savedPath: nullableBudgetText(item.savedPath, budget),
+        transparentBackground: booleanValue(item.transparentBackground),
+      }, budget)
     case 'collabAgentToolCall':
       return withBudget({
         ...common,

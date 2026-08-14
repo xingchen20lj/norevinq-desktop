@@ -246,6 +246,24 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('reselects cached history without requiring the restarted runtime to resume it', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    const first = await service.selectThread('thread-1')
+    expect(first.threadStates['thread-1']?.activities.length).toBeGreaterThan(0)
+    runtime.missingThreadPermanently = true
+    const requestCount = runtime.requests.length
+
+    const selected = await service.selectThread('thread-1')
+
+    expect(selected.selectedThreadId).toBe('thread-1')
+    expect(runtime.requests.slice(requestCount).map(({ method }) => method)).toEqual(['thread/goal/get'])
+    service.dispose()
+    database.close()
+  })
+
   it('reads archived history without trying to resume it', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -273,6 +291,27 @@ describe('AgentService', () => {
 
     expect(runtime.requests.map(({ method }) => method)).toEqual([
       'thread/list', 'turn/start', 'thread/resume', 'turn/start',
+    ])
+    expect(runtime.turnStarts).toBe(2)
+    expect(runtime.turnCompletions).toBe(1)
+    expect(service.getSnapshot().selectedThreadId).toBe('thread-1')
+
+    service.dispose()
+    database.close()
+  })
+
+  it('unarchives and retries a turn when the runtime cannot find an archived rollout', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.failNextTurnStartWithNoRollout = true
+    runtime.failNextResumeWithArchived = true
+
+    await service.startTurn({ threadId: 'thread-1', text: 'Continue archived task' })
+
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'turn/start', 'thread/resume', 'thread/unarchive', 'thread/resume', 'turn/start',
     ])
     expect(runtime.turnStarts).toBe(2)
     expect(runtime.turnCompletions).toBe(1)
@@ -663,6 +702,7 @@ class FakeRuntime {
   turnStarts = 0
   turnCompletions = 0
   failNextTurnStartWithMissingThread = false
+  failNextTurnStartWithNoRollout = false
   failNextResumeWithArchived = false
   missingThreadPermanently = false
   goal: JsonValue | null = null
@@ -689,6 +729,10 @@ class FakeRuntime {
     if (method === 'turn/start' && this.failNextTurnStartWithMissingThread) {
       this.failNextTurnStartWithMissingThread = false
       return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
+    }
+    if (method === 'turn/start' && this.failNextTurnStartWithNoRollout) {
+      this.failNextTurnStartWithNoRollout = false
+      return Promise.reject(new JsonRpcError(-32602, `no rollout found for thread id ${requestedThreadId}`))
     }
     const requestedModel = typeof parameters.model === 'string' ? parameters.model : 'gpt-5.4'
     const requestedModelProvider = typeof parameters.modelProvider === 'string' ? parameters.modelProvider : 'openai'

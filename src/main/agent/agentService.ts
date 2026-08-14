@@ -186,6 +186,12 @@ export class AgentService {
 
   async selectThread(threadId: string): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(threadId)
+    const cachedState = this.#snapshot.threadStates[threadId]
+    if (!this.#snapshot.listArchived && cachedState && cachedState.activities.length > 0) {
+      this.#update({ selectedThreadId: threadId, error: null })
+      await this.#loadThreadGoal(threadId)
+      return this.#snapshot
+    }
     await this.#runtime.start()
     const result = this.#snapshot.listArchived
       ? asRecord(await this.#runtime.request('thread/read', { threadId, includeTurns: true }))
@@ -593,22 +599,46 @@ export class AgentService {
         ...NOREVINQ_THREAD_IDENTITY,
         ...overrides,
       }))
-      const thread = asRecord(result.thread)
-      if (requireString(thread.id, 'thread.id') !== threadId) {
-        throw new Error('Norevinq 智能体引擎恢复了另一个任务。')
-      }
-      if (overrides.model && requireString(result.model, 'thread.resume.model') !== overrides.model) {
-        throw new Error(`Norevinq 智能体引擎未应用所选模型“${overrides.model}”。`)
-      }
-      if (overrides.modelProvider
-        && requireString(result.modelProvider, 'thread.resume.modelProvider') !== overrides.modelProvider) {
-        throw new Error(`Norevinq 智能体引擎未应用所选提供商“${overrides.modelProvider}”。`)
-      }
-      this.#hydrateThread(thread)
+      this.#hydrateResumedThread(threadId, overrides, result)
     } catch (error) {
-      if (!isThreadNotFoundError(error)) throw error
+      if (isThreadArchivedError(error) || isNoRolloutFoundError(error)) {
+        try {
+          await this.#runtime.request('thread/unarchive', { threadId })
+          this.#database.setThreadArchived(threadId, false)
+          const resumed = asRecord(await this.#runtime.request('thread/resume', {
+            threadId,
+            ...NOREVINQ_THREAD_IDENTITY,
+            ...overrides,
+          }))
+          this.#hydrateResumedThread(threadId, overrides, resumed)
+          return
+        } catch (unarchiveError) {
+          if (!isThreadNotFoundError(unarchiveError)) throw unarchiveError
+        }
+      } else if (!isThreadNotFoundError(error)) {
+        throw error
+      }
       throw new Error('This task history is no longer available. Start a new task to continue.', { cause: error })
     }
+  }
+
+  #hydrateResumedThread(
+    threadId: string,
+    overrides: { model?: string; modelProvider?: string },
+    result: Record<string, unknown>,
+  ): void {
+    const thread = asRecord(result.thread)
+    if (requireString(thread.id, 'thread.id') !== threadId) {
+      throw new Error('Norevinq 智能体引擎恢复了另一个任务。')
+    }
+    if (overrides.model && requireString(result.model, 'thread.resume.model') !== overrides.model) {
+      throw new Error(`Norevinq 智能体引擎未应用所选模型“${overrides.model}”。`)
+    }
+    if (overrides.modelProvider
+      && requireString(result.modelProvider, 'thread.resume.modelProvider') !== overrides.modelProvider) {
+      throw new Error(`Norevinq 智能体引擎未应用所选提供商“${overrides.modelProvider}”。`)
+    }
+    this.#hydrateThread(thread)
   }
 
   async #migrateThreadProvider(
@@ -904,12 +934,14 @@ export class AgentService {
     for (const rawTurn of asArray(thread.turns)) {
       const turn = asRecord(rawTurn)
       const turnId = requireString(turn.id, 'turn.id')
-      state = reduceAgentActivity(state, { method: 'turn/started', params: { threadId, turn } })
+      const startedAtMs = typeof turn.startedAt === 'number' ? turn.startedAt * 1_000 : undefined
+      const completedAtMs = typeof turn.completedAt === 'number' ? turn.completedAt * 1_000 : startedAtMs
+      state = reduceAgentActivity(state, { method: 'turn/started', params: { threadId, turn }, ...(startedAtMs === undefined ? {} : { emittedAtMs: startedAtMs }) })
       for (const item of asArray(turn.items)) {
-        state = reduceAgentActivity(state, { method: 'item/started', params: { threadId, turnId, item } })
-        state = reduceAgentActivity(state, { method: 'item/completed', params: { threadId, turnId, item } })
+        state = reduceAgentActivity(state, { method: 'item/started', params: { threadId, turnId, item }, ...(startedAtMs === undefined ? {} : { emittedAtMs: startedAtMs }) })
+        state = reduceAgentActivity(state, { method: 'item/completed', params: { threadId, turnId, item }, ...(completedAtMs === undefined ? {} : { emittedAtMs: completedAtMs }) })
       }
-      state = reduceAgentActivity(state, { method: 'turn/completed', params: { threadId, turn } })
+      state = reduceAgentActivity(state, { method: 'turn/completed', params: { threadId, turn }, ...(completedAtMs === undefined ? {} : { emittedAtMs: completedAtMs }) })
     }
     this.#update({
       threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(thread)),
@@ -981,7 +1013,12 @@ function requirePrompt(text: string): string {
 }
 
 function isThreadNotFoundError(error: unknown): boolean {
-  return error instanceof JsonRpcError && /\bthread not found\b/i.test(error.message)
+  return error instanceof JsonRpcError
+    && (/\bthread not found\b/iu.test(error.message) || isNoRolloutFoundError(error))
+}
+
+function isNoRolloutFoundError(error: unknown): boolean {
+  return error instanceof JsonRpcError && /\bno rollout found for (?:thread|session)(?: id)?\b/iu.test(error.message)
 }
 
 function isThreadArchivedError(error: unknown): boolean {

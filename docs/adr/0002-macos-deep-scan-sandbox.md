@@ -32,3 +32,11 @@ Codex 调用不经过改写。
   不收敛，因此不作为发布运行时。
 - 外层 sandbox 是安全前提；若上游不再提供可验证父沙箱，官方协调器会在
   启动 worker 前失败关闭。
+
+## SDK 顶层权限不变量
+
+本 ADR 只处理 deep worker 的嵌套 Seatbelt，不允许修改 SDK 顶层 managed
+permission profile。上游 `:root=read` 必须保留，以读取用户明确选择的扫描
+目标；`:workspace_roots=write` 必须保留，以写入 SDK 分配的仓库外扫描目录。
+把该 profile 改为只读会使 standard/deep 都在 discovery 前失败，并不是更安全
+的可用降级。依赖补丁测试会直接读取安装后的 SDK 配置并锁定这两个值。

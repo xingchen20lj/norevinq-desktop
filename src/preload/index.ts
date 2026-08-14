@@ -69,6 +69,7 @@ import type {
 import type {
   SecurityArtifactInput,
   SecurityExportInput,
+  SecuritySaveExportInput,
   SecurityFindingActionInput,
   SecurityScanRequest,
   SecuritySnapshot,
@@ -254,6 +255,8 @@ const api: NorevinqDesktopApi = {
     ipcRenderer.invoke(IPC_CHANNELS.securityFindingAction, input),
   exportSecurityFindings: (input: SecurityExportInput) =>
     ipcRenderer.invoke(IPC_CHANNELS.securityExport, input),
+  saveSecurityExport: (input: SecuritySaveExportInput) =>
+    ipcRenderer.invoke(IPC_CHANNELS.securityExportSave, input),
   onSecurityChanged: (subscription: SecuritySubscription) => {
     const listener = (_event: Electron.IpcRendererEvent, snapshot: SecuritySnapshot): void => subscription(snapshot)
     ipcRenderer.on(IPC_CHANNELS.securityChanged, listener)

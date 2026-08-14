@@ -17,8 +17,27 @@ describe('parseAgentMessage', () => {
     ])
   })
 
+  it('renders local image links emitted as ordinary Markdown links', () => {
+    expect(parseAgentMessage('图片已生成：[查看原图](</Volumes/Test Disk/norevinq/image.png>)')).toEqual([
+      { type: 'text', text: '图片已生成：' },
+      {
+        type: 'localImage',
+        alt: '查看原图',
+        path: '/Volumes/Test Disk/norevinq/image.png',
+      },
+    ])
+  })
+
+  it('renders an absolute generated image path emitted as inline code', () => {
+    const path = '/Volumes/Test Disk/norevinq/generated_images/thread/exec-result.png'
+    expect(parseAgentMessage(`图片已显示在上一条消息上方。原图保存在：\n\n\`${path}\``)).toEqual([
+      { type: 'text', text: '图片已显示在上一条消息上方。原图保存在：\n\n' },
+      { type: 'localImage', alt: 'exec-result.png', path },
+    ])
+  })
+
   it('does not turn remote URLs or malformed markdown into renderable media', () => {
-    const text = '![远程](https://example.com/tracker.png) ![缺失](relative.png)'
+    const text = '![远程](https://example.com/tracker.png) ![缺失](relative.png) [文档](</tmp/report.txt>) `/tmp/report.txt`'
     expect(parseAgentMessage(text)).toEqual([{ type: 'text', text }])
   })
 })

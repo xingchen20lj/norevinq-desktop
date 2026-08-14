@@ -4,11 +4,13 @@ export type SecurityTargetKind = 'repository' | 'paths' | 'working_tree' | 'refs
 export type SecuritySeverity = 'critical' | 'high' | 'medium' | 'low' | 'informational'
 export type SecurityModelProvider = 'openai' | 'deepseek'
 export type SecurityDeepSeekModel = 'deepseek-v4-flash' | 'deepseek-v4-pro'
+export type SecurityReportLanguage = 'zh-CN' | 'en'
 
 export type SecurityScanRequest = {
   projectId: string
   provider?: SecurityModelProvider
   model?: SecurityDeepSeekModel
+  reportLanguage?: SecurityReportLanguage
   mode: SecurityScanMode
   target: {
     kind: SecurityTargetKind
@@ -170,6 +172,17 @@ export type SecurityExportResult = {
   format: SecurityExportInput['format']
   content: string
   truncated: boolean
+}
+
+export type SecuritySaveExportInput = {
+  scanId: string
+  format: 'report' | SecurityExportInput['format']
+}
+
+export type SecuritySaveExportResult = {
+  exported: boolean
+  fileName: string | null
+  bytes: number
 }
 
 export type SecuritySubscription = (snapshot: SecuritySnapshot) => void

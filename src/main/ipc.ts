@@ -60,6 +60,8 @@ import type {
   SecurityArtifactInput,
   SecurityExportInput,
   SecurityExportResult,
+  SecuritySaveExportInput,
+  SecuritySaveExportResult,
   SecurityFindingActionInput,
   SecurityFindingActionResult,
   SecurityPreflight,
@@ -227,6 +229,7 @@ export type SecurityController = {
   readArtifact: (input: SecurityArtifactInput) => SecurityArtifact
   runFindingAction: (input: SecurityFindingActionInput) => Promise<SecurityFindingActionResult>
   exportFindings: (input: SecurityExportInput) => Promise<SecurityExportResult>
+  saveExport: (input: SecuritySaveExportInput, destinationPath: string) => Promise<SecuritySaveExportResult>
 }
 
 export type SchedulerController = {
@@ -656,6 +659,20 @@ export function registerIpc(
   })
   ipcMain.handle(IPC_CHANNELS.securityExport, (_event, input: unknown) =>
     security.exportFindings(securityExportSchema.parse(input)))
+  ipcMain.handle(IPC_CHANNELS.securityExportSave, async (_event, input: unknown) => {
+    const parsed = securitySaveExportSchema.parse(input)
+    const exportType = securityExportType(parsed.format)
+    const result = await dialog.showSaveDialog({
+      title: '导出 Norevinq 安全扫描产物',
+      defaultPath: join(app.getPath('downloads'), `Norevinq-Security-${parsed.scanId.slice(0, 8)}.${exportType.extension}`),
+      buttonLabel: '导出文件',
+      filters: [{ name: exportType.name, extensions: [exportType.extension] }],
+      properties: ['createDirectory', 'showOverwriteConfirmation'],
+    })
+    const destinationPath = result.filePath
+    if (result.canceled || !destinationPath) return { exported: false, fileName: null, bytes: 0 }
+    return security.saveExport(parsed, destinationPath)
+  })
   ipcMain.handle(IPC_CHANNELS.schedulerState, (event) => {
     webContents.add(event.sender)
     event.sender.once('destroyed', () => webContents.delete(event.sender))
@@ -764,6 +781,7 @@ const securityScanSchema = z.object({
   projectId: z.uuid(),
   provider: z.enum(['openai', 'deepseek']).default('openai'),
   model: z.enum(['deepseek-v4-flash', 'deepseek-v4-pro']).optional(),
+  reportLanguage: z.enum(['zh-CN', 'en']).default('zh-CN'),
   mode: z.enum(['standard', 'deep']),
   target: securityTargetSchema,
   auth: z.enum(['auto', 'chatgpt', 'api-key']),
@@ -804,6 +822,19 @@ const securityExportSchema = z.object({
   scanId: z.uuid(),
   format: z.enum(['json', 'csv', 'sarif']),
 })
+const securitySaveExportSchema = z.object({
+  scanId: z.uuid(),
+  format: z.enum(['report', 'json', 'csv', 'sarif']),
+})
+
+function securityExportType(format: SecuritySaveExportInput['format']): { extension: string; name: string } {
+  return {
+    report: { extension: 'md', name: 'Markdown 安全报告' },
+    json: { extension: 'json', name: 'JSON 漏洞数据' },
+    csv: { extension: 'csv', name: 'CSV 漏洞数据' },
+    sarif: { extension: 'sarif', name: 'SARIF 安全报告' },
+  }[format]
+}
 const scheduledTaskSchema = z.object({
   id: z.uuid().optional(),
   name: z.string().trim().min(1).max(160),

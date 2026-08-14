@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
 import {
   chmodSync,
+  copyFileSync,
   existsSync,
   lstatSync,
   mkdirSync,
@@ -12,7 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
+import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
   BUNDLED_PLUGIN_VERSION,
   CodexSecurity,
@@ -38,6 +39,8 @@ import type {
   SecurityRuntimeStatus,
   SecurityScanRecord,
   SecurityScanRequest,
+  SecuritySaveExportInput,
+  SecuritySaveExportResult,
   SecuritySnapshot,
   SecuritySubscription,
 } from '../../shared/security.js'
@@ -56,6 +59,13 @@ import {
 
 const MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
 const MAX_FAILURE_MANIFEST_BYTES = 64 * 1024
+
+function securityScanPrompt(language: 'zh-CN' | 'en'): string {
+  if (language === 'en') {
+    return 'Write all human-readable finding titles, summaries, evidence explanations, remediation guidance, and report prose in English. Preserve source code, identifiers, file paths, commands, CWE identifiers, and machine-schema enum values exactly.'
+  }
+  return '请使用简体中文撰写所有面向用户的漏洞标题、摘要、证据说明、修复建议和报告正文。源代码、标识符、文件路径、命令、CWE 编号及机器结构中的枚举值必须保持原样。'
+}
 
 type SecuritySdk = Pick<CodexSecurity, 'metadata' | 'preflight' | 'run' | 'account' | 'close'>
 type SecuritySdkFactory = (config?: CodexSecurityConfig) => SecuritySdk
@@ -233,23 +243,27 @@ export class SecurityService {
   }
 
   async exportFindings(input: SecurityExportInput): Promise<SecurityExportResult> {
-    const scan = this.#requireCompletedScan(input.scanId)
-    const scanDir = join(this.#outputRoot, scan.id)
-    const extension = input.format === 'sarif' ? 'sarif' : input.format
-    const outputPath = join(scanDir, 'exports', `norevinq-findings.${extension}`)
-    mkdirSync(dirname(outputPath), { recursive: true, mode: 0o700 })
-    await this.#cliRunner(scan.projectPath, [
-      'export', scanDir, '--export-format', input.format, '--output', outputPath,
-    ])
-    const canonicalRoot = realpathSync(scanDir)
-    const canonicalOutput = realpathSync(outputPath)
-    const fromRoot = relative(canonicalRoot, canonicalOutput)
-    if (fromRoot.startsWith('..') || isAbsolute(fromRoot)) throw new Error('导出路径越界。')
+    const canonicalOutput = await this.#prepareExportFile(input)
     const size = statSync(canonicalOutput).size
     return {
       format: input.format,
       content: readFileSync(canonicalOutput).subarray(0, MAX_ARTIFACT_BYTES).toString('utf8'),
       truncated: size > MAX_ARTIFACT_BYTES,
+    }
+  }
+
+  async saveExport(input: SecuritySaveExportInput, destinationPath: string): Promise<SecuritySaveExportResult> {
+    if (!isAbsolute(destinationPath)) throw new Error('导出目标必须是绝对路径。')
+    const sourcePath = input.format === 'report'
+      ? this.#resolveArtifactPath(input.scanId, 'report')
+      : await this.#prepareExportFile({ scanId: input.scanId, format: input.format })
+    mkdirSync(dirname(destinationPath), { recursive: true, mode: 0o700 })
+    copyFileSync(sourcePath, destinationPath)
+    chmodSync(destinationPath, 0o600)
+    return {
+      exported: true,
+      fileName: basename(destinationPath),
+      bytes: statSync(destinationPath).size,
     }
   }
 
@@ -329,6 +343,7 @@ export class SecurityService {
       outputDir,
       archiveExisting: false,
       target: toSdkTarget(request),
+      scanPrompt: securityScanPrompt(request.reportLanguage ?? 'zh-CN'),
       ...(provider === 'deepseek' || request.maxCostUsd === undefined ? {} : { maxCostUsd: request.maxCostUsd }),
     }
     if (request.mode === 'deep' && request.deep) {
@@ -338,6 +353,33 @@ export class SecurityService {
       options.maxDiscoveryRuns = request.deep.maxDiscoveryRuns
     }
     return options
+  }
+
+  async #prepareExportFile(input: SecurityExportInput): Promise<string> {
+    const scan = this.#requireCompletedScan(input.scanId)
+    const scanDir = join(this.#outputRoot, scan.id)
+    const outputPath = join(scanDir, 'exports', `norevinq-findings.${input.format}`)
+    mkdirSync(dirname(outputPath), { recursive: true, mode: 0o700 })
+    await this.#cliRunner(scan.projectPath, [
+      'export', scanDir, '--export-format', input.format, '--output', outputPath,
+    ])
+    return this.#requireContainedFile(scanDir, outputPath, '导出路径越界。')
+  }
+
+  #resolveArtifactPath(scanId: string, kind: SecurityArtifactInput['kind']): string {
+    const scan = this.#requireCompletedScan(scanId)
+    const scanRoot = join(this.#outputRoot, scan.id)
+    const candidate = resolve(scanRoot, artifactRelativePath(kind))
+    if (!existsSync(candidate) || !statSync(candidate).isFile()) throw new Error('请求的扫描产物不存在。')
+    return this.#requireContainedFile(scanRoot, candidate, '扫描产物路径越界。')
+  }
+
+  #requireContainedFile(root: string, candidate: string, message: string): string {
+    const canonicalRoot = realpathSync(root)
+    const canonicalFile = realpathSync(candidate)
+    const fromRoot = relative(canonicalRoot, canonicalFile)
+    if (fromRoot.startsWith('..') || isAbsolute(fromRoot)) throw new Error(message)
+    return canonicalFile
   }
 
   #sdkForRequest(request: SecurityScanRequest): { sdk: SecuritySdk; ephemeral: boolean } {
@@ -573,6 +615,7 @@ function classifySecurityError(error: unknown): string {
       ? 'deep_worker_sandbox'
       : 'deep_discovery_failed'
   }
+  if (message.includes('did not create required draft artifacts')) return 'scan_artifacts_missing'
   if (message.includes('trusted access') || message.includes('forbidden') || message.includes('403')) {
     return 'security_access_required'
   }

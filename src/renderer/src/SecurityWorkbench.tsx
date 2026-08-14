@@ -2,7 +2,8 @@ import {
   AlertTriangle,
   Archive,
   CheckCircle2,
-  FileJson,
+  Download,
+  Eye,
   FileSearch,
   FolderGit2,
   Gauge,
@@ -14,6 +15,7 @@ import {
   X,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
+import './SecurityWorkbench.css'
 import type { ProjectSummary } from '../../shared/contracts'
 import type {
   SecurityArtifact,
@@ -21,6 +23,8 @@ import type {
   SecurityFinding,
   SecurityModelProvider,
   SecurityPreflight,
+  SecurityReportLanguage,
+  SecuritySaveExportInput,
   SecurityScanMode,
   SecurityScanRecord,
   SecuritySnapshot,
@@ -42,6 +46,7 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
   const [provider, setProvider] = useState<SecurityModelProvider>('openai')
   const [deepSeekModel, setDeepSeekModel] = useState<SecurityDeepSeekModel>('deepseek-v4-pro')
   const [auth, setAuth] = useState<'auto' | 'chatgpt' | 'api-key'>('auto')
+  const [reportLanguage, setReportLanguage] = useState<SecurityReportLanguage>('zh-CN')
   const [paths, setPaths] = useState('src')
   const [base, setBase] = useState('HEAD')
   const [maxCost, setMaxCost] = useState('5')
@@ -58,6 +63,7 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
   const request = project ? {
     projectId: project.id,
     provider,
+    reportLanguage,
     ...(provider === 'deepseek' ? { model: deepSeekModel } : {}),
     mode,
     target: target === 'repository' ? { kind: 'repository' as const }
@@ -91,6 +97,7 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
             <label><span>模式</span><select value={mode} onChange={(event) => { const next = event.target.value as SecurityScanMode; setMode(next); if (next === 'deep' && (target === 'refs' || target === 'working_tree')) setTarget('repository') }}><option value="standard">普通扫描</option><option value="deep">深度扫描</option></select></label>
             <label><span>目标</span><select value={target} onChange={(event) => setTarget(event.target.value as SecurityTargetKind)}><option value="repository">完整仓库</option><option value="paths">指定路径</option>{mode === 'standard' && <><option value="working_tree">工作区差异</option><option value="refs">提交差异</option></>}</select></label>
             {provider === 'openai' ? <label><span>认证</span><select value={auth} onChange={(event) => setAuth(event.target.value as typeof auth)}><option value="auto">自动选择</option><option value="chatgpt">ChatGPT 登录</option><option value="api-key">环境 API Key</option></select></label> : <label><span>DeepSeek 模型</span><select value={deepSeekModel} onChange={(event) => setDeepSeekModel(event.target.value as SecurityDeepSeekModel)}><option value="deepseek-v4-pro">DeepSeek V4 Pro（并行验证）</option><option value="deepseek-v4-flash">DeepSeek V4 Flash（串行验证）</option></select></label>}
+            <label><span>报告语言</span><select value={reportLanguage} onChange={(event) => setReportLanguage(event.target.value as SecurityReportLanguage)}><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>
             {provider === 'openai' ? <label><span>费用上限（USD）</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} /></label> : <p className="settings-note">使用 DeepSeek API Key 直接计费；下方实时显示 token 与人民币估算。Flash 与 Pro 均已通过 Norevinq 0.1.0 的真实 completed + sealed 扫描。为避免产物收敛竞态，Flash 使用单线程审计，Pro 使用有限并行。SDK 暂不能对 DeepSeek 执行可靠美元硬中止。</p>}
             {target === 'paths' && <label className="wide"><span>仓库相对路径（每行一项）</span><textarea rows={3} value={paths} onChange={(event) => setPaths(event.target.value)} /></label>}
             {(target === 'working_tree' || target === 'refs') && <label className="wide"><span>基准引用</span><input value={base} onChange={(event) => setBase(event.target.value)} /></label>}
@@ -143,15 +150,33 @@ function ScanList({ scans, activeScanId, busy, run, viewArtifact }: {
   run: (action: () => Promise<unknown>) => Promise<void>
   viewArtifact: (artifact: SecurityArtifact) => void
 }): React.JSX.Element {
+  const [exportFormats, setExportFormats] = useState<Record<string, SecuritySaveExportInput['format']>>({})
+  const [exported, setExported] = useState<Record<string, string>>({})
   if (scans.length === 0) return <Empty title="没有扫描历史" detail="本地预检不写入历史；启动真实扫描后会在此显示。" />
-  return <div className="security-scan-list">{scans.map((scan) => <article key={scan.id}>
-    <header><div><strong>{scan.projectName}</strong><span>{scan.request.provider ?? 'openai'}{scan.request.model ? `/${scan.request.model}` : ''} · {scan.request.mode} · {scan.request.target.kind} · {formatTime(scan.createdAt)}</span></div><i className={scan.status}>{scanStatus(scan.status)}</i></header>
+  async function preview(scan: SecurityScanRecord, format: SecuritySaveExportInput['format']): Promise<void> {
+    if (format === 'report') {
+      viewArtifact(await window.norevinq.readSecurityArtifact({ scanId: scan.id, kind: 'report' }))
+      return
+    }
+    if (format === 'sarif') {
+      viewArtifact(await window.norevinq.readSecurityArtifact({ scanId: scan.id, kind: 'sarif' }))
+      return
+    }
+    const value = await window.norevinq.exportSecurityFindings({ scanId: scan.id, format })
+    viewArtifact({ kind: 'findings', content: value.content, truncated: value.truncated })
+  }
+  return <div className="security-scan-list">{scans.map((scan) => {
+    const format = exportFormats[scan.id] ?? (scan.result?.reportAvailable ? 'report' : 'json')
+    const language = scan.request.reportLanguage === 'en' ? 'English' : '简体中文'
+    const canExport = Boolean(scan.result) && (format !== 'report' || scan.result?.reportAvailable) && (format !== 'sarif' || scan.result?.sarifAvailable)
+    return <article key={scan.id}>
+    <header><div><strong>{scan.projectName}</strong><span>{scan.request.provider ?? 'openai'}{scan.request.model ? `/${scan.request.model}` : ''} · {scanModeLabel(scan.request.mode)} · {targetLabel(scan.request.target.kind)} · {language} · {formatTime(scan.createdAt)}</span></div><i className={scan.status}>{scanStatus(scan.status)}</i></header>
     {scan.progress && <div className="security-progress"><div><span style={{ width: `${String(progressPercent(scan))}%` }} /></div><small>{scan.progress.phase} · {scan.progress.filesCompleted}/{scan.progress.filesTotal || '?'} 文件{scan.progress.costUsd === undefined ? '' : ` · $${scan.progress.costUsd.toFixed(4)}`}</small><p>{scan.progress.activity}</p></div>}
     {scan.progress?.deepseekUsage && <DeepSeekUsage usage={scan.progress.deepseekUsage} />}
-    {scan.error && <div className="provider-warning"><strong>{scan.error.code}</strong><span>{scan.error.message}</span></div>}
+    {scan.error && <details className="security-scan-error"><summary>扫描失败 · {securityErrorLabel(scan.error.code)}</summary><p>{scan.error.message}</p></details>}
     {scan.result && <ScanSummary scan={scan} />}
-    <footer>{activeScanId === scan.id && <button className="danger-button" disabled={busy} onClick={() => void run(() => window.norevinq.cancelSecurityScan({ scanId: scan.id }))}><Square size={11} />取消</button>}{scan.result?.reportAvailable && <button disabled={busy} onClick={() => void run(async () => viewArtifact(await window.norevinq.readSecurityArtifact({ scanId: scan.id, kind: 'report' })))}><FileSearch size={11} />报告</button>}{scan.result && <button disabled={busy} onClick={() => void run(async () => { const value = await window.norevinq.exportSecurityFindings({ scanId: scan.id, format: 'json' }); viewArtifact({ kind: 'findings', content: value.content, truncated: value.truncated }) })}><FileJson size={11} />JSON</button>}{scan.result && <button disabled={busy} onClick={() => void run(async () => { const value = await window.norevinq.exportSecurityFindings({ scanId: scan.id, format: 'csv' }); viewArtifact({ kind: 'findings', content: value.content, truncated: value.truncated }) })}><FileJson size={11} />CSV</button>}{scan.result?.sarifAvailable && <button disabled={busy} onClick={() => void run(async () => viewArtifact(await window.norevinq.readSecurityArtifact({ scanId: scan.id, kind: 'sarif' })))}><FileJson size={11} />SARIF</button>}</footer>
-  </article>)}</div>
+    <footer>{activeScanId === scan.id && <button className="danger-button" disabled={busy} onClick={() => void run(() => window.norevinq.cancelSecurityScan({ scanId: scan.id }))}><Square size={12} />取消扫描</button>}{scan.result && <div className="security-export-control"><label htmlFor={`security-export-${scan.id}`}>导出格式</label><select id={`security-export-${scan.id}`} value={format} onChange={(event) => setExportFormats((current) => ({ ...current, [scan.id]: event.target.value as SecuritySaveExportInput['format'] }))}><option value="report" disabled={!scan.result.reportAvailable}>报告 Markdown</option><option value="json">漏洞 JSON</option><option value="csv">漏洞 CSV</option><option value="sarif" disabled={!scan.result.sarifAvailable}>SARIF</option></select></div>}{scan.result && <button disabled={busy || !canExport} onClick={() => void run(() => preview(scan, format))}><Eye size={12} />预览</button>}{scan.result && <button className="primary-export" disabled={busy || !canExport} onClick={() => void run(async () => { const value = await window.norevinq.saveSecurityExport({ scanId: scan.id, format }); if (value.exported && value.fileName) setExported((current) => ({ ...current, [scan.id]: value.fileName ?? '' })) })}><Download size={12} />导出文件</button>}{exported[scan.id] && <span className="security-exported" title={exported[scan.id]}>已导出 {exported[scan.id]}</span>}</footer>
+  </article>})}</div>
 }
 
 function ScanSummary({ scan }: { scan: SecurityScanRecord }): React.JSX.Element {
@@ -206,6 +231,33 @@ function progressPercent(scan: SecurityScanRecord): number {
 
 function scanStatus(status: SecurityScanRecord['status']): string {
   return { queued: '排队中', running: '运行中', completed: '已完成', failed: '失败', cancelled: '已取消' }[status]
+}
+
+function scanModeLabel(mode: SecurityScanMode): string {
+  return mode === 'deep' ? '深度扫描' : '普通扫描'
+}
+
+function targetLabel(target: SecurityTargetKind): string {
+  return {
+    repository: '完整仓库',
+    paths: '指定路径',
+    working_tree: '工作区差异',
+    refs: '提交差异',
+  }[target]
+}
+
+function securityErrorLabel(code: string): string {
+  return {
+    deep_worker_sandbox: '扫描进程权限受限',
+    deep_discovery_failed: '深度发现未完成',
+    security_access_required: '缺少安全扫描权限',
+    authentication_required: '需要登录或 API Key',
+    contract_validation: '扫描产物校验失败',
+    scan_artifacts_missing: '扫描进程未能生成必需产物',
+    interrupted: '扫描已中断',
+    python_unavailable: 'Python 运行时不可用',
+    unknown: '运行时错误',
+  }[code] ?? code
 }
 
 function severityRank(severity: SecurityFinding['severity']): number {
