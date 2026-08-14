@@ -99,7 +99,7 @@ export class FileService {
       return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, null, false)
     }
     const token = this.#issueToken(absolute, mimeType, metadata.size, metadata.dev, metadata.ino)
-    return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, `aster-file://preview/${token}`, false)
+    return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, `norevinq-file://preview/${token}`, false)
   }
 
   readAgentImage(input: AgentImagePreviewInput): AgentImagePreview {
@@ -115,7 +115,7 @@ export class FileService {
       name: absolute.split(sep).at(-1) ?? 'image',
       size: metadata.size,
       mimeType,
-      url: `aster-file://preview/${token}`,
+      url: `norevinq-file://preview/${token}`,
     }
   }
 
@@ -205,7 +205,7 @@ export class FileService {
         if (error instanceof Error && error.message.includes('Symbolic links')) throw error
       }
     }
-    throw new Error('The image is outside the active project and Aster artifact directory.')
+    throw new Error('The image is outside the active project and Norevinq artifact directory.')
   }
 
   #issueToken(path: string, mimeType: string, size: number, device: number, inode: number): string {

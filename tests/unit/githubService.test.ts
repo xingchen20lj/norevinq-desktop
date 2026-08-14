@@ -29,8 +29,8 @@ describe('GitHubService', () => {
       if (args[0] === 'auth') return ok('')
       if (args[0] === 'repo') {
         return ok(JSON.stringify({
-          nameWithOwner: 'aster-fixture/project',
-          url: 'https://github.com/aster-fixture/project',
+          nameWithOwner: 'norevinq-fixture/project',
+          url: 'https://github.com/norevinq-fixture/project',
           defaultBranchRef: { name: 'main' },
         }))
       }
@@ -39,7 +39,7 @@ describe('GitHubService', () => {
       }
       if (args[0] === 'pr' && args[1] === 'create') {
         created = true
-        return ok('https://github.com/aster-fixture/project/pull/42\n')
+        return ok('https://github.com/norevinq-fixture/project/pull/42\n')
       }
       throw new Error(`Unexpected gh invocation: ${args.join(' ')}`)
     }
@@ -61,8 +61,8 @@ describe('GitHubService', () => {
       host: 'github.com',
       pushRemote: 'origin',
       baseRemote: 'origin',
-      pushRepository: 'aster-fixture/project',
-      baseRepository: 'aster-fixture/project',
+      pushRepository: 'norevinq-fixture/project',
+      baseRepository: 'norevinq-fixture/project',
       defaultBranch: 'main',
       dirtyFileCount: 1,
       existingPullRequest: null,
@@ -86,8 +86,8 @@ describe('GitHubService', () => {
     expect(result).toMatchObject({ created: true, pushed: true, pullRequest: { number: 42, draft: true } })
     const create = calls.find(({ args }) => args[0] === 'pr' && args[1] === 'create')
     expect(create?.args).toEqual([
-      'pr', 'create', '--repo', 'aster-fixture/project', '--base', 'main',
-      '--head', 'aster-fixture:feature/pr', '--title', 'feat: verified PR', '--body-file', '-', '--draft',
+      'pr', 'create', '--repo', 'norevinq-fixture/project', '--base', 'main',
+      '--head', 'norevinq-fixture:feature/pr', '--title', 'feat: verified PR', '--body-file', '-', '--draft',
     ])
     expect(create?.stdin).toBe('Body with spaces and `code`.')
     expect(create?.args).not.toContain('Body with spaces and `code`.')
@@ -110,7 +110,7 @@ describe('GitHubService', () => {
       upstream: 'origin/feature/pr',
       remotes: [
         { name: 'origin', fetchUrl: 'git@github.com:contributor/project.git', pushUrl: 'git@github.com:contributor/project.git' },
-        { name: 'upstream', fetchUrl: 'https://github.com/aster-fixture/project.git', pushUrl: 'https://github.com/aster-fixture/project.git' },
+        { name: 'upstream', fetchUrl: 'https://github.com/norevinq-fixture/project.git', pushUrl: 'https://github.com/norevinq-fixture/project.git' },
       ],
     })
     const calls: readonly string[][] = []
@@ -120,8 +120,8 @@ describe('GitHubService', () => {
       if (args[0] === '--version') return ok('gh version 2.97.0\n')
       if (args[0] === 'auth') return ok('')
       if (args[0] === 'repo') return ok(JSON.stringify({
-        nameWithOwner: 'aster-fixture/project',
-        url: 'https://github.com/aster-fixture/project',
+        nameWithOwner: 'norevinq-fixture/project',
+        url: 'https://github.com/norevinq-fixture/project',
         defaultBranchRef: { name: 'main' },
       }))
       if (args[0] === 'pr') return ok('[]')
@@ -136,7 +136,7 @@ describe('GitHubService', () => {
       pushRemote: 'origin',
       baseRemote: 'upstream',
       pushRepository: 'contributor/project',
-      baseRepository: 'aster-fixture/project',
+      baseRepository: 'norevinq-fixture/project',
     })
     expect(mutableCalls.find((args) => args[0] === 'pr')).toEqual(expect.arrayContaining([
       '--head', 'feature/pr', '--limit', '100',
@@ -190,17 +190,17 @@ describe('GitHubService', () => {
   })
 
   it('runs the real bounded CLI transport with stdin, timeout, and a minimal environment', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-github-runner-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-github-runner-'))
     temporaryPaths.push(root)
-    const previousUnrelated = process.env.ASTER_UNRELATED_SECRET
+    const previousUnrelated = process.env.NOREVINQ_UNRELATED_SECRET
     const previousGitHubToken = process.env.GH_TOKEN
-    process.env.ASTER_UNRELATED_SECRET = 'must-not-leak'
+    process.env.NOREVINQ_UNRELATED_SECRET = 'must-not-leak'
     process.env.GH_TOKEN = 'ghp_fixture_token_for_environment_test'
     try {
       const result = await runGitHubCommand(process.execPath, ['-e', [
         "let input='';",
         "process.stdin.on('data', chunk => input += chunk);",
-        "process.stdin.on('end', () => process.stdout.write(JSON.stringify({ input, unrelated: process.env.ASTER_UNRELATED_SECRET ?? null, token: Boolean(process.env.GH_TOKEN) })));",
+        "process.stdin.on('end', () => process.stdout.write(JSON.stringify({ input, unrelated: process.env.NOREVINQ_UNRELATED_SECRET ?? null, token: Boolean(process.env.GH_TOKEN) })));",
       ].join('')], { cwd: root, timeoutMs: 5_000, stdin: 'body through stdin' })
       expect(JSON.parse(result.stdout)).toEqual({ input: 'body through stdin', unrelated: null, token: true })
 
@@ -214,14 +214,14 @@ describe('GitHubService', () => {
         '-e', "process.stderr.write('fixture failure'); process.exit(7)",
       ], { cwd: root, timeoutMs: 5_000 })).rejects.toThrow('fixture failure')
     } finally {
-      restoreEnvironment('ASTER_UNRELATED_SECRET', previousUnrelated)
+      restoreEnvironment('NOREVINQ_UNRELATED_SECRET', previousUnrelated)
       restoreEnvironment('GH_TOKEN', previousGitHubToken)
     }
   })
 
   it('discovers an executable from explicit, PATH, and desktop user-bin locations without hardcoding a host path', () => {
     if (process.platform === 'win32') return
-    const root = mkdtempSync(join(tmpdir(), 'aster-gh-discovery-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-gh-discovery-'))
     temporaryPaths.push(root)
     const pathDirectory = join(root, 'path-bin')
     const homeDirectory = join(root, 'home')
@@ -245,7 +245,7 @@ function createFixture(overrides: Partial<GitRepositorySnapshot> = {}): {
   projectId: string
   snapshot: GitRepositorySnapshot
 } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-github-service-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-github-service-'))
   temporaryPaths.push(root)
   const database = new StateDatabase(join(root, 'state.sqlite3'))
   const project = database.upsertProject(root)
@@ -266,8 +266,8 @@ function createFixture(overrides: Partial<GitRepositorySnapshot> = {}): {
       discards: [],
       remotes: [{
         name: 'origin',
-        fetchUrl: 'https://github.com/aster-fixture/project.git',
-        pushUrl: 'git@github.com:aster-fixture/project.git',
+        fetchUrl: 'https://github.com/norevinq-fixture/project.git',
+        pushUrl: 'git@github.com:norevinq-fixture/project.git',
       }],
       error: null,
       ...overrides,
@@ -280,8 +280,8 @@ function createHostileRunner(): GitHubCommandRunner {
     if (args[0] === '--version') return ok('gh version 2.97.0\n')
     if (args[0] === 'auth') return ok('')
     if (args[0] === 'repo') return ok(JSON.stringify({
-      nameWithOwner: 'aster-fixture/project',
-      url: 'https://github.com/aster-fixture/project',
+      nameWithOwner: 'norevinq-fixture/project',
+      url: 'https://github.com/norevinq-fixture/project',
       defaultBranchRef: { name: 'main' },
     }))
     return ok(JSON.stringify([{ ...pullRequestJson(), url: 'https://attacker.invalid/steal' }]))
@@ -292,12 +292,12 @@ function pullRequestJson(): Record<string, unknown> {
   return {
     number: 42,
     title: 'feat: verified PR',
-    url: 'https://github.com/aster-fixture/project/pull/42',
+    url: 'https://github.com/norevinq-fixture/project/pull/42',
     state: 'OPEN',
     isDraft: true,
     baseRefName: 'main',
     headRefName: 'feature/pr',
-    headRepositoryOwner: { login: 'aster-fixture' },
+    headRepositoryOwner: { login: 'norevinq-fixture' },
   }
 }
 

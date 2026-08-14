@@ -20,7 +20,7 @@ export function AgentImage({ alt, path, projectId, worktreeId }: {
       setLoadError('当前任务没有可用于验证图片路径的项目。')
       return () => { active = false }
     }
-    void window.aster.previewAgentImage({ projectId, path, ...(worktreeId ? { worktreeId } : {}) })
+    void window.norevinq.previewAgentImage({ projectId, path, ...(worktreeId ? { worktreeId } : {}) })
       .then((value) => { if (active) setPreview(value) })
       .catch((reason: unknown) => { if (active) setLoadError(errorMessage(reason)) })
     return () => { active = false }

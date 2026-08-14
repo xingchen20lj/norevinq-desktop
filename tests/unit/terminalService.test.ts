@@ -57,7 +57,7 @@ describe('TerminalService', () => {
       method: 'command/exec',
       options: { timeoutMs: null },
       params: {
-        processId: `aster-terminal-${session.id}`,
+        processId: `norevinq-terminal-${session.id}`,
         tty: true,
         streamStdin: true,
         streamStdoutStderr: true,
@@ -72,13 +72,13 @@ describe('TerminalService', () => {
 
     const bytes = Buffer.from('\u001b[32m你好\u001b[0m\r\n', 'utf8')
     runtime.emit('command/exec/outputDelta', {
-      processId: `aster-terminal-${session.id}`,
+      processId: `norevinq-terminal-${session.id}`,
       stream: 'stdout',
       deltaBase64: bytes.subarray(0, 5).toString('base64'),
       capReached: false,
     })
     runtime.emit('command/exec/outputDelta', {
-      processId: `aster-terminal-${session.id}`,
+      processId: `norevinq-terminal-${session.id}`,
       stream: 'stdout',
       deltaBase64: bytes.subarray(5).toString('base64'),
       capReached: false,
@@ -153,7 +153,7 @@ describe('TerminalService', () => {
     const chunk = Buffer.alloc(1024 * 1024, 0x78).toString('base64')
     for (let index = 0; index < 5; index += 1) {
       runtime.emit('command/exec/outputDelta', {
-        processId: `aster-terminal-${session.id}`,
+        processId: `norevinq-terminal-${session.id}`,
         stream: 'stdout',
         deltaBase64: chunk,
         capReached: false,
@@ -171,7 +171,7 @@ describe('TerminalService', () => {
 })
 
 function createProject(): { root: string; database: StateDatabase; project: ReturnType<StateDatabase['upsertProject']> } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-terminal-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-terminal-'))
   temporaryPaths.push(root)
   const projectPath = join(root, 'project')
   mkdirSync(projectPath)

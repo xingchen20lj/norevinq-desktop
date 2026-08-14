@@ -65,7 +65,7 @@ export class TerminalService {
     const rows = validateDimension(input.rows ?? 30, 2, 300, 'rows')
     const shell = resolveShell(process.platform, process.env)
     const id = randomUUID()
-    const processId = `aster-terminal-${id}`
+    const processId = `norevinq-terminal-${id}`
     const now = new Date().toISOString()
     const session: InternalSession = {
       id,
@@ -116,7 +116,7 @@ export class TerminalService {
       current.status = 'failed'
       current.error = toErrorMessage(reason)
       current.updatedAt = new Date().toISOString()
-      this.#appendOutput(current, `\r\n[Aster terminal disconnected: ${current.error}]\r\n`)
+      this.#appendOutput(current, `\r\n[Norevinq terminal disconnected: ${current.error}]\r\n`)
       this.#emit({ type: 'session', session: publicSession(current) })
     }).finally(() => this.#runtime.markProcessCompleted())
     return publicSession(session)

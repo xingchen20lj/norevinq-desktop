@@ -1,7 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import {
   IPC_CHANNELS,
-  type AsterDesktopApi,
+  type NorevinqDesktopApi,
   type DeepLinkSubscription,
   type DeepLinkTarget,
   type RemoveProjectInput,
@@ -88,7 +88,7 @@ import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
 import type { AccountSnapshot, AccountSubscription, LoginOpenAiApiKeyInput } from '../shared/account.js'
 
-const api: AsterDesktopApi = {
+const api: NorevinqDesktopApi = {
   getBootstrapState: () => ipcRenderer.invoke(IPC_CHANNELS.bootstrap),
   selectProject: () => ipcRenderer.invoke(IPC_CHANNELS.selectProject),
   removeProject: (input: RemoveProjectInput) => ipcRenderer.invoke(IPC_CHANNELS.removeProject, input),
@@ -294,4 +294,4 @@ const api: AsterDesktopApi = {
   },
 }
 
-contextBridge.exposeInMainWorld('aster', Object.freeze(api))
+contextBridge.exposeInMainWorld('norevinq', Object.freeze(api))

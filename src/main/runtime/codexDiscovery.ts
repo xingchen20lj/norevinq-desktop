@@ -112,7 +112,7 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
   if (options.explicitBinary) {
     candidates.push(...configuredCandidate(options.explicitBinary, 'explicit', platform, pathValue))
   }
-  const environmentBinary = env.ASTER_AGENT_BINARY ?? env.CODEX_BINARY
+  const environmentBinary = env.NOREVINQ_AGENT_BINARY ?? env.ASTER_AGENT_BINARY ?? env.CODEX_BINARY
   if (environmentBinary) {
     candidates.push(...configuredCandidate(environmentBinary, 'environment', platform, pathValue))
   }
@@ -184,6 +184,6 @@ export async function discoverCodexBinary(
 
   const detail = failures.length > 0 ? ` Probe failures: ${failures.join('; ')}` : ''
   throw new Error(
-    `Unable to find Aster's agent runtime. Configure one explicitly, set ASTER_AGENT_BINARY, reinstall the bundled runtime, or add the compatible runtime to PATH.${detail}`,
+    `Unable to find Norevinq's agent runtime. Configure one explicitly, set NOREVINQ_AGENT_BINARY, reinstall the bundled runtime, or add the compatible runtime to PATH.${detail}`,
   )
 }

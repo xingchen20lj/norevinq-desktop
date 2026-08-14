@@ -16,13 +16,13 @@ afterEach(() => {
 
 describe('DiffService', () => {
   it('returns bounded working and staged patches including untracked text and binary markers', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
     runGit(projectPath, ['config', 'core.autocrlf', 'false'])
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+    runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
     writeFileSync(join(projectPath, 'tracked.txt'), 'before\n')
     runGit(projectPath, ['add', 'tracked.txt'])
     runGit(projectPath, ['commit', '-m', 'baseline'])
@@ -51,13 +51,13 @@ describe('DiffService', () => {
   }, 30_000)
 
   it('stages, unstages, and explicitly reverts only server-cached hunks', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-actions-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-actions-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
     runGit(projectPath, ['config', 'core.autocrlf', 'false'])
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+    runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
     const baseline = Array.from({ length: 24 }, (_, index) => `line-${String(index + 1)}`)
     writeFileSync(join(projectPath, 'tracked.txt'), `${baseline.join('\n')}\n`)
     runGit(projectPath, ['add', 'tracked.txt'])
@@ -105,7 +105,7 @@ describe('DiffService', () => {
   }, 30_000)
 
   it('stages an untracked file with spaces and refuses destructive untracked revert', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-untracked-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-untracked-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])

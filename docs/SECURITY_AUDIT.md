@@ -62,7 +62,7 @@ Git 状态历史上会原样返回 `git remote -v` URL；若旧仓库把 token �
 
 ### 防御性：notice 生成器信任 PATH 和最终符号链接
 
-该脚本只在受信任的 Aster 源码构建中使用，因此独立攻击路径被判定为非报告项；仍完成前瞻加固：子进程通过当前 pinned pnpm 暴露的绝对 `npm_execpath` 运行，不再二次搜索项目 `PATH`；生成目标必须是普通文件并通过同目录临时文件替换，拒绝符号链接；homepage 只允许 HTTP(S)。自动测试确认外部 symlink victim 内容保持不变。
+该脚本只在受信任的 Norevinq 源码构建中使用，因此独立攻击路径被判定为非报告项；仍完成前瞻加固：子进程通过当前 pinned pnpm 暴露的绝对 `npm_execpath` 运行，不再二次搜索项目 `PATH`；生成目标必须是普通文件并通过同目录临时文件替换，拒绝符号链接；homepage 只允许 HTTP(S)。自动测试确认外部 symlink victim 内容保持不变。
 
 ## 未发现可报告问题的已审计控制
 

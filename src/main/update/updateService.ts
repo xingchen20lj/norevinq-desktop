@@ -204,7 +204,7 @@ function disabledUpdateReason(
   configured: boolean,
   driver: UpdateDriver | undefined,
 ): string | null {
-  if (!supported) return '当前平台不在 Aster Code 的桌面更新支持范围内。'
+  if (!supported) return '当前平台不在 Norevinq 的桌面更新支持范围内。'
   if (!isPackaged) return '开发构建不会连接发布更新源。'
   if (!configured) return '此发布包没有 app-update.yml；发布者尚未配置更新渠道。'
   if (!driver) return '更新运行时不可用。'

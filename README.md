@@ -1,16 +1,16 @@
-# Aster Code
+# Norevinq
 
-[![CI](https://github.com/xingchen20lj/aster-code-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/xingchen20lj/aster-code-desktop/actions/workflows/ci.yml)
+[![CI](https://github.com/xingchen20lj/norevinq-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/xingchen20lj/norevinq-desktop/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey.svg)
 
-Aster Code 是一款面向 macOS 和 Windows 的本地优先桌面智能编程客户端。它以 Codex app-server 为智能体协议层，原生支持 OpenAI Codex、DeepSeek Responses、Git 工作树、差异审阅、终端、MCP、技能、计划任务和 Codex Security。
+Norevinq 是一款面向 macOS 和 Windows 的本地优先桌面智能编程客户端。它以 Codex app-server 为智能体协议层，原生支持 OpenAI Codex、DeepSeek Responses、Git 工作树、差异审阅、终端、MCP、技能、计划任务和 Codex Security。
 
-> 当前处于 `0.1.0` 预览阶段。源码、测试和无签名内部安装包已经过验证；正式公开安装包仍需要平台签名、公证和 Windows 真机发布验证。Aster Code 是独立开源项目，不是 OpenAI 或 DeepSeek 官方产品。
+> 当前处于 `0.1.0` 预览阶段。GitHub 仓库只发布源码、源码标签和构建说明，不提供 DMG、EXE 或其他预编译安装包。Norevinq 是独立开源项目，不是 OpenAI 或 DeepSeek 官方产品。
 
-> **官方来源：** Aster Code 由 [xingchen20lj](https://github.com/xingchen20lj) 创建和维护，当前唯一规范源码仓库是 [xingchen20lj/aster-code-desktop](https://github.com/xingchen20lj/aster-code-desktop)。未由该仓库发布或明确链接的副本、修改版和安装包不是官方发行版。
+> **官方来源：** Norevinq 由 [xingchen20lj](https://github.com/xingchen20lj) 创建和维护，当前唯一规范源码仓库是 [xingchen20lj/norevinq-desktop](https://github.com/xingchen20lj/norevinq-desktop)。未由该仓库发布或明确链接的副本、修改版和安装包不是官方发行版。
 
-![Aster Code 命令面板](docs/assets/screenshots/command-palette.png)
+![Norevinq 命令面板](docs/assets/screenshots/command-palette.png)
 
 ## 已实现能力
 
@@ -30,8 +30,8 @@ Aster Code 是一款面向 macOS 和 Windows 的本地优先桌面智能编程�
 准备 Git、Node.js `24.14.0` 和 pnpm `11.16.0`：
 
 ```bash
-git clone https://github.com/xingchen20lj/aster-code-desktop.git
-cd aster-code-desktop
+git clone https://github.com/xingchen20lj/norevinq-desktop.git
+cd norevinq-desktop
 pnpm install --frozen-lockfile
 pnpm verify:ci
 pnpm dev
@@ -53,17 +53,17 @@ pnpm package:win
 
 产物写入 `release/`。macOS 生成 DMG/ZIP，Windows 生成 NSIS EXE。无签名包只适合本地测试；公开分发前必须完成相应平台的签名验证。
 
-第一次构建、代理配置、常见错误和 GitHub Actions 打包方式见[新手构建指南](docs/BUILDING.md)。正式签名、更新和发布流程见[发布指南](docs/RELEASING.md)。
+第一次构建、代理配置和常见错误见[新手构建指南](docs/BUILDING.md)。签名、更新和发布流程见[发布指南](docs/RELEASING.md)。
 
 ## 账号与外部依赖
 
 - 构建应用不需要 OpenAI 或 DeepSeek 凭据。
-- 使用在线 Codex 时需要在 Aster 内登录 ChatGPT 或配置 OpenAI API Key。
+- 使用在线 Codex 时需要在 Norevinq 内登录 ChatGPT 或配置 OpenAI API Key。
 - 使用 DeepSeek 时可在设置中安全保存 Key，或在启动环境提供 `DEEPSEEK_API_KEY`。
-- GitHub Pull Request 功能通过用户已经登录的 `gh` CLI 工作，Aster 不读取或保存 GitHub token。
-- Codex Security 扫描需要 Python 3.10+；OpenAI 模式受账户 Security/Trusted Access 权限约束，DeepSeek V4 Flash 与 V4 Pro 可直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录。两者均已通过 Aster 0.1.0 的真实 `completed + sealed` 标准扫描。macOS 深扫描保留官方外层 `codex_security_scan` 权限边界，并规避 Seatbelt 不支持可靠嵌套导致的 discovery worker `EPERM`；该兼容层只作用于已验证外层沙箱内的子进程，其他扫描与平台不受影响。
+- GitHub Pull Request 功能通过用户已经登录的 `gh` CLI 工作，Norevinq 不读取或保存 GitHub token。
+- Codex Security 扫描需要 Python 3.10+；OpenAI 模式受账户 Security/Trusted Access 权限约束，DeepSeek V4 Flash 与 V4 Pro 可直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录。两者均已通过 Norevinq 0.1.0 的真实 `completed + sealed` 标准扫描。macOS 深扫描保留官方外层 `codex_security_scan` 权限边界，并规避 Seatbelt 不支持可靠嵌套导致的 discovery worker `EPERM`；该兼容层只作用于已验证外层沙箱内的子进程，其他扫描与平台不受影响。
 
-Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树、凭据和 `agent-home`，不会覆盖官方 Codex 桌面的用户数据。旧版 `codex-home` 会在首次启动新版时原地迁移为 `agent-home`；项目中的 `.codex` 和 `AGENTS.md` 仍遵循上游兼容规则。
+Norevinq 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树、凭据和 `agent-home`，不会覆盖官方 Codex 桌面的用户数据。旧版 `codex-home` 会在首次启动新版时原地迁移为 `agent-home`；项目中的 `.codex` 和 `AGENTS.md` 仍遵循上游兼容规则。
 
 ## 更多界面
 
@@ -84,6 +84,7 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 - [作者与贡献者](AUTHORS.md)
 - [引用信息](CITATION.cff)
 - [品牌与第三方商标说明](TRADEMARKS.md)
+- [名称初筛记录](docs/BRANDING.md)
 
 ## 参与贡献
 
@@ -91,4 +92,4 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 
 ## 许可证
 
-Aster Code 以 [Apache License 2.0](LICENSE) 发布。第三方组件的许可证与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [NOTICE](NOTICE)；项目名称、图标及第三方商标边界见 [TRADEMARKS.md](TRADEMARKS.md)。
+Norevinq 以 [Apache License 2.0](LICENSE) 发布。第三方组件的许可证与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [NOTICE](NOTICE)；项目名称、图标及第三方商标边界见 [TRADEMARKS.md](TRADEMARKS.md)。

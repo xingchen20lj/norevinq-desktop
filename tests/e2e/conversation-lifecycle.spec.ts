@@ -9,7 +9,7 @@ test.skip(process.platform === 'win32', 'The deterministic fixture wrapper uses 
 
 test('searches, paginates, renames, forks, compacts, archives, restores, and deletes tasks', async () => {
   test.setTimeout(60_000)
-  const profile = mkdtempSync(join(tmpdir(), 'aster-lifecycle-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-lifecycle-e2e-'))
   const projectPath = join(profile, 'project')
   const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
@@ -22,8 +22,8 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     'base64',
   ))
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.name', 'Aster Lifecycle'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.email', 'aster-lifecycle@example.invalid'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Norevinq Lifecycle'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'norevinq-lifecycle@example.invalid'], { cwd: projectPath })
   writeFileSync(join(projectPath, 'README.md'), '# lifecycle\n')
   execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: lifecycle baseline'], { cwd: projectPath })
@@ -32,27 +32,27 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   writeFileSync(join(projectPath, 'current-only.txt'), 'not in selected baseline\n')
   execFileSync('git', ['add', 'current-only.txt'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: advance main'], { cwd: projectPath })
-  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  const database = new StateDatabase(join(profile, 'norevinq.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
   writeFileSync(wrapper, `#!/bin/sh\nexec ${shellQuote(process.execPath)} ${shellQuote(helper)} "$@"\n`)
   chmodSync(wrapper, 0o755)
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, NOREVINQ_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
     const taskRow = (name: string): Locator =>
       window.locator('.thread-row').filter({ hasText: name })
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: '设置', exact: true }).click()
     const settings = window.getByRole('dialog', { name: '设置工作台' })
     await expect(settings).toContainText('未登录')
     await settings.getByLabel('OpenAI API Key').fill('sk-e2e-not-a-real-openai-key')
     await settings.getByRole('button', { name: '使用 API Key' }).click()
     await expect(settings.locator('.provider-state').first()).toContainText('OpenAI API Key')
-    await window.screenshot({ path: 'test-results/aster-openai-account.png' })
+    await window.screenshot({ path: 'test-results/norevinq-openai-account.png' })
     await settings.getByRole('button', { name: '退出登录' }).click()
     await expect(settings.locator('.provider-state').first()).toContainText('未登录')
     await settings.getByRole('button', { name: '关闭设置' }).click()
@@ -65,7 +65,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
 
     await window.reload()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     await expect(window.getByRole('button', { name: `取消固定项目 ${project.name}` })).toBeVisible()
     await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
     await window.getByRole('button', { name: '取消固定任务 Lifecycle secondary' }).click()
@@ -74,13 +74,13 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     const secondaryThreadId = '22222222-2222-7222-8222-222222222222'
     await application.evaluate(({ app }, url) => {
       app.emit('second-instance', { preventDefault: () => undefined }, [url], '', {})
-    }, `aster-code://thread/${secondaryThreadId}?project=${project.id}`)
+    }, `norevinq://thread/${secondaryThreadId}?project=${project.id}`)
     await expect(window.locator('.topbar-title')).toContainText('Lifecycle secondary')
     const permissionPanel = window.getByRole('region', { name: '待审批操作' })
     await expect(permissionPanel).toContainText('授予额外权限？')
     await expect(permissionPanel).toContainText('网络访问')
     await expect(permissionPanel).toContainText('generated/**')
-    await window.screenshot({ path: 'test-results/aster-permission-approval.png' })
+    await window.screenshot({ path: 'test-results/norevinq-permission-approval.png' })
     const readPermission = permissionPanel.locator('label').filter({ hasText: '读取' }).getByRole('checkbox')
     await readPermission.uncheck()
     await expect(readPermission).not.toBeChecked()
@@ -94,10 +94,10 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByLabel('搜索任务').fill('')
     await window.getByLabel('搜索任务').press('Enter')
     await taskRow('Lifecycle primary').click()
-    const generatedImage = window.getByRole('img', { name: 'Aster 生成图片' })
+    const generatedImage = window.getByRole('img', { name: 'Norevinq 生成图片' })
     await expect(generatedImage).toBeVisible()
-    await expect(generatedImage).toHaveAttribute('src', /^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
-    await window.screenshot({ path: 'test-results/aster-agent-inline-image.png' })
+    await expect(generatedImage).toHaveAttribute('src', /^norevinq-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    await window.screenshot({ path: 'test-results/norevinq-agent-inline-image.png' })
 
     const topbarActions = window.locator('.topbar-actions')
     for (const label of [
@@ -127,7 +127,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await goalDialog.getByLabel('目标状态').selectOption('paused')
     await goalDialog.getByRole('button', { name: '保存目标' }).click()
     await expect(window.getByRole('article', { name: '当前长期目标' })).toContainText('已暂停')
-    await window.screenshot({ path: 'test-results/aster-thread-goal.png' })
+    await window.screenshot({ path: 'test-results/norevinq-thread-goal.png' })
     await window.getByRole('button', { name: '长期目标' }).click()
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await goalDialog.getByRole('button', { name: '清除目标' }).click()
@@ -138,9 +138,9 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await worktreePanel.getByLabel('工作树基线').selectOption('refs/heads/release/base')
     await worktreePanel.getByRole('button', { name: '创建', exact: true }).click()
     await expect(worktreePanel.getByRole('button', { name: /Detached/ })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-worktree-base.png' })
+    await window.screenshot({ path: 'test-results/norevinq-worktree-base.png' })
     const [managedWorktree] = await window.evaluate(async ({ projectId }) => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         listWorktrees: (input: { projectId: string }) => Promise<{ id: string; path: string; baseRef: string; baseOid: string | null; headOid: string | null }[]>
       }
       return bridge.listWorktrees({ projectId })
@@ -151,13 +151,13 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     writeFileSync(join(projectPath, 'README.md'), '# staged\n')
     execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
     writeFileSync(join(projectPath, 'README.md'), '# staged\nunstaged\n')
-    writeFileSync(join(projectPath, 'handoff.txt'), 'ASTER_HANDOFF_OK\n')
+    writeFileSync(join(projectPath, 'handoff.txt'), 'NOREVINQ_HANDOFF_OK\n')
 
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await worktreePanel.getByRole('button', { name: /Detached/ }).click()
     await expect(window.getByRole('button', { name: 'Worktree', exact: true })).toBeVisible()
     expect(execFileSync('git', ['status', '--porcelain'], { cwd: projectPath, encoding: 'utf8' })).toBe('')
-    expect(readFileSync(join(managedWorktree?.path ?? '', 'handoff.txt'), 'utf8')).toBe('ASTER_HANDOFF_OK\n')
+    expect(readFileSync(join(managedWorktree?.path ?? '', 'handoff.txt'), 'utf8')).toBe('NOREVINQ_HANDOFF_OK\n')
 
     await window.getByRole('button', { name: '重命名任务' }).click()
     const rename = window.getByRole('dialog', { name: '重命名任务' })
@@ -182,7 +182,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByRole('button', { name: '永久删除任务' }).click()
     await expect(taskRow('Renamed primary fork')).toHaveCount(0)
     await expect(taskRow('Renamed primary')).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-conversation-lifecycle.png' })
+    await window.screenshot({ path: 'test-results/norevinq-conversation-lifecycle.png' })
 
     const requests = readFileSync(join(codexHome, 'fake-lifecycle-requests.jsonl'), 'utf8')
       .trim().split('\n').map((line) => JSON.parse(line) as { method: string; params: Record<string, unknown> | null })
@@ -204,7 +204,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     expect(identityRequests.length).toBeGreaterThan(0)
     for (const request of identityRequests) {
       expect(request.params).toMatchObject({
-        developerInstructions: expect.stringContaining('refer to yourself as Aster'),
+        developerInstructions: expect.stringContaining('refer to yourself as Norevinq'),
       })
     }
     expect(requests.find(({ method }) => method === 'account/login/start')?.params).toEqual({

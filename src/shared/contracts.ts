@@ -259,7 +259,7 @@ export type DeepLinkTarget =
 
 export type DeepLinkSubscription = (target: DeepLinkTarget) => void
 
-export type AsterDesktopApi = {
+export type NorevinqDesktopApi = {
   getBootstrapState: () => Promise<BootstrapState>
   selectProject: () => Promise<ProjectSummary | null>
   removeProject: (input: RemoveProjectInput) => Promise<void>

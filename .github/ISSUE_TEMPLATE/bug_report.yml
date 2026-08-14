@@ -1,5 +1,5 @@
 name: Bug 报告
-description: 报告可以稳定复现的 Aster Code 问题
+description: 报告可以稳定复现的 Norevinq 问题
 title: "[Bug]: "
 labels: [bug, needs-triage]
 body:
@@ -10,7 +10,7 @@ body:
   - type: input
     id: version
     attributes:
-      label: Aster Code 版本或提交
+      label: Norevinq 版本或提交
       placeholder: 例如 0.1.0 或 commit SHA
     validations:
       required: true

@@ -10,10 +10,10 @@ describe('parseAgentMessage', () => {
   })
 
   it('supports Windows absolute image paths and multiple images', () => {
-    expect(parseAgentMessage('![一](C:\\Aster\\one.png)\n![二](D:/Aster/two.webp)')).toEqual([
-      { type: 'localImage', alt: '一', path: 'C:\\Aster\\one.png' },
+    expect(parseAgentMessage('![一](C:\\Norevinq\\one.png)\n![二](D:/Norevinq/two.webp)')).toEqual([
+      { type: 'localImage', alt: '一', path: 'C:\\Norevinq\\one.png' },
       { type: 'text', text: '\n' },
-      { type: 'localImage', alt: '二', path: 'D:/Aster/two.webp' },
+      { type: 'localImage', alt: '二', path: 'D:/Norevinq/two.webp' },
     ])
   })
 

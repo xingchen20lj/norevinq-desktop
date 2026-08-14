@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('CredentialStore', () => {
   it('persists only encrypted values in a private atomic file', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-credentials-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-credentials-'))
     temporaryPaths.push(root)
     const path = join(root, 'private', 'credentials.json')
     const store = new CredentialStore(path, reversingEncryption)
@@ -29,7 +29,7 @@ describe('CredentialStore', () => {
   })
 
   it('fails closed when operating-system encryption is unavailable', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-credentials-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-credentials-'))
     temporaryPaths.push(root)
     const store = new CredentialStore(join(root, 'credentials.json'), {
       ...reversingEncryption,

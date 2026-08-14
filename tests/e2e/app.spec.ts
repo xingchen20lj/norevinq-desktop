@@ -8,24 +8,24 @@ import { StateDatabase } from '../../src/main/state/database.js'
 
 test('starts with a sandboxed renderer and real project action', async () => {
   test.setTimeout(330_000)
-  const profile = mkdtempSync(join(tmpdir(), 'aster-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-e2e-'))
   const projectPath = mkdtempSync(join(profile, 'project-'))
-  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  const database = new StateDatabase(join(profile, 'norevinq.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.name', 'Aster E2E'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.email', 'aster-e2e@example.invalid'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Norevinq E2E'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'norevinq-e2e@example.invalid'], { cwd: projectPath })
   writeFileSync(join(projectPath, 'README.md'), '# E2E\n')
-  writeFileSync(join(projectPath, 'AGENTS.md'), 'When the user asks for "instruction proof", reply with exactly ASTER_INSTRUCTIONS_OK and do not use tools.\n')
+  writeFileSync(join(projectPath, 'AGENTS.md'), 'When the user asks for "instruction proof", reply with exactly NOREVINQ_INSTRUCTIONS_OK and do not use tools.\n')
   writeFileSync(join(projectPath, 'proof.png'), Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XwWwWQAAAABJRU5ErkJggg==', 'base64'))
   execFileSync('git', ['add', 'README.md', 'AGENTS.md', 'proof.png'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: baseline'], { cwd: projectPath })
   const previewServer = createServer((request, response) => {
     response.setHeader('Content-Type', 'text/html; charset=utf-8')
     response.end(request.url === '/next'
-      ? '<!doctype html><title>Aster Browser Next</title><h1>ASTER_BROWSER_NEXT</h1>'
-      : '<!doctype html><title>Aster Browser Proof</title><h1>ASTER_BROWSER_OK</h1><a href="/next">Next</a><script>console.log("ASTER_BROWSER_LOG")</script>')
+      ? '<!doctype html><title>Norevinq Browser Next</title><h1>NOREVINQ_BROWSER_NEXT</h1>'
+      : '<!doctype html><title>Norevinq Browser Proof</title><h1>NOREVINQ_BROWSER_OK</h1><a href="/next">Next</a><script>console.log("NOREVINQ_BROWSER_LOG")</script>')
   })
   await new Promise<void>((resolve, reject) => {
     previewServer.once('error', reject)
@@ -38,17 +38,17 @@ test('starts with a sandboxed renderer and real project action', async () => {
     args: ['.', `--user-data-dir=${profile}`],
     env: {
       ...process.env,
-      ASTER_AGENT_HOME: process.env.ASTER_TEST_AGENT_HOME ?? process.env.ASTER_TEST_CODEX_HOME ?? join(homedir(), '.codex'),
+      NOREVINQ_AGENT_HOME: process.env.NOREVINQ_TEST_AGENT_HOME ?? process.env.NOREVINQ_TEST_CODEX_HOME ?? join(homedir(), '.codex'),
     },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window).toHaveTitle('Aster Code')
+    await expect(window).toHaveTitle('Norevinq')
     await expect(window.getByRole('heading', { name: /开始处理 project-/ })).toBeVisible()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
 
     const runtime = await window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getRuntimeStatus: () => Promise<{ phase: string; version: string | null; models: unknown[] }>
       }
       return bridge.getRuntimeStatus()
@@ -68,16 +68,16 @@ test('starts with a sandboxed renderer and real project action', async () => {
     const securityState = await window.evaluate(() => ({
       hasNodeRequire: typeof Reflect.get(globalThis, 'require') !== 'undefined',
       hasProcess: typeof Reflect.get(globalThis, 'process') !== 'undefined',
-      hasAsterBridge: typeof Reflect.get(window, 'aster') === 'object',
+      hasNorevinqBridge: typeof Reflect.get(window, 'norevinq') === 'object',
     }))
-    expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasAsterBridge: true })
+    expect(securityState).toEqual({ hasNodeRequire: false, hasProcess: false, hasNorevinqBridge: true })
 
     await window.keyboard.press(process.platform === 'darwin' ? 'Meta+K' : 'Control+K')
     const commandPalette = window.getByRole('dialog', { name: '命令面板' })
     await expect(commandPalette).toBeVisible()
     await commandPalette.getByLabel('搜索命令').fill('文件与产物')
     await expect(commandPalette.getByRole('option', { name: /文件与产物/ })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-command-palette.png' })
+    await window.screenshot({ path: 'test-results/norevinq-command-palette.png' })
     await commandPalette.getByLabel('搜索命令').press('Escape')
     await expect(commandPalette).toHaveCount(0)
 
@@ -89,9 +89,9 @@ test('starts with a sandboxed renderer and real project action', async () => {
     )
     await expect(settings).toContainText('deepseek-v4-pro')
     await expect(settings).toContainText('两个 Responses 模型均可用')
-    await window.screenshot({ path: 'test-results/aster-provider-settings.png' })
+    await window.screenshot({ path: 'test-results/norevinq-provider-settings.png' })
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getIntegrationState: () => Promise<{
           projectId: string | null
           loading: boolean
@@ -111,15 +111,15 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(settings).toContainText('项目已信任')
     await settings.getByRole('button', { name: '配置', exact: true }).click()
     await expect(settings).toContainText('AGENTS.md')
-    await expect(settings).toContainText('ASTER_INSTRUCTIONS_OK')
-    await window.screenshot({ path: 'test-results/aster-settings.png' })
+    await expect(settings).toContainText('NOREVINQ_INSTRUCTIONS_OK')
+    await window.screenshot({ path: 'test-results/norevinq-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
 
     await window.getByRole('button', { name: '安全', exact: true }).click()
-    const security = window.getByRole('dialog', { name: 'Aster 安全工作台' })
+    const security = window.getByRole('dialog', { name: 'Norevinq 安全工作台' })
     await expect(security).toBeVisible()
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getSecurityState: () => Promise<{
           runtime: { python: { status: string }; account: { status: string }; sdkVersion: string }
         }>
@@ -140,8 +140,8 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(security).toContainText('预检通过', { timeout: 30_000 })
     await expect(security).toContainText('产物目录已隔离')
     if (deepSeekConfigured) await expect(security).toContainText('deepseek · deepseek-v4-pro')
-    await window.screenshot({ path: 'test-results/aster-security.png' })
-    await window.getByRole('button', { name: '关闭 Aster 安全工作台' }).click()
+    await window.screenshot({ path: 'test-results/norevinq-security.png' })
+    await window.getByRole('button', { name: '关闭 Norevinq 安全工作台' }).click()
 
     await window.getByRole('button', { name: '计划任务', exact: true }).click()
     const scheduler = window.getByRole('dialog', { name: '计划任务工作台' })
@@ -149,29 +149,29 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await scheduler.getByRole('button', { name: '任务', exact: true }).click()
     await scheduler.getByRole('button', { name: '新建', exact: true }).click()
     await scheduler.getByLabel('名称').fill('E2E 计划验证')
-    await scheduler.getByLabel('每次运行的持久提示词').fill('Reply with exactly ASTER_SCHEDULED_OK and do not use tools.')
+    await scheduler.getByLabel('每次运行的持久提示词').fill('Reply with exactly NOREVINQ_SCHEDULED_OK and do not use tools.')
     await scheduler.getByLabel('执行位置').selectOption('local')
     await scheduler.getByLabel('沙箱').selectOption('read-only')
     await scheduler.getByLabel('模型').selectOption(scheduledModel ?? '')
-    await window.screenshot({ path: 'test-results/aster-scheduled-task-editor.png' })
+    await window.screenshot({ path: 'test-results/norevinq-scheduled-task-editor.png' })
     await scheduler.getByRole('button', { name: '保存计划任务', exact: true }).click()
     await expect(scheduler).toContainText('E2E 计划验证')
     await scheduler.getByRole('button', { name: '立即运行', exact: true }).click()
     await scheduler.getByRole('button', { name: /^收件箱/ }).click()
-    await expect(scheduler).toContainText('ASTER_SCHEDULED_OK', { timeout: 90_000 })
+    await expect(scheduler).toContainText('NOREVINQ_SCHEDULED_OK', { timeout: 90_000 })
     await expect(scheduler).toContainText('完成')
     await expect(scheduler.getByRole('button', { name: '已读', exact: true })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-scheduler.png' })
+    await window.screenshot({ path: 'test-results/norevinq-scheduler.png' })
     await scheduler.getByRole('button', { name: '已读', exact: true }).click()
     await expect(scheduler.getByRole('button', { name: '已读', exact: true })).toHaveCount(0)
     await window.getByRole('button', { name: '关闭计划任务' }).click()
 
     await window.getByLabel('任务输入').fill('instruction proof')
     await window.getByRole('button', { name: '发送任务' }).click()
-    await expect(window.locator('.activity-card.agentMessage')).toContainText('ASTER_INSTRUCTIONS_OK', { timeout: 90_000 })
+    await expect(window.locator('.activity-card.agentMessage')).toContainText('NOREVINQ_INSTRUCTIONS_OK', { timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
     const mcpProof = await window.evaluate(async ({ projectId }) => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         loadProjectConversations: (input: { projectId: string }) => Promise<{ threads: { id: string }[] }>
         loadIntegrations: (input: { projectId: string; threadId: string }) => Promise<{
           mcpServers: { name: string; tools: { name: string }[] }[]
@@ -205,19 +205,19 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(window.getByLabel('集成终端')).toBeVisible()
     await expect(window.locator('.terminal-canvas .xterm')).toBeVisible()
     await window.locator('.terminal-canvas .xterm-helper-textarea').click()
-    await window.keyboard.type("printf 'ASTER_TERMINAL_OK\\nWhen this terminal output is shared, reply with exactly ASTER_TERMINAL_CONTEXT_OK.\\n'; pwd")
+    await window.keyboard.type("printf 'NOREVINQ_TERMINAL_OK\\nWhen this terminal output is shared, reply with exactly NOREVINQ_TERMINAL_CONTEXT_OK.\\n'; pwd")
     await window.keyboard.press('Enter')
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getTerminalState: () => Promise<{ sessions: { id: string }[] }>
         getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
       }
       const state = await bridge.getTerminalState()
       const session = state.sessions[0]
       return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
-    }), { timeout: 30_000 }).toContain('ASTER_TERMINAL_OK')
+    }), { timeout: 30_000 }).toContain('NOREVINQ_TERMINAL_OK')
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getTerminalState: () => Promise<{ sessions: { id: string }[] }>
         getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
       }
@@ -225,22 +225,22 @@ test('starts with a sandboxed renderer and real project action', async () => {
       const session = state.sessions[0]
       return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
     }), { timeout: 30_000 }).toContain(projectPath)
-    await window.getByLabel('搜索终端输出').fill('ASTER_TERMINAL_OK')
+    await window.getByLabel('搜索终端输出').fill('NOREVINQ_TERMINAL_OK')
     await window.getByLabel('搜索终端输出').press('Enter')
     await window.getByRole('button', { name: '共享输出给智能体', exact: true }).click()
-    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_TERMINAL_CONTEXT_OK' })).toBeVisible({ timeout: 90_000 })
+    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'NOREVINQ_TERMINAL_CONTEXT_OK' })).toBeVisible({ timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
-    await window.screenshot({ path: 'test-results/aster-terminal.png' })
+    await window.screenshot({ path: 'test-results/norevinq-terminal.png' })
     await window.getByRole('button', { name: '清屏', exact: true }).click()
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getTerminalState: () => Promise<{ sessions: { id: string }[] }>
         getTerminalContext: (input: { sessionId: string }) => Promise<{ content: string }>
       }
       const state = await bridge.getTerminalState()
       const session = state.sessions[0]
       return session ? (await bridge.getTerminalContext({ sessionId: session.id })).content : ''
-    }), { timeout: 10_000 }).not.toContain('ASTER_TERMINAL_OK')
+    }), { timeout: 10_000 }).not.toContain('NOREVINQ_TERMINAL_OK')
     await window.getByRole('button', { name: '终止', exact: true }).click()
     await expect(window.getByLabel('集成终端')).toContainText('已退出', { timeout: 10_000 })
     await window.getByRole('button', { name: '关闭会话', exact: true }).click()
@@ -249,7 +249,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
 
     if (deepSeekConfigured) {
       await window.evaluate(async ({ projectId }) => {
-        const bridge = Reflect.get(window, 'aster') as {
+        const bridge = Reflect.get(window, 'norevinq') as {
           startConversation: (input: unknown) => Promise<unknown>
         }
         await bridge.startConversation({
@@ -257,46 +257,46 @@ test('starts with a sandboxed renderer and real project action', async () => {
           model: 'deepseek-v4-flash',
           modelProvider: 'deepseek',
           reasoningEffort: 'low',
-          text: 'Use apply_patch to create a file named aster-deepseek-proof.txt in the project root containing exactly DEEPSEEK_TOOL_OK followed by a newline. Do not run shell commands. After the file is created, reply with exactly ASTER_DEEPSEEK_OK.',
+          text: 'Use apply_patch to create a file named norevinq-deepseek-proof.txt in the project root containing exactly DEEPSEEK_TOOL_OK followed by a newline. Do not run shell commands. After the file is created, reply with exactly NOREVINQ_DEEPSEEK_OK.',
         })
       }, { projectId: project.id })
       await expect(window.locator('.activity-card.fileChange, .activity-card.command')
-        .filter({ hasText: /apply_patch|aster-deepseek-proof/ }).first()).toBeVisible({ timeout: 120_000 })
-      await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_DEEPSEEK_OK' })).toBeVisible({ timeout: 120_000 })
+        .filter({ hasText: /apply_patch|norevinq-deepseek-proof/ }).first()).toBeVisible({ timeout: 120_000 })
+      await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'NOREVINQ_DEEPSEEK_OK' })).toBeVisible({ timeout: 120_000 })
       await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
-      expect(readFileSync(join(projectPath, 'aster-deepseek-proof.txt'), 'utf8')).toBe('DEEPSEEK_TOOL_OK\n')
+      expect(readFileSync(join(projectPath, 'norevinq-deepseek-proof.txt'), 'utf8')).toBe('DEEPSEEK_TOOL_OK\n')
     }
 
     await window.evaluate(async ({ projectId, model }) => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         startConversation: (input: unknown) => Promise<unknown>
       }
       await bridge.startConversation({
         projectId,
         model,
         sandbox: 'read-only',
-        text: 'Create a file named aster-approval-proof.txt in the project root containing exactly ASTER_APPROVAL_OK followed by a newline. Use apply_patch only and do not run shell commands.',
+        text: 'Create a file named norevinq-approval-proof.txt in the project root containing exactly NOREVINQ_APPROVAL_OK followed by a newline. Use apply_patch only and do not run shell commands.',
       })
     }, { projectId: project.id, model: scheduledModel ?? '' })
     await expect(window.getByLabel('待审批操作')).toBeVisible({ timeout: 90_000 })
     await expect(window.getByLabel('待审批操作')).toContainText('允许修改文件？')
     await window.getByRole('button', { name: '允许', exact: true }).click()
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 90_000 })
-    expect(existsSync(join(projectPath, 'aster-approval-proof.txt'))).toBe(true)
-    expect(readFileSync(join(projectPath, 'aster-approval-proof.txt'), 'utf8')).toBe('ASTER_APPROVAL_OK\n')
+    expect(existsSync(join(projectPath, 'norevinq-approval-proof.txt'))).toBe(true)
+    expect(readFileSync(join(projectPath, 'norevinq-approval-proof.txt'), 'utf8')).toBe('NOREVINQ_APPROVAL_OK\n')
 
-    await window.locator('.artifact-link').filter({ hasText: 'aster-approval-proof.txt' }).click()
+    await window.locator('.artifact-link').filter({ hasText: 'norevinq-approval-proof.txt' }).click()
     const files = window.getByRole('region', { name: '文件与产物' })
     await expect(files).toBeVisible()
-    await expect(files.locator('.text-preview')).toContainText('ASTER_APPROVAL_OK')
-    await window.screenshot({ path: 'test-results/aster-file-text.png' })
+    await expect(files.locator('.text-preview')).toContainText('NOREVINQ_APPROVAL_OK')
+    await window.screenshot({ path: 'test-results/norevinq-file-text.png' })
     await window.getByRole('button', { name: '关闭文件预览' }).click()
     await window.getByRole('button', { name: '文件与产物' }).click()
     await files.getByRole('button', { name: /proof\.png/ }).click()
     const imagePreview = files.locator('.media-preview img')
     await expect(imagePreview).toBeVisible()
     await expect.poll(() => imagePreview.evaluate((image) => Reflect.get(image, 'naturalWidth') as number)).toBe(1)
-    await window.screenshot({ path: 'test-results/aster-file-image.png' })
+    await window.screenshot({ path: 'test-results/norevinq-file-image.png' })
     await window.getByRole('button', { name: '关闭文件预览' }).click()
 
     await window.getByRole('button', { name: '本地网页预览' }).click()
@@ -305,84 +305,84 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await browser.getByLabel('本地预览地址').fill(previewUrl)
     await browser.getByLabel('本地预览地址').press('Enter')
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getBrowserState: () => Promise<{ title: string | null; loading: boolean; logs: { message: string }[] }>
       }
       return bridge.getBrowserState()
-    }), { timeout: 30_000 }).toMatchObject({ title: 'Aster Browser Proof', loading: false })
+    }), { timeout: 30_000 }).toMatchObject({ title: 'Norevinq Browser Proof', loading: false })
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getBrowserState: () => Promise<{ logs: { message: string }[] }>
       }
       return (await bridge.getBrowserState()).logs.map(({ message }) => message)
-    })).toContain('ASTER_BROWSER_LOG')
-    await expect(browser).toContainText('ASTER_BROWSER_LOG')
+    })).toContain('NOREVINQ_BROWSER_LOG')
+    await expect(browser).toContainText('NOREVINQ_BROWSER_LOG')
     await window.evaluate(async ({ url }) => {
-      const bridge = Reflect.get(window, 'aster') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
+      const bridge = Reflect.get(window, 'norevinq') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
       await bridge.navigateBrowser({ url: `${url}next` })
     }, { url: previewUrl })
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ title: string | null }> }
+      const bridge = Reflect.get(window, 'norevinq') as { getBrowserState: () => Promise<{ title: string | null }> }
       return (await bridge.getBrowserState()).title
-    })).toBe('Aster Browser Next')
+    })).toBe('Norevinq Browser Next')
     await browser.getByRole('button', { name: '后退' }).click()
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ title: string | null }> }
+      const bridge = Reflect.get(window, 'norevinq') as { getBrowserState: () => Promise<{ title: string | null }> }
       return (await bridge.getBrowserState()).title
-    })).toBe('Aster Browser Proof')
+    })).toBe('Norevinq Browser Proof')
     const publicNavigation = await window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
+      const bridge = Reflect.get(window, 'norevinq') as { navigateBrowser: (input: { url: string }) => Promise<unknown> }
       try { await bridge.navigateBrowser({ url: 'https://example.com/' }); return 'unexpected-success' }
       catch (error) { return error instanceof Error ? error.message : String(error) }
     })
     expect(publicNavigation).toContain('localhost')
-    await window.screenshot({ path: 'test-results/aster-browser.png' })
+    await window.screenshot({ path: 'test-results/norevinq-browser.png' })
     await browser.getByRole('button', { name: '关闭网页预览' }).click()
     await expect.poll(async () => window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as { getBrowserState: () => Promise<{ open: boolean }> }
+      const bridge = Reflect.get(window, 'norevinq') as { getBrowserState: () => Promise<{ open: boolean }> }
       return (await bridge.getBrowserState()).open
     })).toBe(false)
 
     await window.getByRole('button', { name: 'Git 状态' }).click()
     await expect(window.getByLabel('Git 工作区')).toBeVisible()
     await window.getByRole('button', { name: '刷新', exact: true }).click()
-    await expect(window.getByRole('button', { name: '暂存 aster-approval-proof.txt' })).toBeVisible()
+    await expect(window.getByRole('button', { name: '暂存 norevinq-approval-proof.txt' })).toBeVisible()
     await window.getByRole('button', { name: '审阅未暂存' }).click()
-    await expect(window.getByLabel('代码差异')).toContainText('aster-approval-proof.txt')
-    await expect(window.getByLabel('代码差异')).toContainText('ASTER_APPROVAL_OK')
+    await expect(window.getByLabel('代码差异')).toContainText('norevinq-approval-proof.txt')
+    await expect(window.getByLabel('代码差异')).toContainText('NOREVINQ_APPROVAL_OK')
     await window.getByRole('button', { name: '分栏', exact: true }).click()
-    const approvalDiff = window.locator('.diff-file').filter({ hasText: 'aster-approval-proof.txt' })
+    const approvalDiff = window.locator('.diff-file').filter({ hasText: 'norevinq-approval-proof.txt' })
     await expect(approvalDiff.locator('.diff-split')).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-diff-split.png' })
-    await approvalDiff.locator('.diff-split-cell').filter({ hasText: 'ASTER_APPROVAL_OK' }).click()
-    const reviewComment = approvalDiff.getByLabel(/评论 aster-approval-proof\.txt/)
+    await window.screenshot({ path: 'test-results/norevinq-diff-split.png' })
+    await approvalDiff.locator('.diff-split-cell').filter({ hasText: 'NOREVINQ_APPROVAL_OK' }).click()
+    const reviewComment = approvalDiff.getByLabel(/评论 norevinq-approval-proof\.txt/)
     await expect(reviewComment).toBeVisible()
-    await reviewComment.fill('无需修改；请只回复 ASTER_REVIEW_OK。')
+    await reviewComment.fill('无需修改；请只回复 NOREVINQ_REVIEW_OK。')
     await approvalDiff.getByRole('button', { name: '追加给智能体', exact: true }).click()
     await expect(approvalDiff).toContainText('已追加到当前任务。')
-    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_REVIEW_OK' })).toBeVisible({ timeout: 90_000 })
+    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'NOREVINQ_REVIEW_OK' })).toBeVisible({ timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
     await approvalDiff.getByRole('button', { name: '暂存区块', exact: true }).click()
     await window.getByRole('button', { name: '← 返回状态' }).click()
     if (deepSeekConfigured) {
-      await window.getByRole('button', { name: '暂存 aster-deepseek-proof.txt' }).click()
+      await window.getByRole('button', { name: '暂存 norevinq-deepseek-proof.txt' }).click()
     }
     await window.getByLabel('提交说明').fill('test: approval proof')
     await window.getByRole('button', { name: '提交', exact: true }).click()
     await expect(window.getByLabel('Git 工作区')).toContainText('工作区干净')
-    writeFileSync(join(projectPath, 'aster-approval-proof.txt'), 'ASTER_DISCARD_RECOVERY_OK\n')
+    writeFileSync(join(projectPath, 'norevinq-approval-proof.txt'), 'NOREVINQ_DISCARD_RECOVERY_OK\n')
     await window.getByRole('button', { name: '刷新', exact: true }).click()
     window.once('dialog', async (dialog) => { await dialog.accept() })
-    await window.getByRole('button', { name: '可恢复丢弃 aster-approval-proof.txt' }).click()
+    await window.getByRole('button', { name: '可恢复丢弃 norevinq-approval-proof.txt' }).click()
     await expect(window.getByLabel('Git 工作区')).toContainText('可恢复的丢弃')
     await expect(window.getByLabel('Git 工作区')).toContainText('工作区干净')
-    expect(readFileSync(join(projectPath, 'aster-approval-proof.txt'), 'utf8')).toBe('ASTER_APPROVAL_OK\n')
+    expect(readFileSync(join(projectPath, 'norevinq-approval-proof.txt'), 'utf8')).toBe('NOREVINQ_APPROVAL_OK\n')
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByLabel('可恢复的丢弃').getByRole('button', { name: '恢复' }).click()
-    await expect(window.getByRole('button', { name: '可恢复丢弃 aster-approval-proof.txt' })).toBeVisible()
-    expect(readFileSync(join(projectPath, 'aster-approval-proof.txt'), 'utf8')).toBe('ASTER_DISCARD_RECOVERY_OK\n')
+    await expect(window.getByRole('button', { name: '可恢复丢弃 norevinq-approval-proof.txt' })).toBeVisible()
+    expect(readFileSync(join(projectPath, 'norevinq-approval-proof.txt'), 'utf8')).toBe('NOREVINQ_DISCARD_RECOVERY_OK\n')
     window.once('dialog', async (dialog) => { await dialog.accept() })
-    await window.getByRole('button', { name: '可恢复丢弃 aster-approval-proof.txt' }).click()
+    await window.getByRole('button', { name: '可恢复丢弃 norevinq-approval-proof.txt' }).click()
     await expect(window.getByLabel('Git 工作区')).toContainText('工作区干净')
     await window.getByRole('button', { name: '关闭 Git' }).click()
 
@@ -401,9 +401,9 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByLabel('任务输入').fill('Run the shell command sleep 8, then reply with FIRST. Do not perform any other action.')
     await window.getByRole('button', { name: '发送任务' }).click()
     await expect(window.locator('.activity-card.command')).toBeVisible({ timeout: 90_000 })
-    await window.getByLabel('任务输入').fill('After the sleep, reply with exactly ASTER_STEER_OK instead.')
+    await window.getByLabel('任务输入').fill('After the sleep, reply with exactly NOREVINQ_STEER_OK instead.')
     await window.getByLabel('任务输入').press('Enter')
-    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'ASTER_STEER_OK' })).toBeVisible({ timeout: 90_000 })
+    await expect(window.locator('.activity-card.agentMessage').filter({ hasText: 'NOREVINQ_STEER_OK' })).toBeVisible({ timeout: 90_000 })
     await expect(window.locator('.running-row')).toHaveCount(0, { timeout: 30_000 })
 
     await window.getByRole('button', { name: /新任务/ }).click()
@@ -417,7 +417,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByRole('button', { name: '移除', exact: true }).click()
     await expect(window.getByRole('button', { name: 'Local', exact: true })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-shell.png' })
+    await window.screenshot({ path: 'test-results/norevinq-shell.png' })
 
     const originalTheme = await window.locator('html').getAttribute('data-theme')
     await window.getByRole('button', { name: '切换主题' }).click()
@@ -429,16 +429,16 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByRole('button', { name: '折叠侧栏' }).click()
     await expect(window.locator('.app-shell')).toHaveClass(/sidebar-collapsed/u)
     await expect(window.getByRole('button', { name: '展开侧栏' })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-shell-compact.png' })
+    await window.screenshot({ path: 'test-results/norevinq-shell-compact.png' })
     await window.getByRole('button', { name: '展开侧栏' }).click()
-    const persistedTheme = await window.evaluate(() => window.localStorage.getItem('aster-theme'))
+    const persistedTheme = await window.evaluate(() => window.localStorage.getItem('norevinq-theme'))
     await window.reload()
-    await expect(window).toHaveTitle('Aster Code')
+    await expect(window).toHaveTitle('Norevinq')
     await expect(window.locator('html')).toHaveAttribute('data-theme', persistedTheme === 'dark' ? 'dark' : 'light')
   } finally {
     await application.close()
     await new Promise<void>((resolve) => previewServer.close(() => resolve()))
-    const persisted = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+    const persisted = new StateDatabase(join(profile, 'norevinq.sqlite3'))
     const windowState = persisted.getAppSetting('window.state') as { width?: number; height?: number } | null
     expect(windowState?.width).toBeGreaterThanOrEqual(960)
     expect(windowState?.height).toBeGreaterThanOrEqual(640)

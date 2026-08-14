@@ -1,11 +1,11 @@
 cff-version: 1.2.0
-message: "If you use Aster Code in published work, please cite the project using this metadata."
+message: "If you use Norevinq in published work, please cite the project using this metadata."
 type: software
-title: "Aster Code"
+title: "Norevinq"
 authors:
   - family-names: "xingchen20lj"
     alias: "xingchen20lj"
 version: 0.1.0
-repository-code: "https://github.com/xingchen20lj/aster-code-desktop"
-url: "https://github.com/xingchen20lj/aster-code-desktop"
+repository-code: "https://github.com/xingchen20lj/norevinq-desktop"
+url: "https://github.com/xingchen20lj/norevinq-desktop"
 license: Apache-2.0

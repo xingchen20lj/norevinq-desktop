@@ -20,7 +20,7 @@ import { parsePorcelainV2Z } from './statusParser.js'
 const execFileAsync = promisify(execFile)
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 const DEFAULT_TIMEOUT_MS = 30_000
-const DISCARD_REF_PREFIX = 'refs/aster/discards/'
+const DISCARD_REF_PREFIX = 'refs/norevinq/discards/'
 const MAX_DISCARD_SNAPSHOTS = 32
 
 export class GitService {
@@ -99,7 +99,7 @@ export class GitService {
     })))
     const id = randomUUID()
     const metadata = Buffer.from(JSON.stringify({ path: file.path, paths: trackedAtHead }), 'utf8').toString('base64url')
-    const subject = `aster-discard-v1:${id}:${metadata}`
+    const subject = `norevinq-discard-v1:${id}:${metadata}`
     // For a rename, passing both the destination and the now-missing source
     // makes `git stash` reject the pathspec. Capturing the destination still
     // records both sides of the rename in the stash commit; Git only leaves
@@ -142,7 +142,7 @@ export class GitService {
     const ref = `${DISCARD_REF_PREFIX}${input.discardId}`
     // Keep the recovery ref on any apply failure. Git may leave conflict
     // markers behind; automatically cleaning them could erase a concurrent
-    // edit made outside Aster between the clean-target check and this apply.
+    // edit made outside Norevinq between the clean-target check and this apply.
     await this.#git(projectPath, ['stash', 'apply', '--index', ref], 120_000)
     await this.#git(projectPath, ['update-ref', '-d', ref])
     return this.getStatus({ projectId: input.projectId })
@@ -194,21 +194,21 @@ export class GitService {
     for (const line of result.stdout.split('\n')) {
       if (!line) continue
       const [shortRef, createdAt, subject] = line.split('\0')
-      const id = shortRef?.slice('aster/discards/'.length)
-      const match = subject ? /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(subject) : null
+      const id = shortRef?.slice('norevinq/discards/'.length)
+      const match = subject ? /norevinq-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(subject) : null
       const encoded = match?.[1]
       if (!id || !createdAt || !encoded || !/^[0-9a-f-]{36}$/u.test(id)) continue
       try {
         const parsed = parseDiscardMetadata(encoded)
         snapshots.push({ id, path: parsed.path, createdAt })
-      } catch { /* Ignore malformed refs outside Aster's format. */ }
+      } catch { /* Ignore malformed refs outside Norevinq's format. */ }
     }
     return snapshots.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
 
   async #readDiscardMetadata(cwd: string, id: string): Promise<DiscardMetadata> {
     const result = await this.#git(cwd, ['show', '-s', '--format=%s', `${DISCARD_REF_PREFIX}${id}`])
-    const encoded = /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(result.stdout.trim())?.[1]
+    const encoded = /norevinq-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(result.stdout.trim())?.[1]
     if (!encoded) throw new Error('Recoverable discard metadata is invalid.')
     return parseDiscardMetadata(encoded)
   }

@@ -30,7 +30,7 @@ export function TerminalPanel({ projectId, sessions, selectedId, theme, select, 
 
   async function closeSession(sessionId: string): Promise<void> {
     await run(async () => {
-      await window.aster.closeTerminal({ sessionId })
+      await window.norevinq.closeTerminal({ sessionId })
       const next = projectSessions.find(({ id }) => id !== sessionId)
       select(next?.id ?? null)
     })
@@ -58,11 +58,11 @@ export function TerminalPanel({ projectId, sessions, selectedId, theme, select, 
         <button disabled={busy} onClick={() => void run(() => appendContext(selected.id))}>共享输出给智能体</button>
         <button disabled={busy} onClick={() => void run(async () => {
           if (selected.status === 'running' || selected.status === 'starting') {
-            await window.aster.writeTerminal({ sessionId: selected.id, data: '\f' })
+            await window.norevinq.writeTerminal({ sessionId: selected.id, data: '\f' })
           }
-          await window.aster.clearTerminal({ sessionId: selected.id })
+          await window.norevinq.clearTerminal({ sessionId: selected.id })
         })}>清屏</button>
-        {(selected.status === 'running' || selected.status === 'starting') && <button className="terminal-stop" disabled={busy} onClick={() => void run(() => window.aster.terminateTerminal({ sessionId: selected.id }))}><Square size={10} fill="currentColor" />终止</button>}
+        {(selected.status === 'running' || selected.status === 'starting') && <button className="terminal-stop" disabled={busy} onClick={() => void run(() => window.norevinq.terminateTerminal({ sessionId: selected.id }))}><Square size={10} fill="currentColor" />终止</button>}
         <button disabled={busy} onClick={() => void closeSession(selected.id)}>关闭会话</button>
       </div>
       <TerminalCanvas session={selected} theme={theme} onError={onError} />
@@ -117,10 +117,10 @@ function TerminalCanvas({ session, theme, onError }: {
       renderedOutput.current = latestOutput.current
       terminal.write(latestOutput.current)
       const dataDisposable = terminal.onData((data) => {
-        void window.aster.writeTerminal({ sessionId: session.id, data }).catch((reason: unknown) => onError(toErrorMessage(reason)))
+        void window.norevinq.writeTerminal({ sessionId: session.id, data }).catch((reason: unknown) => onError(toErrorMessage(reason)))
       })
       const resizeDisposable = terminal.onResize(({ cols, rows }) => {
-        void window.aster.resizeTerminal({ sessionId: session.id, cols, rows }).catch((reason: unknown) => onError(toErrorMessage(reason)))
+        void window.norevinq.resizeTerminal({ sessionId: session.id, cols, rows }).catch((reason: unknown) => onError(toErrorMessage(reason)))
       })
       const resizeObserver = new ResizeObserver(() => {
         try { fit.fit() } catch { /* The drawer may be transitioning out of layout. */ }

@@ -31,13 +31,13 @@
 - 创建本地 bare remote，真实 push `main` 并断言 `origin/main`、remote fetch/push URL。
 - Electron E2E 中 OpenAI/DeepSeek 智能体真实创建文件；Git 面板刷新后逐文件暂存并真实 commit，最终工作区干净。
 - GitHub PR Electron E2E 对真实临时仓库执行 feature 分支 push 到本地 bare remote；确定性 `gh` 替身验证正文 stdin、Draft #42、结构化回读、重复调用不创建第二个 PR，以及无关密钥不进入子进程。
-- Aster 桌面真实发现用户级 `gh`，向受控测试远端推送 feature 分支并创建 Draft PR；修正 list/create 的 head 参数差异后，在线结构化回读和重复创建幂等均通过。
+- Norevinq 桌面真实发现用户级 `gh`，向受控测试远端推送 feature 分支并创建 Draft PR；修正 list/create 的 head 参数差异后，在线结构化回读和重复创建幂等均通过。
 
 ## GitHub CLI 公开协议基线
 
-- `gh pr create` 在分支未推送时可能提示或 fork，因此 Aster 始终先显式 push，并传入 `--head` 禁止隐式推送/fork行为。
+- `gh pr create` 在分支未推送时可能提示或 fork，因此 Norevinq 始终先显式 push，并传入 `--head` 禁止隐式推送/fork行为。
 - 标题、body、base/head 均传显式参数；body 使用官方支持的 `--body-file -` 从 stdin 读取。
-- `--dry-run` 官方说明仍可能 push，Aster 不把它用于无副作用预检。
+- `--dry-run` 官方说明仍可能 push，Norevinq 不把它用于无副作用预检。
 - 是否已存在 PR 使用 `gh pr list --state open --json ...`，创建后再次读取并验证，而不信任命令打印的 URL。
 - `gh pr list --head` 使用纯分支名过滤，再用结构化 `headRepositoryOwner.login` 精确匹配 head owner；不能沿用 `pr create` 接受的 `owner:branch` 语法。
 

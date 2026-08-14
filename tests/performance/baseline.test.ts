@@ -54,7 +54,7 @@ describe('performance baselines', () => {
   })
 
   it('lists and marks a 3,000-run scheduler history within bounded time', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-performance-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-performance-'))
     temporaryPaths.push(root)
     const database = new StateDatabase(join(root, 'state.sqlite3'))
     const run: ScheduledRun = {

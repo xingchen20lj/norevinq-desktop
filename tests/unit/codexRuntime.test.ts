@@ -67,7 +67,7 @@ describe('CodexRuntimeSupervisor recovery', () => {
       HOME: '/home/tester',
       OPENAI_API_KEY: 'explicit-provider-key',
       LC_ALL: 'C',
-      ASTER_UNRELATED_SECRET: 'must-not-leak',
+      NOREVINQ_UNRELATED_SECRET: 'must-not-leak',
       GITHUB_TOKEN: 'must-not-leak',
     })).toEqual({
       PATH: '/usr/bin',
@@ -83,7 +83,7 @@ describe('CodexRuntimeSupervisor recovery', () => {
       discover: () => Promise.resolve({
         path: '/fake/codex', source: 'explicit', version: 'codex-cli 0.147.0-test',
       }),
-      fixedChildEnvironment: { CODEX_HOME: '/private/aster/agent-home' },
+      fixedChildEnvironment: { CODEX_HOME: '/private/norevinq/agent-home' },
       childEnvironment: { CODEX_HOME: '/shared/official/codex-home' },
       spawnProcess: (_command, _args, options) => {
         environments.push(options.env ?? {})
@@ -95,11 +95,11 @@ describe('CodexRuntimeSupervisor recovery', () => {
     })
     try {
       await runtime.start()
-      expect(environments[0]?.CODEX_HOME).toBe('/private/aster/agent-home')
+      expect(environments[0]?.CODEX_HOME).toBe('/private/norevinq/agent-home')
       await runtime.updateLaunchConfiguration({
         childEnvironment: { CODEX_HOME: '/another/shared/home', DEEPSEEK_API_KEY: 'test-key' },
       })
-      expect(environments[1]?.CODEX_HOME).toBe('/private/aster/agent-home')
+      expect(environments[1]?.CODEX_HOME).toBe('/private/norevinq/agent-home')
       expect(environments[1]?.DEEPSEEK_API_KEY).toBe('test-key')
     } finally {
       await runtime.stop()

@@ -43,7 +43,7 @@ describe('third-party notice generator', () => {
 })
 
 async function createFixture(packages: { name: string; homepage: string }[]): Promise<string> {
-  const root = await mkdtemp(join(tmpdir(), 'aster-notices-'))
+  const root = await mkdtemp(join(tmpdir(), 'norevinq-notices-'))
   temporaryRoots.push(root)
   const manager = join(root, 'fake-pnpm.mjs')
   const report = {

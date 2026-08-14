@@ -37,7 +37,7 @@
 
 ## 项目信任与指令
 
-项目首次打开默认为未信任。信任状态保存在本地 SQLite，仅控制 Aster 的扩展能力边界，不伪装成 Codex 上游的策略字段。
+项目首次打开默认为未信任。信任状态保存在本地 SQLite，仅控制 Norevinq 的扩展能力边界，不伪装成 Codex 上游的策略字段。
 
 设置工作台只读预览项目根的 `AGENTS.override.md` 或 `AGENTS.md`（拒绝符号链接和越界 realpath，预览上限 128 KiB）。真正的指令合并、大小限制和逐层覆盖仍由 Codex app-server 执行。
 
@@ -45,7 +45,7 @@
 
 - 单元测试覆盖 MCP/技能/配置归一、项目和 thread 归属、信任门、外部根目录、参数预算、资源与工具结果，以及两类反向请求的挂起/决策。
 - Electron E2E 通过真实 app-server 读取当前 MCP、技能和配置，持久化项目信任，并展示临时仓库 `AGENTS.md`。
-- 同一 E2E 的真实 Codex turn 只收到 `instruction proof`，依据项目指令回复 `ASTER_INSTRUCTIONS_OK`。
+- 同一 E2E 的真实 Codex turn 只收到 `instruction proof`，依据项目指令回复 `NOREVINQ_INSTRUCTIONS_OK`。
 - 当前环境配置的 `node_repl` MCP 通过 `mcpServer/tool/call` 执行无副作用表达式 `1 + 1`，结果不是错误。
 
 OAuth 完成通知、资源读取和具有副作用的第三方工具不能在没有相应外部服务器/账户的环境中进行统一在线回归；协议与错误路径由替身测试覆盖，界面不会伪造登录或工具结果。

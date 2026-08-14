@@ -29,7 +29,7 @@ threads.get(primaryThreadId).turns = [{
   items: [{
     type: 'agentMessage',
     id: 'generated-image-message',
-    text: `图片保存在：\n\n![Aster 生成图片](<${generatedImagePath}>)`,
+    text: `图片保存在：\n\n![Norevinq 生成图片](<${generatedImagePath}>)`,
     phase: 'final_answer',
   }],
 }]

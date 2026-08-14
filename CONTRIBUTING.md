@@ -1,6 +1,6 @@
-# Contributing to Aster Code
+# Contributing to Norevinq
 
-感谢你为 Aster Code 提交问题、文档或代码。
+感谢你为 Norevinq 提交问题、文档或代码。
 
 ## 开始之前
 

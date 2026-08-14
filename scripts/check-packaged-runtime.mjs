@@ -35,7 +35,7 @@ if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
 console.log(`Packaged Codex: ${version} (${binary})`)
 await verifySecurityPlugin(unpackedRoot)
 await verifyProtocolRegistration()
-console.log('Packaged deep-link protocol: aster-code')
+console.log('Packaged deep-link protocol: norevinq')
 await verifyUpdateConfiguration(resourcesRoot)
 
 async function findCodexBinaries(directory) {
@@ -94,21 +94,21 @@ async function verifyProtocolRegistration() {
   const packageDocument = JSON.parse(await readFile(resolve('package.json'), 'utf8'))
   const protocols = packageDocument?.build?.protocols
   const configured = Array.isArray(protocols) && protocols.some((protocol) =>
-    Array.isArray(protocol?.schemes) && protocol.schemes.includes('aster-code'))
-  if (!configured) throw new Error('electron-builder is missing the aster-code protocol registration.')
+    Array.isArray(protocol?.schemes) && protocol.schemes.includes('norevinq'))
+  if (!configured) throw new Error('electron-builder is missing the norevinq protocol registration.')
 
   if (process.platform !== 'darwin') return
   const infoPath = join(applicationRoot, 'Contents', 'Info.plist')
   const info = await readFile(infoPath, 'utf8')
-  if (!/<key>CFBundleURLSchemes<\/key>[\s\S]*?<string>aster-code<\/string>/u.test(info)) {
-    throw new Error(`Packaged Info.plist is missing the aster-code URL scheme: ${infoPath}`)
+  if (!/<key>CFBundleURLSchemes<\/key>[\s\S]*?<string>norevinq<\/string>/u.test(info)) {
+    throw new Error(`Packaged Info.plist is missing the norevinq URL scheme: ${infoPath}`)
   }
 }
 
 async function findMacApplicationRoot() {
   const candidates = [
-    resolve('release/mac/Aster Code.app'),
-    resolve('release/mac-arm64/Aster Code.app'),
+    resolve('release/mac/Norevinq.app'),
+    resolve('release/mac-arm64/Norevinq.app'),
   ]
   const existing = []
   for (const candidate of candidates) {

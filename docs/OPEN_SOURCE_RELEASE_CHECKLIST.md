@@ -1,16 +1,15 @@
 # 公开发布检查表
 
-本文区分“公开源码”和“公开安装包”。源码可以先公开；正式安装包必须在签名、公证和目标平台安装验证完成后再发布。
+本仓库采用源码优先发布：GitHub 只提供源码、源码标签和构建说明，不提供预编译安装包。
 
 ## 当前结论
 
 - 源码工程质量：满足公开预览要求；
 - 许可证与社区文件：已准备 Apache-2.0、NOTICE、贡献/支持/行为准则及 Issue/PR 模板；
 - 依赖安全：发布前必须保持 `pnpm audit:dependencies` 与 `pnpm verify:ci` 通过；
-- macOS 内部包：无签名 DMG/ZIP 已验证；
-- 正式 macOS 包：仍需要 Developer ID 和 Apple 公证权限；
-- Windows 包：构建配置和 CI 路径已建立，仍需要 Windows 真机安装、SmartScreen 和签名验证；
-- 自动更新：需要发布者控制的 HTTPS 下载地址和稳定签名身份；
+- 本地打包：macOS 无签名内部 DMG/ZIP 已验证，Windows 保留源码构建配置；
+- GitHub 分发：不生成、不上传 DMG、ZIP、EXE、blockmap 或更新元数据；
+- 第三方自行构建：必须使用自己的名称/签名身份并遵守许可证与品牌边界；
 - Codex Security OpenAI 模式受外部账户 Security/Trusted Access 权限约束；DeepSeek 模式使用用户自己的 API Key，不要求 OpenAI 登录。这些在线条件都不影响普通源码公开。
 
 ## 公开前（保持仓库 Private）
@@ -30,10 +29,9 @@
 - [ ] 启用 GitHub Private Vulnerability Reporting；
 - [ ] 启用 Secret Scanning、Push Protection 和 Dependabot Alerts；
 - [ ] 创建 `main` ruleset：禁止 force push/删除，合并前要求 `Verify (macos-15)` 与 `Verify (windows-2025)`；
-- [ ] 要求 PR 审阅后合并，并限制发布工作流只使用受保护的 `main`；
-- [ ] 为 `release` environment 配置 required reviewer，发布者不能自批；
+- [ ] 要求 PR 审阅后合并；
 - [ ] 验证 README 的 CI/License badge、Issue 模板和 Security Advisory 入口；
-- [ ] 检查公开仓库的 Actions 日志和 artifact，确认没有环境变量、签名资料或本地路径泄漏。
+- [ ] 检查公开仓库的 Actions 日志，确认没有环境变量、签名资料、本地路径或安装产物泄漏。
 
 私有免费仓库当前无法配置 ruleset/classic branch protection；公开后应立即执行以上设置，避免 `main` 长时间处于未保护状态。
 
@@ -43,10 +41,10 @@
 - [ ] 把 CHANGELOG 中对应版本从 `Unreleased` 改为发布日期；
 - [x] 运行完整质量门和依赖审计；
 - [ ] 创建带注释的 Git tag；
-- [ ] 发布源码归档、变更说明和已知限制；
-- [ ] 如果平台签名尚未完成，不上传容易被误认为正式稳定版的无签名安装包。
+- [ ] 由 GitHub tag 自动提供源码归档，并发布变更说明和已知限制；
+- [ ] 确认 Release/Actions 中不存在预编译安装包。
 
-## 首个公开安装包
+## GitHub 之外如需提供正式安装包
 
 - [ ] macOS：签名、notarize、staple，并通过 `codesign`、`stapler` 和 `spctl`；
 - [ ] Windows：签名 NSIS EXE，在 Windows x64/arm64 目标上验证安装、启动、升级和卸载；
@@ -58,7 +56,7 @@
 ## 不得公开的内容
 
 - API Key、ChatGPT/GitHub token、签名证书和密码；
-- Electron `userData`、Aster `agent-home`、SQLite、日志或安全扫描未密封产物；
+- Electron `userData`、Norevinq `agent-home`、SQLite、日志或安全扫描未密封产物；
 - 私人项目源代码、用户目录截图或无关个人信息；
 - 未验证的漏洞细节、攻击代码或第三方私密报告；
 - 使用真实外部服务产生但未经脱敏和授权的测试数据。

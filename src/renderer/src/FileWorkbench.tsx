@@ -35,7 +35,7 @@ export function FileWorkbench({ project, worktree, initialPath, close, onError }
     setLoading(true)
     onError(null)
     try {
-      setDirectory(await window.aster.listProjectDirectory({ ...context, path }))
+      setDirectory(await window.norevinq.listProjectDirectory({ ...context, path }))
       setDirectoryPath(path)
     } catch (reason) {
       onError(errorMessage(reason))
@@ -47,7 +47,7 @@ export function FileWorkbench({ project, worktree, initialPath, close, onError }
   async function openFile(path: string): Promise<void> {
     setLoading(true)
     onError(null)
-    try { setSelected(await window.aster.previewProjectFile({ ...context, path })) }
+    try { setSelected(await window.norevinq.previewProjectFile({ ...context, path })) }
     catch (reason) { onError(errorMessage(reason)) }
     finally { setLoading(false) }
   }
@@ -63,7 +63,7 @@ export function FileWorkbench({ project, worktree, initialPath, close, onError }
   async function openExternal(): Promise<void> {
     if (!selected || !window.confirm(`使用系统默认应用打开 ${selected.name}？`)) return
     onError(null)
-    try { await window.aster.openProjectFileExternal({ ...context, path: selected.path, confirmed: true }) }
+    try { await window.norevinq.openProjectFileExternal({ ...context, path: selected.path, confirmed: true }) }
     catch (reason) { onError(errorMessage(reason)) }
   }
 

@@ -130,7 +130,7 @@ describe('SchedulerService', () => {
 })
 
 function createFixture(): { database: StateDatabase; projectId: string } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-scheduler-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-scheduler-test-'))
   temporaryPaths.push(root)
   const database = new StateDatabase(join(root, 'state.sqlite3'))
   const project = database.upsertProject(root)

@@ -195,8 +195,8 @@ export class WorktreeService {
       if (await hasChanges(target)) throw new Error('The handoff target must be clean before receiving changes.')
 
       const id = randomUUID()
-      const marker = `aster-handoff-v2:${id}`
-      const recoveryRef = `refs/aster/handoffs/${id}`
+      const marker = `norevinq-handoff-v2:${id}`
+      const recoveryRef = `refs/norevinq/handoffs/${id}`
       const sourceHeadOid = await resolveCommit(source, 'HEAD')
       const sourceTreeOid = await snapshotWorkingTree(source)
       const sourceIndexOid = await snapshotIndex(source)
@@ -315,7 +315,7 @@ export class WorktreeService {
     }
     const stashOid = operation.stashOid
       ?? await resolveOptionalRef(source, operation.recoveryRef)
-      ?? await findStashByMarker(source, `aster-handoff-v2:${operation.id}`)
+      ?? await findStashByMarker(source, `norevinq-handoff-v2:${operation.id}`)
 
     if (!stashOid) {
       if (context.worktreeId === operation.targetWorktreeId) {
@@ -433,7 +433,7 @@ export class WorktreeService {
   #requireHandoff(operationId: string): WorktreeHandoffRecovery {
     const operation = this.#database.getWorktreeHandoff(operationId)
     if (!operation) throw new Error('Worktree handoff recovery record not found.')
-    if (operation.recoveryRef !== `refs/aster/handoffs/${operation.id}`) {
+    if (operation.recoveryRef !== `refs/norevinq/handoffs/${operation.id}`) {
       throw new Error('Worktree handoff recovery ref failed its ownership check.')
     }
     return operation
@@ -527,7 +527,7 @@ async function resolveOptionalRef(cwd: string, ref: string): Promise<string | nu
 }
 
 async function snapshotWorkingTree(cwd: string): Promise<string> {
-  const temporaryIndex = join(dirname(cwd), `.aster-index-${randomUUID()}`)
+  const temporaryIndex = join(dirname(cwd), `.norevinq-index-${randomUUID()}`)
   try {
     await runGit(cwd, ['read-tree', 'HEAD'], 30_000, { GIT_INDEX_FILE: temporaryIndex })
     await runGit(cwd, ['add', '-A', '--'], 120_000, { GIT_INDEX_FILE: temporaryIndex })

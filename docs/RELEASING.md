@@ -11,7 +11,7 @@
 - 源码采用 Apache-2.0；安装包额外携带 `LICENSE.txt`、`NOTICE.txt` 和 `THIRD_PARTY_NOTICES.md`；
 - 构建不会自动发布，所有 builder 命令显式使用 `--publish never`。
 
-官方 OpenAI 文档说明 `codex app-server` 默认使用 stdio/JSONL，并且生成的 schema 与运行的 Codex 版本严格对应。Aster Code 因此直接固定并发现包内 0.147.0，而不是依赖用户 PATH 或 ChatGPT 安装。显式配置和 `CODEX_BINARY` 仍可覆盖包内版本用于诊断。
+官方 OpenAI 文档说明 `codex app-server` 默认使用 stdio/JSONL，并且生成的 schema 与运行的 Codex 版本严格对应。Norevinq 因此直接固定并发现包内 0.147.0，而不是依赖用户 PATH 或 ChatGPT 安装。显式配置和 `CODEX_BINARY` 仍可覆盖包内版本用于诊断。
 
 ## 本地构建
 
@@ -35,16 +35,16 @@ CSC_IDENTITY_AUTO_DISCOVERY=false pnpm package:mac
 pnpm package:win
 ```
 
-`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready；还会在真实临时 Git 仓库上执行 DeepSeek Security 本地预检。`afterPack` 必须把 Security `_bundled_plugin` 从已解析依赖路径复制到真实 `app.asar.unpacked` 目录，`check:package` 会拒绝缺失、符号链接、越界或 manifest 身份不匹配。
+`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Norevinq.app` 或 `release/win-unpacked/Norevinq.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready；还会在真实临时 Git 仓库上执行 DeepSeek Security 本地预检。`afterPack` 必须把 Security `_bundled_plugin` 从已解析依赖路径复制到真实 `app.asar.unpacked` 目录，`check:package` 会拒绝缺失、符号链接、越界或 manifest 身份不匹配。
 
-应用注册 `aster-code` 自定义协议，只接受 `aster-code://project/<project-uuid>` 与 `aster-code://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
+应用注册 `norevinq` 自定义协议，只接受 `norevinq://project/<project-uuid>` 与 `norevinq://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
 
 ## 自动更新渠道
 
 普通 `package:mac`/`package:win` 和无签名 CI 只生成内部安装包，不内置更新渠道。正式签名发布必须提供真实 HTTPS base URL：
 
 ```bash
-ASTER_UPDATE_URL='https://downloads.example.org/aster-code/' pnpm package:update
+NOREVINQ_UPDATE_URL='https://downloads.example.org/norevinq/' pnpm package:update
 pnpm check:package
 ```
 
@@ -74,9 +74,9 @@ pnpm check:package
 
 ```bash
 pnpm package:mac
-codesign --verify --deep --strict --verbose=2 "release/mac/Aster Code.app"
-xcrun stapler validate "release/mac/Aster Code.app"
-spctl --assess --type execute --verbose=4 "release/mac/Aster Code.app"
+codesign --verify --deep --strict --verbose=2 "release/mac/Norevinq.app"
+xcrun stapler validate "release/mac/Norevinq.app"
+spctl --assess --type execute --verbose=4 "release/mac/Norevinq.app"
 ```
 
 项目启用 hardened runtime，并只声明 Electron JIT/unsigned executable memory 与动态库校验所需 entitlement。当前环境没有证书，因此只能验证明确未签名的包，不能宣称已签名或公证。
@@ -92,25 +92,18 @@ spctl --assess --type execute --verbose=4 "release/mac/Aster Code.app"
 
 Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。当前仓库所在 Intel macOS 不能替代 Windows 真机安装、SmartScreen、卸载与签名证书验证。
 
-## GitHub Actions
+## GitHub 源码发布
 
-“Desktop release artifacts” 是手动 workflow，只允许从 `main` 执行，并把 checkout 绑定到触发时的不可变 `github.sha`。默认 `require_signing=true`，此时还必须填写实际 `update_url`，缺平台凭据或安全 HTTPS 地址会失败。仅用于内部验证时可显式选择 false，此时签名变量被显式置空、使用普通 package 命令且不生成更新元数据；产物仍只保留为 Actions artifact，不创建 GitHub Release。
+GitHub 只运行源码 CI，不构建或上传桌面安装产物。`scripts/check-workflows.mjs` 会拒绝 workflow 中出现 `upload-artifact`、electron-builder 或三个平台打包命令，避免后来误把 DMG/ZIP/EXE 重新放回 GitHub。
 
-首次启用前必须在 GitHub 创建受保护的 `release` environment：
+源码版本发布流程：
 
-- 设置至少一名独立 required reviewer，并禁止发起人自行批准；
-- deployment branches 只允许受保护的 `main`；
-- 下列签名凭据只存为该 environment 的 secrets，不存为普通 repository secrets；
-- 保留 workflow 的 `github.ref == 'refs/heads/main'` 源码守门，不以环境配置替代源码约束。
+- 合并已通过 macOS/Windows CI 的受保护 `main`；
+- 创建带注释的版本 tag；
+- Release 只写变更说明并引用 GitHub 自动生成的 Source code 归档；
+- 不附加 DMG、ZIP、EXE、blockmap、校验和或 `latest*.yml`。
 
-所有第三方 Actions 固定到已审阅的完整提交 SHA，版本号仅作为行尾注释。升级 Action 时必须审阅上游 release/commit 后同时更新 SHA 和注释。
-
-所需 secrets：
-
-- macOS：`MAC_CSC_LINK`、`MAC_CSC_KEY_PASSWORD`、`APPLE_ID`、`APPLE_APP_SPECIFIC_PASSWORD`、`APPLE_TEAM_ID`；
-- Windows：`WIN_CSC_LINK`、`WIN_CSC_KEY_PASSWORD`。
-
-每个平台依次执行生产依赖审计、完整质量门、平台打包、包内 Codex/更新配置冒烟、签名/公证验证（要求签名时）、SHA-256 和 artifact 上传。签名构建同时保留 latest metadata；Actions 不会向 `update_url` 上传，发布者必须按上述顺序部署。将 artifact 发布到公开渠道仍需审阅版本、third-party notices、功能一致性和已知限制。
+所有第三方 Actions 仍固定到已审阅的完整提交 SHA。GitHub 仓库不需要也不应配置 Apple、Windows 签名或公证凭据。
 
 ## 发布清单
 
@@ -118,5 +111,5 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 2. 同步并审阅 Codex schema；确认 package runtime 与 schema 版本。
 3. 运行 `pnpm verify:ci`、`pnpm audit:dependencies` 和平台 packaged E2E。
 4. 在目标系统安装产物，验证项目、任务、终端、Git、文件预览、DeepSeek 和安全诊断。
-5. 从上一签名版本验证签名、公证/SmartScreen、安装、`aster-code` 外部唤起、自动更新下载/重启升级、卸载和用户数据保留。
+5. 从上一签名版本验证签名、公证/SmartScreen、安装、`norevinq` 外部唤起、自动更新下载/重启升级、卸载和用户数据保留。
 6. 记录产物 SHA-256；人工批准后再发布。

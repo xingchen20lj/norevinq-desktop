@@ -22,9 +22,9 @@ describe('package output preparation', () => {
   })
 
   it('removes stale updater metadata before recreating an empty output directory', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-package-output-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-package-output-'))
     temporaryPaths.push(root)
-    const stalePath = join(root, 'release', 'mac', 'Aster Code.app', 'Contents', 'Resources', 'app-update.yml')
+    const stalePath = join(root, 'release', 'mac', 'Norevinq.app', 'Contents', 'Resources', 'app-update.yml')
     mkdirSync(dirname(stalePath), { recursive: true })
     writeFileSync(stalePath, 'provider: stale\n')
 
@@ -36,8 +36,8 @@ describe('package output preparation', () => {
   })
 
   it('replaces an output symlink without touching its target', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-package-symlink-'))
-    const target = mkdtempSync(join(tmpdir(), 'aster-package-target-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-package-symlink-'))
+    const target = mkdtempSync(join(tmpdir(), 'norevinq-package-target-'))
     temporaryPaths.push(root, target)
     writeFileSync(join(target, 'keep.txt'), 'keep\n')
     symlinkSync(target, join(root, 'release'), 'dir')

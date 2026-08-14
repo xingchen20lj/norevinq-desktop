@@ -9,19 +9,19 @@ test.skip(process.platform === 'win32', 'The deterministic Codex fixture wrapper
 
 test('discards and restores a whole file across an app restart', async () => {
   test.setTimeout(60_000)
-  const profile = mkdtempSync(join(tmpdir(), 'aster-git-discard-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-git-discard-e2e-'))
   const projectPath = join(profile, 'project')
   const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.name', 'Aster Git E2E'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.email', 'aster-git-e2e@example.invalid'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Norevinq Git E2E'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'norevinq-git-e2e@example.invalid'], { cwd: projectPath })
   writeFileSync(join(projectPath, 'proof.txt'), 'baseline\n')
   execFileSync('git', ['add', 'proof.txt'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: baseline'], { cwd: projectPath })
-  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  const database = new StateDatabase(join(profile, 'norevinq.sqlite3'))
   database.upsertProject(projectPath)
   database.close()
   const helper = resolve('tests/helpers/fakeCodexLifecycle.mjs')
@@ -29,13 +29,13 @@ test('discards and restores a whole file across an app restart', async () => {
   chmodSync(wrapper, 0o755)
   const launch = () => electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, NOREVINQ_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
 
   let application = await launch()
   try {
     let window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     writeFileSync(join(projectPath, 'proof.txt'), 'recoverable\n')
     await window.getByRole('button', { name: 'Git 状态' }).click()
     await window.getByRole('button', { name: '刷新', exact: true }).click()
@@ -47,7 +47,7 @@ test('discards and restores a whole file across an app restart', async () => {
 
     application = await launch()
     window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Git 状态' }).click()
     const recovery = window.getByLabel('可恢复的丢弃')
     await expect(recovery).toContainText('proof.txt')
@@ -56,7 +56,7 @@ test('discards and restores a whole file across an app restart', async () => {
     await expect(window.getByRole('button', { name: '可恢复丢弃 proof.txt' })).toBeVisible()
     await expect(recovery).toHaveCount(0)
     expect(readFileSync(join(projectPath, 'proof.txt'), 'utf8')).toBe('recoverable\n')
-    await window.screenshot({ path: 'test-results/aster-git-discard-restored.png' })
+    await window.screenshot({ path: 'test-results/norevinq-git-discard-restored.png' })
   } finally {
     await application.close()
     rmSync(profile, { force: true, recursive: true })

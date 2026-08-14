@@ -10,20 +10,20 @@ test.skip(process.platform === 'win32', 'The deterministic Codex fixture wrapper
 
 test('shows a durable handoff recovery without deleting post-crash user changes', async () => {
   test.setTimeout(45_000)
-  const profile = mkdtempSync(join(tmpdir(), 'aster-worktree-recovery-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-worktree-recovery-e2e-'))
   const projectPath = join(profile, 'project')
   const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.name', 'Aster Recovery'], { cwd: projectPath })
-  execFileSync('git', ['config', 'user.email', 'aster-recovery@example.invalid'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.name', 'Norevinq Recovery'], { cwd: projectPath })
+  execFileSync('git', ['config', 'user.email', 'norevinq-recovery@example.invalid'], { cwd: projectPath })
   writeFileSync(join(projectPath, 'README.md'), '# recovery\n')
   execFileSync('git', ['add', 'README.md'], { cwd: projectPath })
   execFileSync('git', ['commit', '-m', 'test: recovery baseline'], { cwd: projectPath })
 
-  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  const database = new StateDatabase(join(profile, 'norevinq.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.associateThread(project.id, '11111111-1111-7111-8111-111111111111')
   const service = new WorktreeService(database, join(profile, 'worktrees'), {
@@ -47,18 +47,18 @@ test('shows a durable handoff recovery without deleting post-crash user changes'
   chmodSync(wrapper, 0o755)
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, NOREVINQ_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Local', exact: true }).click()
     const panel = window.getByRole('complementary', { name: '工作树' })
     const recovery = panel.getByRole('status').filter({ hasText: '工作树交接需要恢复' })
     await expect(recovery).toContainText('Local → Detached')
     await expect(recovery).toContainText('需要安全检查')
     await expect(recovery).toContainText('after the interruption')
-    await window.screenshot({ path: 'test-results/aster-worktree-recovery.png' })
+    await window.screenshot({ path: 'test-results/norevinq-worktree-recovery.png' })
     await recovery.getByRole('button', { name: '安全重试' }).click()
     await expect(window.getByRole('alert')).toContainText('after the interruption')
     expect(execFileSync('git', ['show-ref', operation.recoveryRef], { cwd: projectPath, encoding: 'utf8' })).toContain(operation.stashOid)

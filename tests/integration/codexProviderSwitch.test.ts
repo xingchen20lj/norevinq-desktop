@@ -13,7 +13,7 @@ const openAiAuthPath = join(homedir(), '.codex', 'auth.json')
 const providerTest = deepSeekKey && await fileExists(openAiAuthPath) ? test : test.skip
 
 providerTest('official runtime answers through new provider-bound threads in both directions', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'aster-provider-switch-'))
+  const root = await mkdtemp(join(tmpdir(), 'norevinq-provider-switch-'))
   const codexHome = join(root, 'agent-home')
   const projectPath = join(root, 'project')
   await Promise.all([mkdir(codexHome), mkdir(projectPath)])
@@ -38,7 +38,7 @@ providerTest('official runtime answers through new provider-bound threads in bot
 
   try {
     await peer.request('initialize', {
-      clientInfo: { name: 'aster-provider-switch-test', version: '0.1.0' },
+      clientInfo: { name: 'norevinq-provider-switch-test', version: '0.1.0' },
       capabilities: {},
     })
     await peer.notify('initialized')
@@ -55,7 +55,7 @@ providerTest('official runtime answers through new provider-bound threads in bot
       items: [{
         type: 'message',
         role: 'user',
-        content: [{ type: 'input_text', text: 'Aster provider switch seed' }],
+        content: [{ type: 'input_text', text: 'Norevinq provider switch seed' }],
       }],
     })
     const openai = asRecord(await peer.request('thread/start', {

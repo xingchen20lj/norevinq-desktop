@@ -18,7 +18,7 @@ afterEach(async () => {
 })
 
 async function executable(name: string, body = '#!/bin/sh\necho codex-cli-test 1.2.3\n'): Promise<string> {
-  const directory = await mkdtemp(join(tmpdir(), 'aster-codex-discovery-'))
+  const directory = await mkdtemp(join(tmpdir(), 'norevinqx-discovery-'))
   temporaryDirectories.push(directory)
   const path = join(directory, name)
   await writeFile(path, body, 'utf8')
@@ -30,17 +30,17 @@ describe('Codex binary discovery', () => {
   it('orders explicit, environment, bundled runtime, PATH, then known macOS bundle candidates', () => {
     const candidates = getCodexBinaryCandidates({
       explicitBinary: '/configured/codex',
-      env: { ASTER_AGENT_BINARY: '/environment/aster-agent', CODEX_BINARY: '/legacy/codex', PATH: '/first:/second' },
+      env: { NOREVINQ_AGENT_BINARY: '/environment/norevinq-agent', CODEX_BINARY: '/legacy/codex', PATH: '/first:/second' },
       platform: 'darwin',
       arch: 'x64',
-      resourcesPath: '/Aster Code.app/Contents/Resources',
+      resourcesPath: '/Norevinq.app/Contents/Resources',
       knownBundlePaths: ['/Applications/ChatGPT.app/Contents/Resources/codex'],
     })
 
     expect(candidates).toEqual([
       { path: '/configured/codex', source: 'explicit' },
-      { path: '/environment/aster-agent', source: 'environment' },
-      { path: '/Aster Code.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/bin/codex', source: 'bundled' },
+      { path: '/environment/norevinq-agent', source: 'environment' },
+      { path: '/Norevinq.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/bin/codex', source: 'bundled' },
       { path: '/first/codex', source: 'path' },
       { path: '/second/codex', source: 'path' },
       { path: '/Applications/ChatGPT.app/Contents/Resources/codex', source: 'chatgpt-bundle' },
@@ -95,6 +95,6 @@ describe('Codex binary discovery', () => {
     await expect(discoverCodexBinary({
       env: { PATH: '' },
       platform: 'linux',
-    })).rejects.toThrow('ASTER_AGENT_BINARY')
+    })).rejects.toThrow('NOREVINQ_AGENT_BINARY')
   })
 })

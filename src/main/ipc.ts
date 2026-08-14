@@ -394,8 +394,8 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.diagnosticsExport, async () => {
     const now = new Date().toISOString().slice(0, 10)
     const result = await dialog.showSaveDialog({
-      title: '导出 Aster Code 诊断包',
-      defaultPath: join(app.getPath('downloads'), `Aster-Code-Diagnostics-${now}.zip`),
+      title: '导出 Norevinq 诊断包',
+      defaultPath: join(app.getPath('downloads'), `Norevinq-Diagnostics-${now}.zip`),
       buttonLabel: '导出诊断包',
       filters: [{ name: 'ZIP 诊断包', extensions: ['zip'] }],
       properties: ['createDirectory', 'showOverwriteConfirmation'],

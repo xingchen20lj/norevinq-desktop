@@ -129,7 +129,7 @@ function createHarness(): {
   runtime: FakeRuntime
   service: IntegrationService
 } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-integrations-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-integrations-'))
   const selectedPath = join(root, 'project')
   mkdirSync(selectedPath)
   writeFileSync(join(selectedPath, 'AGENTS.md'), 'Always reply with INSTRUCTIONS_OK.\n')
@@ -235,10 +235,10 @@ describe('IntegrationService', () => {
     }, { id: 41, method: 'mcpServer/elicitation/request' })
     const requestId = service.getSnapshot().pendingRequests[0]?.id
     expect(requestId).toBeTruthy()
-    service.resolveRequest({ requestId: requestId ?? '', action: 'accept', content: { repository: 'aster' } })
+    service.resolveRequest({ requestId: requestId ?? '', action: 'accept', content: { repository: 'norevinq' } })
     await expect(elicitation).resolves.toEqual({
       action: 'accept',
-      content: { repository: 'aster' },
+      content: { repository: 'norevinq' },
       _meta: null,
     })
 
