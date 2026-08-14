@@ -1,0 +1,10 @@
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Historical scheduler redaction fixture; exact test-only line and path"
+targetRules = ["generic-api-key"]
+condition = "AND"
+regexTarget = "line"
+regexes = ['''api_key=sk-proj-secret123456 failed''']
+paths = ['''^tests/unit/schedulerService\.test\.ts$''']

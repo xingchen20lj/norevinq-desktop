@@ -1,6 +1,16 @@
 import { randomUUID } from 'node:crypto'
 import { execFile } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync } from 'node:fs'
+import {
+  chmodSync,
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  realpathSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
@@ -45,6 +55,7 @@ import {
 } from '../providers/deepseekPricing.js'
 
 const MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
+const MAX_FAILURE_MANIFEST_BYTES = 64 * 1024
 
 type SecuritySdk = Pick<CodexSecurity, 'metadata' | 'preflight' | 'run' | 'account' | 'close'>
 type SecuritySdkFactory = (config?: CodexSecurityConfig) => SecuritySdk
@@ -58,6 +69,7 @@ export type SecurityServiceOptions = {
   exchangeRateResolver?: () => Promise<UsdCnyQuote>
   pythonResolver?: () => Promise<string>
   now?: () => Date
+  platform?: NodeJS.Platform
   cliRunner?: (cwd: string, args: string[]) => Promise<string>
 }
 
@@ -75,6 +87,7 @@ export class SecurityService {
   readonly #exchangeRateResolver: () => Promise<UsdCnyQuote>
   readonly #pythonResolver: () => Promise<string>
   readonly #now: () => Date
+  readonly #platform: NodeJS.Platform
   readonly #cliRunner: (cwd: string, args: string[]) => Promise<string>
   readonly #subscriptions = new Set<SecuritySubscription>()
   readonly #abortControllers = new Map<string, AbortController>()
@@ -87,6 +100,7 @@ export class SecurityService {
     this.#outputRoot = join(securityRoot, 'scans')
     this.#stateRoot = join(securityRoot, 'sdk-state')
     this.#now = options.now ?? (() => new Date())
+    this.#platform = options.platform ?? process.platform
     preparePrivateDirectory(securityRoot)
     preparePrivateDirectory(this.#outputRoot)
     preparePrivateDirectory(this.#stateRoot)
@@ -258,6 +272,11 @@ export class SecurityService {
       selected = this.#sdkForRequest(initial.request)
       const usageAccumulator = await this.#usageAccumulator(initial.request)
       if (controller.signal.aborted) throw controller.signal.reason
+      if (initial.request.mode === 'deep' && this.#platform === 'darwin') {
+        this.#updateProgress(initial.id, {
+          activity: 'macOS 深扫描使用官方外层安全沙箱兼容模式',
+        })
+      }
       const result = await selected.sdk.run(initial.projectPath, {
         ...this.#scanOptions(initial.request, outputDir),
         signal: controller.signal,
@@ -289,9 +308,10 @@ export class SecurityService {
       }, true)
     } catch (error) {
       const cancelled = controller.signal.aborted
+      const failure = cancelled ? error : resolveSecurityFailure(error, outputDir)
       this.#replaceScan(initial.id, {
         status: cancelled ? 'cancelled' : 'failed',
-        error: { code: classifySecurityError(error), message: safeErrorMessage(error) },
+        error: { code: classifySecurityError(failure), message: safeErrorMessage(failure) },
       }, true)
     } finally {
       if (selected?.ephemeral) await this.#closeEphemeralSdk(selected.sdk)
@@ -331,12 +351,15 @@ export class SecurityService {
     if (this.#requireCodexBinary && !codexBinary) {
       throw new Error('Aster 智能体运行时尚未就绪；请等待状态变为已就绪后重试安全扫描。')
     }
+    const effectiveCodexBinary = request.mode === 'deep' && codexBinary
+      ? prepareMacDeepScanCodexWrapper(this.#stateRoot, codexBinary, this.#platform)
+      : codexBinary
     const config = createDeepSeekSecurityConfig(
       model,
       credential,
       this.#stateRoot,
       this.#environment,
-      codexBinary,
+      effectiveCodexBinary,
     )
     const sdk = this.#sdkFactory(this.#pluginPath ? { ...config, pluginPath: this.#pluginPath } : config)
     this.#ephemeralSdks.add(sdk)
@@ -545,11 +568,96 @@ function classifySecurityError(error: unknown): string {
   }
   if (mapping[name]) return mapping[name]
   const message = safeErrorMessage(error).toLocaleLowerCase('en-US')
+  if (message.includes('deep scan stopped') || message.includes('deep security scan terminally failed')) {
+    return message.includes('operation not permitted')
+      ? 'deep_worker_sandbox'
+      : 'deep_discovery_failed'
+  }
   if (message.includes('trusted access') || message.includes('forbidden') || message.includes('403')) {
     return 'security_access_required'
   }
   return 'unknown'
 }
+
+type DeepFailureManifest = {
+  status?: unknown
+  failure?: { message?: unknown } | null
+}
+
+function resolveSecurityFailure(error: unknown, outputDir: string): unknown {
+  const secondary = safeErrorMessage(error).toLocaleLowerCase('en-US')
+  if (!secondary.includes('only a running scan can be completed')
+    && !secondary.includes('could not save the codex security scan')) return error
+  const manifestPath = join(outputDir, 'artifacts', 'deep_discovery', 'coordinator-manifest.json')
+  try {
+    const metadata = lstatSync(manifestPath)
+    if (!metadata.isFile() || metadata.isSymbolicLink() || metadata.size > MAX_FAILURE_MANIFEST_BYTES) return error
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as DeepFailureManifest
+    const message = manifest.status === 'failed' && typeof manifest.failure?.message === 'string'
+      ? manifest.failure.message.trim()
+      : ''
+    return message ? new Error(`Deep Scan discovery failed: ${message}`) : error
+  } catch {
+    return error
+  }
+}
+
+export function prepareMacDeepScanCodexWrapper(
+  stateRoot: string,
+  codexBinary: string,
+  platform: NodeJS.Platform = process.platform,
+): string {
+  if (platform !== 'darwin') return codexBinary
+  assertSafeRuntimePath(codexBinary)
+  const canonicalBinary = realpathSync(codexBinary)
+  assertSafeRuntimePath(canonicalBinary)
+  const binaryMetadata = lstatSync(canonicalBinary)
+  if (!binaryMetadata.isFile() || binaryMetadata.isSymbolicLink() || (binaryMetadata.mode & 0o111) === 0) {
+    throw new Error('Aster 智能体运行时不是可执行的普通文件。')
+  }
+  const wrapperRoot = join(stateRoot, 'deep-worker-runtime')
+  preparePrivateDirectory(wrapperRoot)
+  const wrapperPath = join(wrapperRoot, 'codex')
+  const binaryPathFile = join(wrapperRoot, 'real-codex-path')
+  const nonce = randomUUID()
+  const temporaryWrapper = `${wrapperPath}.${nonce}.tmp`
+  const temporaryPathFile = `${binaryPathFile}.${nonce}.tmp`
+  writeFileSync(temporaryPathFile, `${canonicalBinary}\n`, { encoding: 'utf8', mode: 0o600, flag: 'wx' })
+  writeFileSync(temporaryWrapper, MAC_DEEP_SCAN_WRAPPER, { encoding: 'utf8', mode: 0o700, flag: 'wx' })
+  renameSync(temporaryPathFile, binaryPathFile)
+  renameSync(temporaryWrapper, wrapperPath)
+  if (process.platform !== 'win32') {
+    chmodSync(binaryPathFile, 0o600)
+    chmodSync(wrapperPath, 0o700)
+  }
+  return wrapperPath
+}
+
+function assertSafeRuntimePath(path: string): void {
+  for (let index = 0; index < path.length; index += 1) {
+    const code = path.charCodeAt(index)
+    if (code <= 0x1f || code === 0x7f) throw new Error('Aster 智能体运行时路径包含不安全字符。')
+  }
+}
+
+const MAC_DEEP_SCAN_WRAPPER = `#!/bin/bash
+set -eu
+wrapper_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
+IFS= read -r real_codex < "$wrapper_dir/real-codex-path"
+if [[ ! -x "$real_codex" ]]; then
+  echo "Aster Deep Scan runtime is unavailable." >&2
+  exit 126
+fi
+args=("$@")
+if [[ -n "\${CODEX_SECURITY_SCAN_ID:-}" && "\${args[0]:-}" == "exec" && "\${args[1]:-}" == "--experimental-json" ]]; then
+  for ((index=0; index + 1 < \${#args[@]}; index++)); do
+    if [[ "\${args[index]}" == "--sandbox" && "\${args[index + 1]}" == "read-only" ]]; then
+      args[index + 1]="danger-full-access"
+    fi
+  done
+fi
+exec "$real_codex" "\${args[@]}"
+`
 
 function safeErrorMessage(error: unknown): string {
   if (error instanceof Error) return redactString(error.message).slice(0, 4_096)

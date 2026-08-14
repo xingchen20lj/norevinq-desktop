@@ -1,10 +1,10 @@
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { CodexSecurity, type CodexSecurityConfig, type ScanOptions, type ScanPreflight, type ScanResult } from '@openai/codex-security'
 import { afterEach, describe, expect, it } from 'vitest'
-import { SecurityService } from '../../src/main/security/securityService.js'
+import { prepareMacDeepScanCodexWrapper, SecurityService } from '../../src/main/security/securityService.js'
 import { createDeepSeekSecurityConfig } from '../../src/main/providers/deepseek.js'
 import { StateDatabase } from '../../src/main/state/database.js'
 import type { SecurityScanRequest } from '../../src/shared/security.js'
@@ -103,6 +103,29 @@ describe('SecurityService', () => {
     const failed = await waitForScan(service, 'failed')
     expect(failed.scans[0]?.error?.code).toBe('security_access_required')
     expect(failed.scans[0]?.error?.message).not.toContain('sk-proj-example123456')
+    await service.dispose()
+    fixture.database.close()
+  })
+
+  it('preserves the primary Deep Scan coordinator failure instead of the secondary completion error', async () => {
+    const fixture = createFixture()
+    const sdk = createSdk((_repository, options = {}) => {
+      const output = options.outputDir ?? ''
+      mkdirSync(join(output, 'artifacts', 'deep_discovery'), { recursive: true })
+      writeFileSync(join(output, 'artifacts', 'deep_discovery', 'coordinator-manifest.json'), JSON.stringify({
+        status: 'failed',
+        failure: {
+          message: 'Deep Scan stopped after 3 workers: failed to initialize in-process app-server client: Operation not permitted',
+        },
+      }))
+      return Promise.reject(new Error('Could not save the Codex Security scan: Only a running scan can be completed.'))
+    })
+    const service = new SecurityService(fixture.database, fixture.securityRoot, { sdkFactory: () => sdk })
+    service.startScan({ ...scanRequest(fixture.projectId), mode: 'deep' })
+    const failed = await waitForScan(service, 'failed')
+    expect(failed.scans[0]?.error).toMatchObject({ code: 'deep_worker_sandbox' })
+    expect(failed.scans[0]?.error?.message).toContain('Deep Scan stopped after 3 workers')
+    expect(failed.scans[0]?.error?.message).not.toContain('Only a running scan')
     await service.dispose()
     fixture.database.close()
   })
@@ -235,6 +258,33 @@ describe('SecurityService', () => {
     })
     await service.dispose()
     fixture.database.close()
+  })
+
+  it.skipIf(process.platform === 'win32')('uses a private macOS Deep Scan wrapper that only relaxes the redundant worker sandbox', () => {
+    const root = mkdtempSync(join(tmpdir(), 'aster-security-wrapper-test-'))
+    temporaryPaths.push(root)
+    const realCodex = join(root, 'real-codex')
+    const argsOutput = join(root, 'args.txt')
+    writeFileSync(realCodex, '#!/bin/bash\nprintf "%s\\n" "$@" > "$ASTER_TEST_ARGS_OUTPUT"\n', { mode: 0o700 })
+    chmodSync(realCodex, 0o700)
+    const wrapper = prepareMacDeepScanCodexWrapper(join(root, 'state'), realCodex, 'darwin')
+    expect(statSync(wrapper).mode & 0o777).toBe(0o700)
+
+    execFileSync(wrapper, ['exec', '--experimental-json', '--sandbox', 'read-only', '--skip-git-repo-check'], {
+      env: { ...process.env, CODEX_SECURITY_SCAN_ID: 'scan-test', ASTER_TEST_ARGS_OUTPUT: argsOutput },
+    })
+    expect(readFileSync(argsOutput, 'utf8')).toContain('danger-full-access')
+    expect(readFileSync(argsOutput, 'utf8')).not.toContain('read-only')
+
+    execFileSync(wrapper, ['exec', '--experimental-json', '--sandbox', 'read-only'], {
+      env: { ...process.env, ASTER_TEST_ARGS_OUTPUT: argsOutput },
+    })
+    expect(readFileSync(argsOutput, 'utf8')).toContain('read-only')
+  })
+
+  it('rejects control characters in a macOS Deep Scan runtime path', () => {
+    expect(() => prepareMacDeepScanCodexWrapper('/tmp/state', '/tmp/codex\nruntime', 'darwin'))
+      .toThrow('路径包含不安全字符')
   })
 })
 

@@ -88,7 +88,7 @@
 | 计划任务 | 运行历史、未读、重试 | 已测试 | 收件箱、成功/失败/取消/跳过、未读、1–4 次退避、敏感错误脱敏和崩溃不重放 |
 | 安全 | 安全总览 | 已测试 | 总览/扫描/漏洞/仓库/设置五页工作台；Electron 浅色 1320×840 真机截图通过 |
 | 安全 | 普通仓库/路径扫描 | 部分实现 | 官方 SDK 真实进入 discovery；本次受 $2 硬预算中断，未把部分产物标记完成；sealed 成功/失败由自动替身覆盖 |
-| 安全 | 深度扫描 | 部分实现 | SDK deep 参数、目标约束和 UI 已接入；真实 deep 扫描尚受模型费用约束 |
+| 安全 | 深度扫描 | 已测试 | SDK deep 参数、目标约束和 UI 已接入；DeepSeek Flash 一文件真实执行 discovery、validation、attack path、reporting 并返回 completed + sealed。macOS 对官方外层已验证沙箱内的 worker 使用非嵌套兼容模式，修复 Seatbelt EPERM；大型仓库仍会产生显著模型费用 |
 | 安全 | commit/工作区 diff 扫描 | 部分实现 | `DiffTarget.refs/workingTree` 已接入且深度模式本地拒绝；真实在线 diff 扫描待有界验证 |
 | 安全 | 预检、预算、取消、进度 | 已测试 | 真实 SDK preflight、Python/账户诊断和 $2 cost-limit 终止；AbortSignal/进度/费用/Trusted Access 回调自动测试 |
 | 安全 | 漏洞证据、严重程度、攻击路径 | 已测试 | sealed findings 映射、证据/位置/验证/攻击路径 UI 与持久化自动测试；真实扫描未完成所以当前没有伪造漏洞 |

@@ -11,16 +11,16 @@
 - 正式 macOS 包：仍需要 Developer ID 和 Apple 公证权限；
 - Windows 包：构建配置和 CI 路径已建立，仍需要 Windows 真机安装、SmartScreen 和签名验证；
 - 自动更新：需要发布者控制的 HTTPS 下载地址和稳定签名身份；
-- Codex Security 在线能力：受外部账户 Security/Trusted Access 权限约束，不影响普通源码公开。
+- Codex Security OpenAI 模式受外部账户 Security/Trusted Access 权限约束；DeepSeek 模式使用用户自己的 API Key，不要求 OpenAI 登录。这些在线条件都不影响普通源码公开。
 
 ## 公开前（保持仓库 Private）
 
 - [ ] 合并开源准备 PR，并确认 `main` CI 全绿；
-- [ ] 再运行一次历史密钥检查，确认命中项仅为明确的测试占位符；
-- [ ] 确认 README、截图、生成清单和文档不含个人绝对路径、真实凭据或私人仓库内容；
-- [ ] 运行 `pnpm install --frozen-lockfile`、`pnpm audit:dependencies`、`pnpm verify:ci`；
-- [ ] 在 macOS 重新生成无签名内部 DMG，并运行 packaged E2E；
-- [ ] 在 GitHub 仓库设置中确认描述、主题和默认分支；
+- [x] 再运行一次历史密钥检查，确认命中项仅为明确的测试占位符；
+- [x] 确认 README、截图、生成清单和文档不含个人绝对路径、真实凭据或私人仓库内容；
+- [x] 运行 `pnpm install --frozen-lockfile`、`pnpm audit:dependencies`、`pnpm verify:ci`；
+- [x] 在 macOS 重新生成无签名内部 DMG，并运行 packaged E2E；
+- [x] 在 GitHub 仓库设置中确认描述、主题和默认分支；
 - [ ] 备份私有仓库和本地签名/发布资料，凭据不得进入 Git。
 
 建议仓库主题：`electron`、`react`、`typescript`、`codex`、`deepseek`、`coding-agent`、`desktop-app`、`git-worktree`。
@@ -41,7 +41,7 @@
 
 - [ ] 将 `package.json` 从开发版本更新为确定的预览版本；
 - [ ] 把 CHANGELOG 中对应版本从 `Unreleased` 改为发布日期；
-- [ ] 运行完整质量门和依赖审计；
+- [x] 运行完整质量门和依赖审计；
 - [ ] 创建带注释的 Git tag；
 - [ ] 发布源码归档、变更说明和已知限制；
 - [ ] 如果平台签名尚未完成，不上传容易被误认为正式稳定版的无签名安装包。
@@ -62,3 +62,12 @@
 - 私人项目源代码、用户目录截图或无关个人信息；
 - 未验证的漏洞细节、攻击代码或第三方私密报告；
 - 使用真实外部服务产生但未经脱敏和授权的测试数据。
+
+## 2026-08-14 验证证据
+
+- Gitleaks 8.30.1 扫描全部既有历史提交：0 泄漏；旧测试占位符使用规则 ID、精确行与精确路径限定的 allowlist；
+- `pnpm audit --prod --audit-level high`：0 已知漏洞；生产依赖许可证清单：93 个包；
+- `pnpm verify:ci`：40 个测试文件，205 项通过、1 项需要显式在线环境的测试跳过；覆盖率 statements 81.30%、branches 70.18%、functions 86.32%、lines 88.22%；
+- 真实 Electron 主流程 E2E：1 项通过；packaged app runtime E2E：1 项通过；
+- Intel x64 与 Apple Silicon arm64 DMG 均通过 `hdiutil verify`，包内 Electron 与 Codex 架构匹配；
+- 四张 README 产品截图由上述真实 Electron E2E 生成并人工检查，无用户目录、真实凭据或私人项目内容。

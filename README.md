@@ -59,7 +59,7 @@ pnpm package:win
 - 使用在线 Codex 时需要在 Aster 内登录 ChatGPT 或配置 OpenAI API Key。
 - 使用 DeepSeek 时可在设置中安全保存 Key，或在启动环境提供 `DEEPSEEK_API_KEY`。
 - GitHub Pull Request 功能通过用户已经登录的 `gh` CLI 工作，Aster 不读取或保存 GitHub token。
-- Codex Security 扫描需要 Python 3.10+；OpenAI 模式受账户 Security/Trusted Access 权限约束，DeepSeek V4 Flash 与 V4 Pro 可直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录。两者均已通过 Aster 0.1.0 的真实 `completed + sealed` 扫描；Flash 固定复用 Aster 0.147.0 运行时并串行审计，Pro 使用有限并行。
+- Codex Security 扫描需要 Python 3.10+；OpenAI 模式受账户 Security/Trusted Access 权限约束，DeepSeek V4 Flash 与 V4 Pro 可直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录。两者均已通过 Aster 0.1.0 的真实 `completed + sealed` 标准扫描。macOS 深扫描保留官方外层 `codex_security_scan` 权限边界，并规避 Seatbelt 不支持可靠嵌套导致的 discovery worker `EPERM`；该兼容层只作用于已验证外层沙箱内的子进程，其他扫描与平台不受影响。
 
 Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树、凭据和 `agent-home`，不会覆盖官方 Codex 桌面的用户数据。旧版 `codex-home` 会在首次启动新版时原地迁移为 `agent-home`；项目中的 `.codex` 和 `AGENTS.md` 仍遵循上游兼容规则。
 
@@ -79,6 +79,7 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 - [发布流程](docs/RELEASING.md)
 - [当前开发状态](docs/AUTONOMOUS_STATE.md)
 - [第三方许可证](THIRD_PARTY_NOTICES.md)
+- [品牌与第三方商标说明](TRADEMARKS.md)
 
 ## 参与贡献
 
@@ -86,4 +87,4 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 
 ## 许可证
 
-Aster Code 以 [Apache License 2.0](LICENSE) 发布。第三方组件的许可证与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [NOTICE](NOTICE)。
+Aster Code 以 [Apache License 2.0](LICENSE) 发布。第三方组件的许可证与来源见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md) 和 [NOTICE](NOTICE)；项目名称、图标及第三方商标边界见 [TRADEMARKS.md](TRADEMARKS.md)。

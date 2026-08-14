@@ -19,6 +19,8 @@ const requiredFiles = [
   'SUPPORT.md',
   'CHANGELOG.md',
   'THIRD_PARTY_NOTICES.md',
+  'TRADEMARKS.md',
+  '.gitleaks.toml',
   '.node-version',
   '.github/CODEOWNERS',
   '.github/PULL_REQUEST_TEMPLATE.md',

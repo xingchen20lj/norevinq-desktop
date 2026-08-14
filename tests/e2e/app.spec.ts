@@ -77,6 +77,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(commandPalette).toBeVisible()
     await commandPalette.getByLabel('搜索命令').fill('文件与产物')
     await expect(commandPalette.getByRole('option', { name: /文件与产物/ })).toBeVisible()
+    await window.screenshot({ path: 'test-results/aster-command-palette.png' })
     await commandPalette.getByLabel('搜索命令').press('Escape')
     await expect(commandPalette).toHaveCount(0)
 
@@ -88,6 +89,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     )
     await expect(settings).toContainText('deepseek-v4-pro')
     await expect(settings).toContainText('两个 Responses 模型均可用')
+    await window.screenshot({ path: 'test-results/aster-provider-settings.png' })
     await expect.poll(async () => window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
         getIntegrationState: () => Promise<{
@@ -151,6 +153,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await scheduler.getByLabel('执行位置').selectOption('local')
     await scheduler.getByLabel('沙箱').selectOption('read-only')
     await scheduler.getByLabel('模型').selectOption(scheduledModel ?? '')
+    await window.screenshot({ path: 'test-results/aster-scheduled-task-editor.png' })
     await scheduler.getByRole('button', { name: '保存计划任务', exact: true }).click()
     await expect(scheduler).toContainText('E2E 计划验证')
     await scheduler.getByRole('button', { name: '立即运行', exact: true }).click()

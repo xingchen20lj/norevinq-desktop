@@ -72,6 +72,7 @@ flowchart LR
 23. 整文件丢弃先用 Git stash 事务捕获 index/worktree/untracked 状态，再移动到 `refs/aster/discards/<uuid>` 并删除临时 stash 项；恢复成功后才删除 ref，失败时保留恢复点且绝不自动清理可能包含外部并发编辑的冲突文件。
 24. 普通项目目录不要求预先存在 Git；Git/工作树能力必须返回显式未初始化状态。工作树基线只能来自主进程枚举的 HEAD/heads/remotes/tags，创建前再次解析并匹配 UI 所见 OID，再以不可变 OID调用 Git，防止 ref 移动造成错误基线。
 25. 工作树 Handoff 是跨任务关联与 Git 修改的持久化事务：修改快照固定为 Aster 自有 Git ref，并保存源/目标 HEAD、工作树 tree 和 index tree；只有任务关联提交后才删除 ref。启动恢复只能在内容身份完全匹配时自动清理，检测到人工修改必须失败关闭并保留恢复点。
+26. macOS Deep Security 的 discovery worker 不叠加第二层 Seatbelt：官方协调器必须先提供可验证的 managed 父沙箱元数据，Aster 的私有 wrapper 还要求 scan ID 与精确 worker 命令形状，才把子进程 `read-only` 改为 `danger-full-access`。这个值只描述子进程不再创建新 Seatbelt；继承的外层 `codex_security_scan` 文件和网络限制仍是实际权限上限。其他命令、模式和平台原样转发。详见 ADR 0002。
 
 ## 上游与公开资料
 

@@ -14,6 +14,8 @@
 
 ## 已完成任务
 
+- 复现并修复 macOS Deep Security discovery worker 的 `Operation not permitted`：官方 0.1.11 协调器在已经受 `codex_security_scan` 外层沙箱保护的进程内再次固定请求 `read-only` Seatbelt，而 Codex 上游明确记录 Seatbelt 不能可靠嵌套。Aster 仅在 macOS、deep 模式、存在官方 scan ID 且命令精确为 discovery worker `codex exec --experimental-json --sandbox read-only` 时改用非嵌套子进程；外层文件/网络权限边界继续生效。真实 DeepSeek Flash 一文件对照完成 discovery 1/1、validation、attack path、reporting 与 `completed + sealed`。协调器失败清单现在优先于二次 `complete-scan` 错误展示。
+- 开源历史凭据扫描改用 Gitleaks 8.30.1 扫描全部既有提交；唯一旧测试占位符以规则 ID、精确行和精确路径三重约束加入 allowlist，当前测试源码已移除凭据形状值，复扫为 0 泄漏。发布工作流全部第三方 Action 已固定 40 位提交 SHA。
 - 为顶栏 11 个纯图标动作增加随状态变化的原生悬停名称与可访问标签；真实 Electron 生命周期 E2E 覆盖全部 `title`/`aria-label` 名称。
 - 助手回复中的本地 Markdown 图片现可直接显示：仅接受当前项目/工作树与 Aster 私有 `agent-home/generated_images` 下的绝对路径，经主进程真实路径、符号链接、格式和 50 MiB 上限验证后签发 15 分钟不透明 `aster-file` URL；远程 URL、SVG、越界文件和任意 `file://` 均不加载。单元测试与真实 Electron PNG 解码截图通过。
 - 普通界面、活动作者、运行状态、审批、安全工作台和用户可见错误统一采用 Aster 产品身份；新建、恢复和分叉任务均注入透明的 Aster `developerInstructions`，要求日常回答自称 Aster、被询问架构/许可/模型时如实披露 OpenAI 开源 Codex app-server 与实际提供商。单元测试、Electron 生命周期协议断言通过，DeepSeek V4 Flash 真实在线身份测试于 4.5 秒返回包含 Aster 且不含 Codex 的普通回答。
@@ -96,7 +98,7 @@
 - 完成提供商、MCP、技能、配置四页设置工作台及空状态、错误、loading、OAuth 和结果预览。
 - Electron E2E 真实读取 app-server MCP/技能/配置，持久化项目信任，并通过项目指令返回 `ASTER_INSTRUCTIONS_OK`。
 - 当前环境 `node_repl` MCP 通过 app-server 直接工具调用执行无副作用表达式；elicitation 与用户输入由自动替身闭环覆盖。
-- 集成公开 `@openai/codex-security` 0.1.8，并隔离其 Codex SDK/可执行文件 0.144.6 与 plugin 0.1.15。
+- 最初集成公开 `@openai/codex-security` 0.1.8（Codex SDK/可执行文件 0.144.6、plugin 0.1.15），随后升级并固定当前 0.1.11 / plugin 0.1.19。
 - 完成 SDK/Python/账户诊断、repository/path/refs/working-tree/deep 参数、preflight、费用、进度、Trusted Access、取消和错误分类。
 - 扫描输出固定在仓库外 `userData/security` 私有目录；只有 completed + sealed contract 的结果可导入。
 - 完成安全总览、扫描、漏洞、仓库和设置五页工作台，支持报告、finding、coverage、JSON/CSV/SARIF 与 2 MiB 有界预览。

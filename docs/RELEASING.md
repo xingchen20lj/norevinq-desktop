@@ -6,7 +6,7 @@
 
 - Node.js 24.14.0、pnpm 11.16.0、Electron 43.3.0、electron-builder 26.15.3、electron-updater 6.8.9；
 - 主 Codex runtime 固定为公开 `@openai/codex` 0.147.0，并随平台包内置；
-- Codex Security SDK 固定 0.1.11，其依赖元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，DeepSeek Security 显式复用该二进制并已通过 Flash/Pro sealed 扫描复验；OpenAI 账户路径仍需签名目标包在线复验；
+- Codex Security SDK 固定 0.1.11，其依赖元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，DeepSeek Security 显式复用该二进制并已通过 Flash/Pro 标准 sealed 扫描；macOS Deep Scan 的官方外层沙箱兼容模式已完成一文件完整 sealed 对照；OpenAI 账户路径仍需签名目标包在线复验；
 - macOS 目标为 DMG + ZIP，Windows 目标为交互式 per-user NSIS；
 - 源码采用 Apache-2.0；安装包额外携带 `LICENSE.txt`、`NOTICE.txt` 和 `THIRD_PARTY_NOTICES.md`；
 - 构建不会自动发布，所有 builder 命令显式使用 `--publish never`。
