@@ -1760,7 +1760,9 @@ async function writeClipboard(text: string): Promise<void> {
 }
 
 function humanizeActivityError(message: string): string {
-  if (/\bthread not found\b/iu.test(message)) return '任务会话暂时不可用。请重新打开任务；如果问题持续出现，请创建新任务继续。'
+  if (/\b(?:thread not found|no rollout found for (?:thread|session)(?: id)?)\b/iu.test(message)) {
+    return '任务会话暂时不可用。请重新打开任务；如果问题持续出现，请创建新任务继续。'
+  }
   if (/\bis archived\b/iu.test(message)) return '任务已归档，正在等待恢复后继续。'
   return message
     .replace(/^Error invoking remote method '[^']+':\s*/iu, '')

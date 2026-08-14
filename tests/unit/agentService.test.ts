@@ -300,6 +300,27 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('unarchives and retries a turn when the runtime cannot find an archived rollout', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.failNextTurnStartWithNoRollout = true
+    runtime.failNextResumeWithArchived = true
+
+    await service.startTurn({ threadId: 'thread-1', text: 'Continue archived task' })
+
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'turn/start', 'thread/resume', 'thread/unarchive', 'thread/resume', 'turn/start',
+    ])
+    expect(runtime.turnStarts).toBe(2)
+    expect(runtime.turnCompletions).toBe(1)
+    expect(service.getSnapshot().selectedThreadId).toBe('thread-1')
+
+    service.dispose()
+    database.close()
+  })
+
   it('migrates conversation history before changing model providers in either direction', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -681,6 +702,7 @@ class FakeRuntime {
   turnStarts = 0
   turnCompletions = 0
   failNextTurnStartWithMissingThread = false
+  failNextTurnStartWithNoRollout = false
   failNextResumeWithArchived = false
   missingThreadPermanently = false
   goal: JsonValue | null = null
@@ -707,6 +729,10 @@ class FakeRuntime {
     if (method === 'turn/start' && this.failNextTurnStartWithMissingThread) {
       this.failNextTurnStartWithMissingThread = false
       return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
+    }
+    if (method === 'turn/start' && this.failNextTurnStartWithNoRollout) {
+      this.failNextTurnStartWithNoRollout = false
+      return Promise.reject(new JsonRpcError(-32602, `no rollout found for thread id ${requestedThreadId}`))
     }
     const requestedModel = typeof parameters.model === 'string' ? parameters.model : 'gpt-5.4'
     const requestedModelProvider = typeof parameters.modelProvider === 'string' ? parameters.modelProvider : 'openai'

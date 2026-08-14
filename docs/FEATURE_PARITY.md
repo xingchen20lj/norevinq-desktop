@@ -23,7 +23,7 @@
 | 对话 | 对话搜索和分页 | 已测试 | `thread/list` cwd/searchTerm/opaque cursor、游标失效保护、分页合并和侧栏搜索/加载更多均通过自动测试 |
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |
 | 对话 | 长上下文压缩 | 已测试 | `thread/compact/start`、活动 turn 保护和确认 UI 经协议替身/Electron E2E；真实模型压缩内容待账户恢复后复验 |
-| 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 与已完成历史 hydration 自动测试通过；`turn/start` 遇到新 app-server 尚未加载历史 thread 时会自动 resume 并安全重试一次；真实进程在线 E2E 因账户使用量耗尽待复验 |
+| 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 与已完成历史 hydration 自动测试通过；`turn/start` 遇到 `thread not found`/`no rollout found` 时会自动 resume，归档 rollout 会先 unarchive，并安全重试一次；真实进程在线 E2E 因账户使用量耗尽待复验 |
 | 智能体 | Codex app-server stdio 生命周期 | 已测试 | 开发与打包 Electron 均真实自动启动；发布包使用官方 `@openai/codex` 0.147.0，而非 ChatGPT 私有安装；私有 `userData/agent-home` 隔离官方客户端登录、thread 与用户配置，旧 `codex-home` 自动迁移 |
 | 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
 | 智能体 | app-server 崩溃检测与恢复 | 已测试 | 真实子进程 JSONL 替身注入 exit 23：空闲连接恢复 ready，活动 turn 失败关闭且不重启/重放 |
@@ -70,7 +70,7 @@
 | 终端 | app-server 读取当前终端输出 | 已测试 | 用户显式共享最近 32 KiB，真实 `turn/start` 后收到 `NOREVINQ_TERMINAL_CONTEXT_OK`；不静默泄露输出 |
 | 文件 | 文件树、文本与代码预览 | 已测试 | 项目/worktree 根绑定、500 项目录、2 MiB UTF-8、无扩展名检测；单元及真实文本 E2E |
 | 文件 | 图片、音频、视频、PDF 预览 | 部分实现 | 图片自定义协议真实解码；音视频/PDF UI、MIME、Range/HEAD/206/416 已测试，真实格式矩阵待最终回归 |
-| 文件 | 产物链接和外部打开 | 已测试 | fileChange 直达真实文本产物；助手 Markdown 中项目图片与 `agent-home/generated_images` 通过短期不透明 URL 直接显示；确认式系统打开、可执行/脚本拒绝和路径边界单测 |
+| 文件 | 产物链接和外部打开 | 已测试 | fileChange 直达真实文本产物；助手的官方图片活动、Markdown 图片、普通本地图片链接与反引号图片路径均通过短期不透明 URL 直接显示；确认式系统打开、可执行/脚本拒绝和路径边界单测及真实 Electron 图片解码通过 |
 | 浏览器 | 本地网页预览 | 已测试 | 独立临时 WebContentsView、无 preload/Node、loopback 顶级与子资源策略；宽屏右侧分栏、窄屏底部停靠，不遮挡对话和输入区；真实 HTTP/Electron E2E |
 | 浏览器 | 导航、刷新、开发日志 | 已测试 | 地址/前后退/刷新/停止/外部打开、标题/加载/错误、500 条控制台；真实导航/后退/console 回归 |
 | 浏览器 | 通用 Computer Use | 被私有服务阻塞 | 只采用公开可调用能力，不伪造 |
