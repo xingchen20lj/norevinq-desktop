@@ -558,6 +558,7 @@ export function App(): React.JSX.Element {
         snapshot = await window.aster.startTurn({
           threadId: selectedThread.id,
           text,
+          ...(model ? { model, modelProvider: providerForModel(model) } : {}),
           ...(effort ? { reasoningEffort: effort } : {}),
         })
       }
@@ -651,6 +652,7 @@ export function App(): React.JSX.Element {
         : await window.aster.startTurn({
           threadId: selectedThread.id,
           text,
+          ...(model ? { model, modelProvider: providerForModel(model) } : {}),
           ...(effort ? { reasoningEffort: effort } : {}),
         })
       setConversations(snapshot)
@@ -814,14 +816,14 @@ export function App(): React.JSX.Element {
             />
             <div className="composer-footer">
               <div className="composer-options">
-                <select aria-label="模型" value={model} onChange={(event) => {
+                <select aria-label="模型" value={model} disabled={activeTurn || isSubmitting} onChange={(event) => {
                   const nextModel = runtime?.models.find(({ id }) => id === event.target.value)
                   setModel(event.target.value)
                   setEffort(nextModel?.defaultReasoningEffort ?? nextModel?.supportedReasoningEfforts[0] ?? '')
                 }}>
                   {runtime?.models.map((item) => <option value={item.id} key={item.id} disabled={item.hidden}>{item.displayName}</option>)}
                 </select>
-                <select aria-label="推理强度" value={effort} onChange={(event) => setEffort(event.target.value)}>
+                <select aria-label="推理强度" value={effort} disabled={activeTurn || isSubmitting} onChange={(event) => setEffort(event.target.value)}>
                   {(selectedModel?.supportedReasoningEfforts ?? []).map((item) => <option value={item} key={item}>{item}</option>)}
                 </select>
                 <button type="button" onClick={() => setWorktreeOpen(true)}><GitBranch size={13} />{selectedWorktree ? 'Worktree' : 'Local'}</button>
@@ -1682,6 +1684,10 @@ function toErrorMessage(reason: unknown): string {
   if (reason instanceof Error) return reason.message
   if (typeof reason === 'string' && reason) return reason
   return '发生未知错误。'
+}
+
+function providerForModel(model: string): string {
+  return model.startsWith('deepseek-') ? 'deepseek' : 'openai'
 }
 
 function sortProjects(projects: ProjectSummary[]): ProjectSummary[] {

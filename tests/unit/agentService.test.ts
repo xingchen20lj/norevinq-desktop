@@ -242,6 +242,50 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('applies model and provider changes before continuing the same conversation', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+
+    await service.startTurn({
+      threadId: 'thread-1',
+      text: 'Use DeepSeek',
+      model: 'deepseek-v4-flash',
+      modelProvider: 'deepseek',
+      reasoningEffort: 'low',
+    })
+    await service.startTurn({
+      threadId: 'thread-1',
+      text: 'Switch back to OpenAI',
+      model: 'gpt-5.6-sol',
+      modelProvider: 'openai',
+      reasoningEffort: 'high',
+    })
+
+    expect(runtime.requests.slice(1).map(({ method }) => method)).toEqual([
+      'thread/unsubscribe', 'thread/resume', 'turn/start',
+      'thread/unsubscribe', 'thread/resume', 'turn/start',
+    ])
+    expect(runtime.requests[1]?.params).toEqual({ threadId: 'thread-1' })
+    expect(runtime.requests[2]?.params).toEqual({
+      threadId: 'thread-1', model: 'deepseek-v4-flash', modelProvider: 'deepseek',
+    })
+    expect(runtime.requests[3]?.params).toMatchObject({
+      threadId: 'thread-1', model: 'deepseek-v4-flash', effort: 'low',
+    })
+    expect(runtime.requests[4]?.params).toEqual({ threadId: 'thread-1' })
+    expect(runtime.requests[5]?.params).toEqual({
+      threadId: 'thread-1', model: 'gpt-5.6-sol', modelProvider: 'openai',
+    })
+    expect(runtime.requests[6]?.params).toMatchObject({
+      threadId: 'thread-1', model: 'gpt-5.6-sol', effort: 'high',
+    })
+
+    service.dispose()
+    database.close()
+  })
+
   it('returns an actionable error when the persisted task history was actually removed', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -569,9 +613,13 @@ class FakeRuntime {
       this.failNextTurnStartWithMissingThread = false
       return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
     }
+    const requestedModel = typeof parameters.model === 'string' ? parameters.model : 'gpt-5.4'
+    const requestedModelProvider = typeof parameters.modelProvider === 'string' ? parameters.modelProvider : 'openai'
     const thread = protocolThread(
       method === 'thread/resume' ? [turn('turn-old', 'completed')] : [],
       requestedThreadId,
+      20,
+      requestedModelProvider,
     )
     if (method === 'thread/list') {
       const response = this.threadListResponses.shift()
@@ -593,7 +641,7 @@ class FakeRuntime {
       return Promise.resolve({} as T)
     }
     const responses: Record<string, JsonValue> = {
-      'thread/resume': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
+      'thread/resume': { thread, model: requestedModel, modelProvider: requestedModelProvider },
       'thread/read': { thread },
       'thread/start': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
       'thread/name/set': {},
@@ -649,14 +697,19 @@ function createDatabase(): { database: StateDatabase; projectId: string; root: s
   return { database, projectId: database.upsertProject(projectPath).id, root }
 }
 
-function protocolThread(turns: JsonValue[], id = 'thread-1', updatedAt = 20): JsonValue {
+function protocolThread(
+  turns: JsonValue[],
+  id = 'thread-1',
+  updatedAt = 20,
+  modelProvider = 'openai',
+): JsonValue {
   return {
     id,
     sessionId: `session-${id}`,
     forkedFromId: null,
     parentThreadId: null,
     preview: 'Say hello',
-    modelProvider: 'openai',
+    modelProvider,
     createdAt: 10,
     updatedAt,
     status: { type: 'idle' },

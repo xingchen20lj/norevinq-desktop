@@ -40,9 +40,9 @@
 | 沙箱 | 网络与路径权限 | 已测试 | 官方 0.147.0 `permissionProfile/list` 真实集成；网络/文件读写/path/glob 权限反向审批、逐项子集、turn/session、拒绝与伪造 ID 失败关闭均经单元和 Electron E2E |
 | 模型 | OpenAI API Key 登录 | 已测试 | 官方 0.147.0 隔离 login/read/logout、主进程脱敏状态机和 Electron 登录/退出闭环；Key 不进入 Aster 持久化、快照或日志，真实计费请求沿用既有 OpenAI 在线回归证据 |
 | 模型 | ChatGPT 浏览器/设备码登录 | 已测试 | 官方浏览器 start/cancel 与在线设备码 URL/code/cancel 已验证；HTTPS 域白名单、主进程 loginId、completed/updated、重开/取消和令牌刷新有自动测试，最终用户授权仪式需用户本人完成 |
-| 模型 | 模型列表与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过 |
+| 模型 | 模型列表、切换与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过；同提供商使用 turn model 覆盖，OpenAI↔DeepSeek 在空闲 thread 上 unsubscribe/resume 并核验有效 provider，官方 0.147.0 真实切换契约通过 |
 | 模型 | 自定义 Responses provider | 已测试 | 进程级 `-c` provider 注册，不污染用户全局配置；DeepSeek 真实闭环通过 |
-| DeepSeek | 一级提供商配置 | 已测试 | Flash/Pro 模型选择、provider 路由、设置状态和 app-server Responses 真实运行；Pro 于 2026-08-13 经官方 reference 与真实端点确认开放 |
+| DeepSeek | 一级提供商配置 | 已测试 | Flash/Pro 模型选择、provider 路由、设置状态和 app-server Responses 真实运行；同一任务可在 Flash/Pro/OpenAI 间切换且不静默沿用旧 provider；Pro 于 2026-08-13 经官方 reference 与真实端点确认开放 |
 | DeepSeek | 安全保存 API Key | 已测试 | Electron safeStorage + 0600 原子文件；renderer 不可读回；环境密钥优先 |
 | DeepSeek | 官方 Responses API 流式连接 | 已测试 | 桌面经 app-server 真实收到 reasoning、工具和最终文本事件 |
 | DeepSeek | 工具调用与文件修改闭环 | 已测试 | Flash 与 Pro 均经官方 Codex 0.147.0 custom apply_patch 创建文件；分别精确断言 `DEEPSEEK_TOOL_OK\n` 与 `DEEPSEEK_PRO_TOOL_OK\n` |
@@ -100,7 +100,7 @@
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 36 个测试文件 183 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、Apple Silicon 真机与完整在线回归待验证 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 37 个测试文件 185 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile/provider 切换集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、Apple Silicon 真机与完整在线回归待验证 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；目标架构钩子确保 arm64 包只携带 arm64 官方 Codex，Electron/Codex Mach-O 已验证；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Apple Silicon 真机、Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |
 | 发布 | 开源许可证、构建指南与社区治理 | 已测试 | Apache-2.0、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南、公开发布检查表和隐私安全截图已加入；冻结安装、181 项测试、开源守门、生产构建、目录包和 packaged E2E 通过，法律资源已在真实 `.app` 中回读 |

@@ -850,6 +850,8 @@ const handoffThreadSchema = z.object({
 const startTurnSchema = z.object({
   threadId: z.string().min(1).max(200),
   text: promptSchema,
+  model: z.string().min(1).max(200).optional(),
+  modelProvider: z.string().min(1).max(200).optional(),
   reasoningEffort: z.string().min(1).max(40).optional(),
 })
 const steerTurnSchema = z.object({

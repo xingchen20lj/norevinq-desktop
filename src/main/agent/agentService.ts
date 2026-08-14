@@ -449,15 +449,28 @@ export class AgentService {
   }
 
   async startTurn(input: StartTurnInput): Promise<ConversationSnapshot> {
-    this.#requireVisibleThread(input.threadId)
+    const thread = this.#requireIdleVisibleThread(input.threadId)
     if (this.#handoffThreads.has(input.threadId)) throw new Error('Wait for the conversation handoff to finish.')
     await this.#runtime.start()
     const turnInput = { ...input, text: requirePrompt(input.text) }
+    const providerChanged = input.modelProvider !== undefined
+      && thread.modelProvider !== 'unknown'
+      && input.modelProvider !== thread.modelProvider
+    if (providerChanged) {
+      await this.#runtime.request('thread/unsubscribe', { threadId: input.threadId })
+      await this.#resumeThreadForTurn(input.threadId, {
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.modelProvider ? { modelProvider: input.modelProvider } : {}),
+      })
+    }
     try {
       await this.#startTurn(turnInput)
     } catch (error) {
       if (!isThreadNotFoundError(error)) throw error
-      await this.#resumeThreadForTurn(input.threadId)
+      await this.#resumeThreadForTurn(input.threadId, {
+        ...(input.model ? { model: input.model } : {}),
+        ...(input.modelProvider ? { modelProvider: input.modelProvider } : {}),
+      })
       await this.#startTurn(turnInput)
     }
     this.#update({ selectedThreadId: input.threadId, error: null })
@@ -513,6 +526,7 @@ export class AgentService {
         ? this.#requireWorktreePath(context.projectId, context.worktreeId)
         : project.path
     }
+    if (input.model) params.model = input.model
     if (input.reasoningEffort) params.effort = input.reasoningEffort
     this.#runtime.markTurnStarted()
     try {
@@ -524,12 +538,22 @@ export class AgentService {
     }
   }
 
-  async #resumeThreadForTurn(threadId: string): Promise<void> {
+  async #resumeThreadForTurn(
+    threadId: string,
+    overrides: { model?: string; modelProvider?: string } = {},
+  ): Promise<void> {
     try {
-      const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
+      const result = asRecord(await this.#runtime.request('thread/resume', { threadId, ...overrides }))
       const thread = asRecord(result.thread)
       if (requireString(thread.id, 'thread.id') !== threadId) {
         throw new Error('Codex resumed a different conversation.')
+      }
+      if (overrides.model && requireString(result.model, 'thread.resume.model') !== overrides.model) {
+        throw new Error(`Codex did not apply the selected model "${overrides.model}".`)
+      }
+      if (overrides.modelProvider
+        && requireString(result.modelProvider, 'thread.resume.modelProvider') !== overrides.modelProvider) {
+        throw new Error(`Codex did not apply the selected provider "${overrides.modelProvider}".`)
       }
       this.#hydrateThread(thread)
     } catch (error) {
