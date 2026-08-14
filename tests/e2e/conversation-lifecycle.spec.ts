@@ -113,10 +113,10 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
       '终端',
       '帮助（暂未开放）',
     ]) {
-      await expect(topbarActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('data-tooltip', label)
+      const action = topbarActions.getByRole('button', { name: label, exact: true })
+      await expect(action).toHaveAttribute('data-tooltip', label)
+      await expect(action).toHaveAttribute('title', label)
     }
-    await topbarActions.getByRole('button', { name: '重命名任务' }).hover()
-    await window.screenshot({ path: 'test-results/aster-topbar-tooltip.png' })
     await window.getByRole('button', { name: '长期目标' }).click()
     const goalDialog = window.getByRole('dialog', { name: '长期目标' })
     await goalDialog.getByLabel('目标内容').fill('Ship the durable lifecycle')

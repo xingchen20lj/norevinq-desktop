@@ -1,0 +1,5 @@
+.agent-image { max-width: 640px; margin: 0; border: 1px solid var(--border); border-radius: 10px; }
+.agent-image img { display: block; max-width: 100%; max-height: 520px; margin: auto; }
+.agent-image figcaption { padding: 7px 9px; color: var(--subtle); }
+.agent-image-loading, .agent-image-error { display: flex; align-items: center; gap: 7px; padding: 10px; border: 1px dashed var(--border); color: var(--subtle); }
+.agent-image-error { justify-content: flex-start; color: var(--danger); }

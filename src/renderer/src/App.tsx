@@ -66,9 +66,9 @@ import type { UpdateSnapshot } from '../../shared/update'
 import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
 import type { AccountSnapshot } from '../../shared/account'
 import type { CommandAction } from './CommandPalette'
-import type { AgentImagePreview } from '../../shared/files'
 import { parseAgentMessage } from '../../shared/agentMessage'
 
+const AgentImage = lazy(() => import('./AgentImage').then(({ AgentImage: component }) => ({ default: component })))
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
 const CommandPalette = lazy(() => import('./CommandPalette').then(({ CommandPalette: component }) => ({ default: component })))
 const FileWorkbench = lazy(() => import('./FileWorkbench').then(({ FileWorkbench: component }) => ({ default: component })))
@@ -776,18 +776,18 @@ export function App(): React.JSX.Element {
           </div>
           <div className="topbar-actions">
             {selectedThread && !newTask && <>
-              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" data-tooltip="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
-              <button className="icon-button" aria-label="重命名任务" data-tooltip="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
-              <button className="icon-button" aria-label="分叉任务" data-tooltip="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
-              <button className="icon-button" aria-label="压缩上下文" data-tooltip="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
-              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} data-tooltip={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
-              <button className="icon-button danger-action" aria-label="永久删除任务" data-tooltip="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
+              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" data-tooltip="长期目标" title="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
+              <button className="icon-button" aria-label="重命名任务" data-tooltip="重命名任务" title="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
+              <button className="icon-button" aria-label="分叉任务" data-tooltip="分叉任务" title="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
+              <button className="icon-button" aria-label="压缩上下文" data-tooltip="压缩上下文" title="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
+              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} data-tooltip={conversations?.listArchived ? '恢复任务' : '归档任务'} title={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
+              <button className="icon-button danger-action" aria-label="永久删除任务" data-tooltip="永久删除任务" title="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
             </>}
-            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} data-tooltip={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
-            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" data-tooltip="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
-            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" data-tooltip="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
-            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" data-tooltip="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
-            <button className="icon-button" aria-label="帮助（暂未开放）" data-tooltip="帮助（暂未开放）"><CircleHelp size={17} /></button>
+            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} data-tooltip={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" data-tooltip="文件与产物" title="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
+            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" data-tooltip="本地网页预览" title="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
+            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" data-tooltip="终端" title="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
+            <button className="icon-button" aria-label="帮助（暂未开放）" data-tooltip="帮助（暂未开放）" title="帮助（暂未开放）"><CircleHelp size={17} /></button>
           </div>
         </header>
 
@@ -1555,38 +1555,9 @@ function AgentMessageContent({ text, projectId, worktreeId }: {
 }): React.JSX.Element {
   return <div className="agent-message-content">{parseAgentMessage(text).map((part, index) => part.type === 'text'
     ? <p key={`text:${String(index)}`}>{part.text}</p>
-    : <AgentImage key={`image:${part.path}:${String(index)}`} alt={part.alt} path={part.path} projectId={projectId} worktreeId={worktreeId} />)}</div>
-}
-
-function AgentImage({ alt, path, projectId, worktreeId }: {
-  alt: string
-  path: string
-  projectId: string | null
-  worktreeId: string | null
-}): React.JSX.Element {
-  const [preview, setPreview] = useState<AgentImagePreview | null>(null)
-  const [loadError, setLoadError] = useState<string | null>(null)
-
-  useEffect(() => {
-    let active = true
-    setPreview(null)
-    setLoadError(null)
-    if (!projectId) {
-      setLoadError('当前任务没有可用于验证图片路径的项目。')
-      return () => { active = false }
-    }
-    void window.aster.previewAgentImage({ projectId, path, ...(worktreeId ? { worktreeId } : {}) })
-      .then((value) => { if (active) setPreview(value) })
-      .catch((reason: unknown) => { if (active) setLoadError(toErrorMessage(reason)) })
-    return () => { active = false }
-  }, [path, projectId, worktreeId])
-
-  if (loadError) return <div className="agent-image-error" role="note"><FileCode2 size={14} /><span>图片无法安全预览：{loadError}</span></div>
-  if (!preview) return <div className="agent-image-loading" role="status"><LoaderCircle size={14} className="spin" />正在验证本地图片…</div>
-  return <figure className="agent-image">
-    <img src={preview.url} alt={alt || preview.name} onError={() => setLoadError('图片读取失败或预览凭据已过期。')} />
-    <figcaption>{alt || preview.name}</figcaption>
-  </figure>
+    : <Suspense fallback={<div role="status">正在加载图片预览…</div>} key={`image:${part.path}:${String(index)}`}>
+      <AgentImage alt={part.alt} path={part.path} projectId={projectId} worktreeId={worktreeId} />
+    </Suspense>)}</div>
 }
 
 function IntegrationRequestPanel({ request, onError }: {

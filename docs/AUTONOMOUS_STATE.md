@@ -14,7 +14,7 @@
 
 ## 已完成任务
 
-- 为顶栏 11 个纯图标动作增加随状态变化的悬停/键盘名称提示；真实 Electron 截图验证“重命名任务”浮层可见，生命周期 E2E 覆盖全部名称。
+- 为顶栏 11 个纯图标动作增加随状态变化的原生悬停名称与可访问标签；真实 Electron 生命周期 E2E 覆盖全部 `title`/`aria-label` 名称。
 - 助手回复中的本地 Markdown 图片现可直接显示：仅接受当前项目/工作树与 Aster 私有 `agent-home/generated_images` 下的绝对路径，经主进程真实路径、符号链接、格式和 50 MiB 上限验证后签发 15 分钟不透明 `aster-file` URL；远程 URL、SVG、越界文件和任意 `file://` 均不加载。单元测试与真实 Electron PNG 解码截图通过。
 - 普通界面、活动作者、运行状态、审批、安全工作台和用户可见错误统一采用 Aster 产品身份；新建、恢复和分叉任务均注入透明的 Aster `developerInstructions`，要求日常回答自称 Aster、被询问架构/许可/模型时如实披露 OpenAI 开源 Codex app-server 与实际提供商。单元测试、Electron 生命周期协议断言通过，DeepSeek V4 Flash 真实在线身份测试于 4.5 秒返回包含 Aster 且不含 Codex 的普通回答。
 - Aster 默认私有运行时目录从 `userData/codex-home` 改为 `userData/agent-home`；首次启动时仅在新目录不存在且旧路径为真实目录时原地迁移，保留登录、任务、MCP 和技能状态。新公开覆盖变量为 `ASTER_AGENT_HOME`/`ASTER_AGENT_BINARY`，旧变量只作为兼容别名；上游子进程所需的 `CODEX_HOME`、项目 `.codex` 和第三方包名继续保留以维持官方兼容性。目录创建、权限、符号链接拒绝、迁移保真及 Electron 回归通过。
