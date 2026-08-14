@@ -1,6 +1,6 @@
 import { execFile, type ExecException } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { lstatSync, realpathSync } from 'node:fs'
+import { lstatSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -37,7 +37,7 @@ export class GitService {
       const rootResult = await this.#git(project.path, ['rev-parse', '--show-toplevel'])
       const selectedRoot = realpathSync(project.path)
       const root = realpathSync(rootResult.stdout.trim())
-      if (!sameCanonicalPath(root, selectedRoot)) {
+      if (!sameDirectoryIdentity(root, selectedRoot)) {
         return emptySnapshot(
           input.projectId,
           '所选项目位于另一个 Git 仓库内。为防止读取或修改项目目录外的文件，请改为打开该 Git 仓库根目录。',
@@ -255,12 +255,13 @@ function pathExists(path: string): boolean {
   catch { return false }
 }
 
-function sameCanonicalPath(left: string, right: string): boolean {
-  const normalizedLeft = normalize(left)
-  const normalizedRight = normalize(right)
-  return process.platform === 'win32'
-    ? normalizedLeft.toLocaleLowerCase('en-US') === normalizedRight.toLocaleLowerCase('en-US')
-    : normalizedLeft === normalizedRight
+function sameDirectoryIdentity(left: string, right: string): boolean {
+  const leftMetadata = statSync(left, { bigint: true })
+  const rightMetadata = statSync(right, { bigint: true })
+  return leftMetadata.isDirectory()
+    && rightMetadata.isDirectory()
+    && leftMetadata.dev === rightMetadata.dev
+    && leftMetadata.ino === rightMetadata.ino
 }
 
 function parseDiscardMetadata(encoded: string): DiscardMetadata {
