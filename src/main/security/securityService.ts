@@ -10,9 +10,11 @@ import {
   VERSION,
   resolvePluginPython,
   type AccountStatus,
+  type CodexSecurityConfig,
   type ScanOptions,
   type ScanPreflight,
   type ScanResult,
+  type ScanTokenUsage,
 } from '@openai/codex-security'
 import type {
   SecurityArtifact,
@@ -31,13 +33,28 @@ import type {
 } from '../../shared/security.js'
 import type { StateDatabase } from '../state/database.js'
 import { redactString } from '../logging/redact.js'
+import {
+  createDeepSeekSecurityConfig,
+  DEEPSEEK_SECURITY_MODELS,
+  isDeepSeekSecurityModel,
+} from '../providers/deepseek.js'
+import {
+  DeepSeekUsageAccumulator,
+  resolveUsdCnyQuote,
+  type UsdCnyQuote,
+} from '../providers/deepseekPricing.js'
 
 const MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
 
 type SecuritySdk = Pick<CodexSecurity, 'metadata' | 'preflight' | 'run' | 'account' | 'close'>
+type SecuritySdkFactory = (config?: CodexSecurityConfig) => SecuritySdk
 
 export type SecurityServiceOptions = {
-  sdkFactory?: () => SecuritySdk
+  sdkFactory?: SecuritySdkFactory
+  deepSeekCredential?: () => string | null
+  codexBinary?: () => string | null
+  environment?: NodeJS.ProcessEnv
+  exchangeRateResolver?: () => Promise<UsdCnyQuote>
   pythonResolver?: () => Promise<string>
   now?: () => Date
   cliRunner?: (cwd: string, args: string[]) => Promise<string>
@@ -48,11 +65,18 @@ export class SecurityService {
   readonly #outputRoot: string
   readonly #stateRoot: string
   readonly #sdk: SecuritySdk
+  readonly #sdkFactory: SecuritySdkFactory
+  readonly #deepSeekCredential: () => string | null
+  readonly #codexBinary: () => string | null
+  readonly #requireCodexBinary: boolean
+  readonly #environment: NodeJS.ProcessEnv
+  readonly #exchangeRateResolver: () => Promise<UsdCnyQuote>
   readonly #pythonResolver: () => Promise<string>
   readonly #now: () => Date
   readonly #cliRunner: (cwd: string, args: string[]) => Promise<string>
   readonly #subscriptions = new Set<SecuritySubscription>()
   readonly #abortControllers = new Map<string, AbortController>()
+  readonly #ephemeralSdks = new Set<SecuritySdk>()
   #snapshot: SecuritySnapshot
   #lastPersistedAt = 0
 
@@ -65,14 +89,20 @@ export class SecurityService {
     preparePrivateDirectory(this.#outputRoot)
     preparePrivateDirectory(this.#stateRoot)
     process.env.CODEX_SECURITY_STATE_DIR = this.#stateRoot
-    this.#sdk = options.sdkFactory?.() ?? new CodexSecurity()
+    this.#sdkFactory = options.sdkFactory ?? ((config) => new CodexSecurity(config))
+    this.#sdk = this.#sdkFactory()
+    this.#deepSeekCredential = options.deepSeekCredential ?? (() => null)
+    this.#codexBinary = options.codexBinary ?? (() => null)
+    this.#requireCodexBinary = options.codexBinary !== undefined
+    this.#environment = options.environment ?? process.env
+    this.#exchangeRateResolver = options.exchangeRateResolver ?? (() => resolveUsdCnyQuote())
     this.#pythonResolver = options.pythonResolver ?? (() => resolvePluginPython({
       environment: process.env,
       protectedRoot: this.#stateRoot,
     }))
     this.#cliRunner = options.cliRunner ?? ((cwd, args) => runSecurityCli(this.#stateRoot, cwd, args))
     this.#snapshot = {
-      runtime: initialRuntime(this.#sdk),
+      runtime: initialRuntime(this.#sdk, this.#deepSeekCredential() !== null),
       activeScanId: null,
       scans: this.#database.listSecurityScans(),
     }
@@ -88,7 +118,7 @@ export class SecurityService {
   }
 
   async refreshRuntime(): Promise<SecuritySnapshot> {
-    const runtime = initialRuntime(this.#sdk)
+    const runtime = initialRuntime(this.#sdk, this.#deepSeekCredential() !== null)
     const [python, account] = await Promise.allSettled([this.#pythonResolver(), this.#sdk.account()])
     runtime.python = python.status === 'fulfilled'
       ? { status: 'ready', executable: python.value }
@@ -104,12 +134,18 @@ export class SecurityService {
   async preflight(request: SecurityScanRequest): Promise<SecurityPreflight> {
     const project = this.#requireProject(request.projectId)
     const outputDir = join(this.#outputRoot, `preflight-${randomUUID()}`)
-    const result = await this.#sdk.preflight(project.path, this.#scanOptions(request, outputDir))
-    return toSecurityPreflight(request.projectId, result, this.#outputRoot)
+    const selected = this.#sdkForRequest(request)
+    try {
+      const result = await selected.sdk.preflight(project.path, this.#scanOptions(request, outputDir))
+      return toSecurityPreflight(request.projectId, result, this.#outputRoot)
+    } finally {
+      if (selected.ephemeral) await this.#closeEphemeralSdk(selected.sdk)
+    }
   }
 
   startScan(request: SecurityScanRequest): SecuritySnapshot {
     if (this.#snapshot.activeScanId) throw new Error('已有安全扫描正在运行；请等待完成或先取消。')
+    this.#validateProviderRequest(request)
     const project = this.#requireProject(request.projectId)
     const id = randomUUID()
     const timestamp = this.#now().toISOString()
@@ -204,6 +240,8 @@ export class SecurityService {
     for (const controller of this.#abortControllers.values()) controller.abort(new Error('Application closing'))
     this.#abortControllers.clear()
     this.#subscriptions.clear()
+    await Promise.allSettled([...this.#ephemeralSdks].map((sdk) => sdk.close()))
+    this.#ephemeralSdks.clear()
     await this.#sdk.close()
   }
 
@@ -212,8 +250,12 @@ export class SecurityService {
     this.#abortControllers.set(initial.id, controller)
     this.#replaceScan(initial.id, { status: 'running', error: null }, true)
     const outputDir = join(this.#outputRoot, initial.id)
+    let selected: { sdk: SecuritySdk; ephemeral: boolean } | null = null
     try {
-      const result = await this.#sdk.run(initial.projectPath, {
+      selected = this.#sdkForRequest(initial.request)
+      const usageAccumulator = await this.#usageAccumulator(initial.request)
+      if (controller.signal.aborted) throw controller.signal.reason
+      const result = await selected.sdk.run(initial.projectPath, {
         ...this.#scanOptions(initial.request, outputDir),
         signal: controller.signal,
         onAuthentication: (authentication) => this.#updateProgress(initial.id, {
@@ -227,6 +269,11 @@ export class SecurityService {
         onProgress: (progress) => this.#updateProgress(initial.id, progress),
         onActivity: (activity) => this.#updateProgress(initial.id, { activity: activity.description }),
         onCost: (cost) => this.#updateProgress(initial.id, { costUsd: cost.estimatedUsd }),
+        ...(usageAccumulator ? {
+          onUsage: (usage: ScanTokenUsage) => this.#updateProgress(initial.id, {
+            deepseekUsage: usageAccumulator.update(usage, this.#now()),
+          }),
+        } : {}),
         onReconnect: (attempt, maxAttempts) => this.#updateProgress(initial.id, {
           activity: `连接恢复 ${String(attempt)}/${String(maxAttempts)}`,
         }),
@@ -244,6 +291,7 @@ export class SecurityService {
         error: { code: classifySecurityError(error), message: safeErrorMessage(error) },
       }, true)
     } finally {
+      if (selected?.ephemeral) await this.#closeEphemeralSdk(selected.sdk)
       this.#abortControllers.delete(initial.id)
       this.#snapshot = { ...this.#snapshot, activeScanId: null }
       this.#emit()
@@ -251,13 +299,14 @@ export class SecurityService {
   }
 
   #scanOptions(request: SecurityScanRequest, outputDir: string): ScanOptions {
+    const provider = request.provider ?? 'openai'
     const options: ScanOptions = {
-      auth: request.auth,
+      auth: provider === 'deepseek' ? 'api-key' : request.auth,
       mode: request.mode,
       outputDir,
       archiveExisting: false,
       target: toSdkTarget(request),
-      ...(request.maxCostUsd === undefined ? {} : { maxCostUsd: request.maxCostUsd }),
+      ...(provider === 'deepseek' || request.maxCostUsd === undefined ? {} : { maxCostUsd: request.maxCostUsd }),
     }
     if (request.mode === 'deep' && request.deep) {
       options.workers = request.deep.workers
@@ -268,11 +317,54 @@ export class SecurityService {
     return options
   }
 
+  #sdkForRequest(request: SecurityScanRequest): { sdk: SecuritySdk; ephemeral: boolean } {
+    if ((request.provider ?? 'openai') === 'openai') return { sdk: this.#sdk, ephemeral: false }
+    this.#validateProviderRequest(request)
+    const credential = this.#deepSeekCredential()
+    if (!credential) throw new Error('尚未配置 DeepSeek API Key；请先前往设置保存凭据。')
+    const model = request.model
+    if (!model || !isDeepSeekSecurityModel(model)) throw new Error('DeepSeek 安全扫描模型无效。')
+    const codexBinary = this.#codexBinary()
+    if (this.#requireCodexBinary && !codexBinary) {
+      throw new Error('Aster 智能体运行时尚未就绪；请等待状态变为已就绪后重试安全扫描。')
+    }
+    const sdk = this.#sdkFactory(createDeepSeekSecurityConfig(
+      model,
+      credential,
+      this.#stateRoot,
+      this.#environment,
+      codexBinary,
+    ))
+    this.#ephemeralSdks.add(sdk)
+    return { sdk, ephemeral: true }
+  }
+
+  #validateProviderRequest(request: SecurityScanRequest): void {
+    if ((request.provider ?? 'openai') !== 'deepseek') return
+    if (!this.#deepSeekCredential()) throw new Error('尚未配置 DeepSeek API Key；请先前往设置保存凭据。')
+    if (!request.model || !isDeepSeekSecurityModel(request.model)) throw new Error('请选择有效的 DeepSeek 安全扫描模型。')
+    if (request.maxCostUsd !== undefined) {
+      throw new Error('Codex Security SDK 尚无 DeepSeek 官方计价器，不能为该扫描提供可靠的美元硬上限。')
+    }
+  }
+
+  async #closeEphemeralSdk(sdk: SecuritySdk): Promise<void> {
+    this.#ephemeralSdks.delete(sdk)
+    await sdk.close()
+  }
+
+  async #usageAccumulator(request: SecurityScanRequest): Promise<DeepSeekUsageAccumulator | null> {
+    if ((request.provider ?? 'openai') !== 'deepseek' || !request.model) return null
+    const quote = await this.#exchangeRateResolver()
+    return new DeepSeekUsageAccumulator(request.model, quote)
+  }
+
   #updateProgress(scanId: string, patch: Partial<NonNullable<SecurityScanRecord['progress']>>): void {
     const current = this.#snapshot.scans.find(({ id }) => id === scanId)?.progress
     const activity = patch.activity ?? current?.activity
     const costUsd = patch.costUsd ?? current?.costUsd
     const trustedAccess = patch.trustedAccess ?? current?.trustedAccess
+    const deepseekUsage = patch.deepseekUsage ?? current?.deepseekUsage
     this.#replaceScan(scanId, {
       progress: {
         phase: patch.phase ?? current?.phase ?? 'preflight',
@@ -281,6 +373,7 @@ export class SecurityService {
         ...(activity === undefined ? {} : { activity }),
         ...(costUsd === undefined ? {} : { costUsd }),
         ...(trustedAccess === undefined ? {} : { trustedAccess }),
+        ...(deepseekUsage === undefined ? {} : { deepseekUsage }),
       },
     }, Date.now() - this.#lastPersistedAt >= 500)
   }
@@ -318,7 +411,7 @@ export class SecurityService {
   }
 }
 
-function initialRuntime(sdk: SecuritySdk): SecurityRuntimeStatus {
+function initialRuntime(sdk: SecuritySdk, deepSeekConfigured: boolean): SecurityRuntimeStatus {
   const major = Number.parseInt(process.versions.node.split('.')[0] ?? '0', 10)
   return {
     sdkVersion: VERSION,
@@ -329,6 +422,11 @@ function initialRuntime(sdk: SecuritySdk): SecurityRuntimeStatus {
     python: { status: 'unknown' },
     account: { status: 'unknown' },
     access: 'unknown',
+    deepseek: {
+      configured: deepSeekConfigured,
+      integration: 'aster-sdk-extension',
+      models: [...DEEPSEEK_SECURITY_MODELS],
+    },
   }
 }
 

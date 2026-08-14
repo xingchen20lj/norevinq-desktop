@@ -2,9 +2,13 @@ export type SecurityScanStatus = 'queued' | 'running' | 'completed' | 'failed' |
 export type SecurityScanMode = 'standard' | 'deep'
 export type SecurityTargetKind = 'repository' | 'paths' | 'working_tree' | 'refs'
 export type SecuritySeverity = 'critical' | 'high' | 'medium' | 'low' | 'informational'
+export type SecurityModelProvider = 'openai' | 'deepseek'
+export type SecurityDeepSeekModel = 'deepseek-v4-flash' | 'deepseek-v4-pro'
 
 export type SecurityScanRequest = {
   projectId: string
+  provider?: SecurityModelProvider
+  model?: SecurityDeepSeekModel
   mode: SecurityScanMode
   target: {
     kind: SecurityTargetKind
@@ -29,6 +33,22 @@ export type SecurityScanProgress = {
   activity?: string
   costUsd?: number
   trustedAccess?: 'granted' | 'not_granted' | 'unknown'
+  deepseekUsage?: {
+    inputTokens: number
+    cachedInputTokens: number
+    cacheWriteInputTokens: number
+    uncachedInputTokens: number
+    outputTokens: number
+    reasoningOutputTokens: number
+    totalTokens: number
+    estimatedUsd: number
+    estimatedCny: number
+    usdCnyRate: number
+    exchangeRateDate: string
+    exchangeRateSource: 'frankfurter-ecb' | 'fallback'
+    pricingTier: 'current' | 'peak' | 'off_peak'
+    pricingVersion: string
+  }
 }
 
 export type SecurityFinding = {
@@ -103,6 +123,11 @@ export type SecurityRuntimeStatus = {
   python: { status: 'ready' | 'missing' | 'unknown'; executable?: string; message?: string }
   account: { status: 'authenticated' | 'missing' | 'unknown'; details?: string }
   access: 'granted' | 'not_granted' | 'unknown'
+  deepseek: {
+    configured: boolean
+    integration: 'aster-sdk-extension'
+    models: SecurityDeepSeekModel[]
+  }
 }
 
 export type SecuritySnapshot = {

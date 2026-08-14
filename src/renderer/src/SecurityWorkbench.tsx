@@ -17,7 +17,9 @@ import { useMemo, useState } from 'react'
 import type { ProjectSummary } from '../../shared/contracts'
 import type {
   SecurityArtifact,
+  SecurityDeepSeekModel,
   SecurityFinding,
+  SecurityModelProvider,
   SecurityPreflight,
   SecurityScanMode,
   SecurityScanRecord,
@@ -37,6 +39,8 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
   const [busy, setBusy] = useState(false)
   const [mode, setMode] = useState<SecurityScanMode>('standard')
   const [target, setTarget] = useState<SecurityTargetKind>('repository')
+  const [provider, setProvider] = useState<SecurityModelProvider>('openai')
+  const [deepSeekModel, setDeepSeekModel] = useState<SecurityDeepSeekModel>('deepseek-v4-pro')
   const [auth, setAuth] = useState<'auto' | 'chatgpt' | 'api-key'>('auto')
   const [paths, setPaths] = useState('src')
   const [base, setBase] = useState('HEAD')
@@ -53,13 +57,15 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
 
   const request = project ? {
     projectId: project.id,
+    provider,
+    ...(provider === 'deepseek' ? { model: deepSeekModel } : {}),
     mode,
     target: target === 'repository' ? { kind: 'repository' as const }
       : target === 'paths' ? { kind: 'paths' as const, paths: paths.split('\n').map((value) => value.trim()).filter(Boolean) }
         : target === 'working_tree' ? { kind: 'working_tree' as const, base }
           : { kind: 'refs' as const, base },
     auth,
-    ...(Number(maxCost) > 0 ? { maxCostUsd: Number(maxCost) } : {}),
+    ...(provider === 'openai' && Number(maxCost) > 0 ? { maxCostUsd: Number(maxCost) } : {}),
     ...(mode === 'deep' ? { deep: { workers: 2, subagents: 0, stopAfterNoNew: 3, maxDiscoveryRuns: 10 } } : {}),
   } : null
 
@@ -81,16 +87,17 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
         {tab === 'scans' && <div className="settings-section">
           <div className="section-heading"><div><h3>运行扫描</h3><p>产物保存在仓库外的应用私有目录；真实扫描可能产生模型费用。</p></div></div>
           {!project ? <Empty title="尚未打开项目" detail="打开项目后才能预检或启动扫描。" /> : <div className="security-scan-form">
+            <label><span>模型提供商</span><select value={provider} onChange={(event) => { setProvider(event.target.value as SecurityModelProvider); setPreflight(null) }}><option value="openai">OpenAI / ChatGPT</option><option value="deepseek">DeepSeek Responses</option></select></label>
             <label><span>模式</span><select value={mode} onChange={(event) => { const next = event.target.value as SecurityScanMode; setMode(next); if (next === 'deep' && (target === 'refs' || target === 'working_tree')) setTarget('repository') }}><option value="standard">普通扫描</option><option value="deep">深度扫描</option></select></label>
             <label><span>目标</span><select value={target} onChange={(event) => setTarget(event.target.value as SecurityTargetKind)}><option value="repository">完整仓库</option><option value="paths">指定路径</option>{mode === 'standard' && <><option value="working_tree">工作区差异</option><option value="refs">提交差异</option></>}</select></label>
-            <label><span>认证</span><select value={auth} onChange={(event) => setAuth(event.target.value as typeof auth)}><option value="auto">自动选择</option><option value="chatgpt">ChatGPT 登录</option><option value="api-key">环境 API Key</option></select></label>
-            <label><span>费用上限（USD）</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} /></label>
+            {provider === 'openai' ? <label><span>认证</span><select value={auth} onChange={(event) => setAuth(event.target.value as typeof auth)}><option value="auto">自动选择</option><option value="chatgpt">ChatGPT 登录</option><option value="api-key">环境 API Key</option></select></label> : <label><span>DeepSeek 模型</span><select value={deepSeekModel} onChange={(event) => setDeepSeekModel(event.target.value as SecurityDeepSeekModel)}><option value="deepseek-v4-pro">DeepSeek V4 Pro（并行验证）</option><option value="deepseek-v4-flash">DeepSeek V4 Flash（串行验证）</option></select></label>}
+            {provider === 'openai' ? <label><span>费用上限（USD）</span><input type="number" min="0.01" step="0.01" value={maxCost} onChange={(event) => setMaxCost(event.target.value)} /></label> : <p className="settings-note">使用 DeepSeek API Key 直接计费；下方实时显示 token 与人民币估算。Flash 与 Pro 均已通过 Aster 0.1.0 的真实 completed + sealed 扫描。为避免产物收敛竞态，Flash 使用单线程审计，Pro 使用有限并行。SDK 暂不能对 DeepSeek 执行可靠美元硬中止。</p>}
             {target === 'paths' && <label className="wide"><span>仓库相对路径（每行一项）</span><textarea rows={3} value={paths} onChange={(event) => setPaths(event.target.value)} /></label>}
             {(target === 'working_tree' || target === 'refs') && <label className="wide"><span>基准引用</span><input value={base} onChange={(event) => setBase(event.target.value)} /></label>}
             {mode === 'deep' && <p className="settings-note wide">深度扫描采用 2 个发现 worker、0 个子智能体，连续 3 轮无新发现后停止，最多 10 轮。</p>}
             <div className="settings-actions wide"><button disabled={busy || !request || snapshot?.activeScanId !== null} onClick={() => void run(async () => { if (request) setPreflight(await window.aster.preflightSecurityScan(request)) })}><ShieldCheck size={13} />本地预检</button><button className="primary-button" disabled={busy || !request || snapshot?.activeScanId !== null} onClick={() => void run(async () => { if (request) { await window.aster.startSecurityScan(request); setPreflight(null) } })}><Play size={13} />启动真实扫描</button></div>
           </div>}
-          {preflight && <div className="security-preflight"><CheckCircle2 size={16} /><div><strong>预检通过</strong><p>{preflight.model} · {preflight.reasoningEffort} · {preflight.authentication} · {preflight.outputIsolated ? '产物目录已隔离' : '产物目录异常'}</p></div></div>}
+          {preflight && <div className="security-preflight"><CheckCircle2 size={16} /><div><strong>预检通过</strong><p>{preflight.modelProvider ?? 'openai'} · {preflight.model} · {preflight.reasoningEffort} · {preflight.authentication} · {preflight.outputIsolated ? '产物目录已隔离' : '产物目录异常'}</p></div></div>}
           <ScanList scans={snapshot?.scans ?? []} activeScanId={snapshot?.activeScanId ?? null} busy={busy} run={run} viewArtifact={setArtifact} />
         </div>}
         {tab === 'findings' && <Findings scans={snapshot?.scans ?? []} busy={busy} run={run} viewResult={setArtifact} />}
@@ -125,6 +132,7 @@ function RuntimeCard({ snapshot }: { snapshot: SecuritySnapshot | null }): React
     <div><strong>隔离 Codex</strong><span>SDK {runtime?.codexSdkVersion ?? '—'} · executable {runtime?.codexExecutableVersion ?? '—'}</span></div>
     <div><strong>Python</strong><span>{runtime?.python.status === 'ready' ? runtime.python.executable : runtime?.python.message ?? '尚未诊断'}</span></div>
     <div><strong>账户 / Trusted Access</strong><span>{runtime?.account.details ?? runtime?.account.status ?? 'unknown'} · {runtime?.access ?? 'unknown'}</span></div>
+    <div><strong>DeepSeek Security</strong><span>{runtime?.deepseek.configured ? `已配置 · ${runtime.deepseek.models.join(' / ')}` : '未配置 API Key'}</span></div>
   </div>
 }
 
@@ -137,8 +145,9 @@ function ScanList({ scans, activeScanId, busy, run, viewArtifact }: {
 }): React.JSX.Element {
   if (scans.length === 0) return <Empty title="没有扫描历史" detail="本地预检不写入历史；启动真实扫描后会在此显示。" />
   return <div className="security-scan-list">{scans.map((scan) => <article key={scan.id}>
-    <header><div><strong>{scan.projectName}</strong><span>{scan.request.mode} · {scan.request.target.kind} · {formatTime(scan.createdAt)}</span></div><i className={scan.status}>{scanStatus(scan.status)}</i></header>
+    <header><div><strong>{scan.projectName}</strong><span>{scan.request.provider ?? 'openai'}{scan.request.model ? `/${scan.request.model}` : ''} · {scan.request.mode} · {scan.request.target.kind} · {formatTime(scan.createdAt)}</span></div><i className={scan.status}>{scanStatus(scan.status)}</i></header>
     {scan.progress && <div className="security-progress"><div><span style={{ width: `${String(progressPercent(scan))}%` }} /></div><small>{scan.progress.phase} · {scan.progress.filesCompleted}/{scan.progress.filesTotal || '?'} 文件{scan.progress.costUsd === undefined ? '' : ` · $${scan.progress.costUsd.toFixed(4)}`}</small><p>{scan.progress.activity}</p></div>}
+    {scan.progress?.deepseekUsage && <DeepSeekUsage usage={scan.progress.deepseekUsage} />}
     {scan.error && <div className="provider-warning"><strong>{scan.error.code}</strong><span>{scan.error.message}</span></div>}
     {scan.result && <ScanSummary scan={scan} />}
     <footer>{activeScanId === scan.id && <button className="danger-button" disabled={busy} onClick={() => void run(() => window.aster.cancelSecurityScan({ scanId: scan.id }))}><Square size={11} />取消</button>}{scan.result?.reportAvailable && <button disabled={busy} onClick={() => void run(async () => viewArtifact(await window.aster.readSecurityArtifact({ scanId: scan.id, kind: 'report' })))}><FileSearch size={11} />报告</button>}{scan.result && <button disabled={busy} onClick={() => void run(async () => { const value = await window.aster.exportSecurityFindings({ scanId: scan.id, format: 'json' }); viewArtifact({ kind: 'findings', content: value.content, truncated: value.truncated }) })}><FileJson size={11} />JSON</button>}{scan.result && <button disabled={busy} onClick={() => void run(async () => { const value = await window.aster.exportSecurityFindings({ scanId: scan.id, format: 'csv' }); viewArtifact({ kind: 'findings', content: value.content, truncated: value.truncated }) })}><FileJson size={11} />CSV</button>}{scan.result?.sarifAvailable && <button disabled={busy} onClick={() => void run(async () => viewArtifact(await window.aster.readSecurityArtifact({ scanId: scan.id, kind: 'sarif' })))}><FileJson size={11} />SARIF</button>}</footer>
@@ -149,6 +158,18 @@ function ScanSummary({ scan }: { scan: SecurityScanRecord }): React.JSX.Element 
   const result = scan.result
   if (!result) return <></>
   return <div className="scan-result-summary"><span>{result.findings.length} 个漏洞</span><span>覆盖：{result.coverage.completeness}</span><span>{result.coverage.surfaces} 个安全面</span><span>plugin {result.pluginVersion}</span></div>
+}
+
+function DeepSeekUsage({ usage }: { usage: NonNullable<NonNullable<SecurityScanRecord['progress']>['deepseekUsage']> }): React.JSX.Element {
+  const hitRate = usage.inputTokens > 0 ? usage.cachedInputTokens / usage.inputTokens : 0
+  return <div className="deepseek-usage" aria-label="DeepSeek 实时 Token 与费用">
+    <div><span>输入</span><strong>{formatTokens(usage.inputTokens)}</strong><small>总计 {formatTokens(usage.totalTokens)}</small></div>
+    <div><span>缓存命中</span><strong>{formatTokens(usage.cachedInputTokens)}</strong><small>{(hitRate * 100).toFixed(1)}%</small></div>
+    <div><span>缓存未命中</span><strong>{formatTokens(usage.uncachedInputTokens)}</strong></div>
+    <div><span>输出</span><strong>{formatTokens(usage.outputTokens)}</strong><small>推理 {formatTokens(usage.reasoningOutputTokens)}</small></div>
+    <div className="cost"><span>预估消耗</span><strong>¥{usage.estimatedCny.toFixed(6)}</strong><small>${usage.estimatedUsd.toFixed(6)} · USD/CNY {usage.usdCnyRate.toFixed(4)}</small></div>
+    <p>DeepSeek 官方 {pricingTier(usage.pricingTier)}价（{usage.pricingVersion}）· 汇率 {usage.exchangeRateDate}{usage.exchangeRateSource === 'fallback' ? ' 备用值' : ' ECB 参考' } · 实际账单以 DeepSeek 控制台为准</p>
+  </div>
 }
 
 function Findings({ scans, busy, run, viewResult }: {
@@ -193,6 +214,14 @@ function severityRank(severity: SecurityFinding['severity']): number {
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value))
+}
+
+function formatTokens(value: number): string {
+  return new Intl.NumberFormat('zh-CN').format(value)
+}
+
+function pricingTier(value: 'current' | 'peak' | 'off_peak'): string {
+  return { current: '当前', peak: '高峰', off_peak: '非高峰' }[value]
 }
 
 function toErrorMessage(reason: unknown): string {

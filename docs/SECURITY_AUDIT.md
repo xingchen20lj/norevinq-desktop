@@ -36,11 +36,11 @@
 
 ### 高：Codex Security 的 PDF.js 传递依赖漏洞
 
-`@openai/codex-security@0.1.8` 固定 `pdfjs-dist@5.6.205`，命中 GHSA-hq66-cqwq-w95j（恶意 PDF 任意 JavaScript 执行）。工作区使用 pnpm override 固定到已修复的 `6.2.108`；Node 24 满足其引擎要求。复扫结果为 `No known vulnerabilities found`，SDK 服务测试、构建与本地预检路径继续通过。
+Codex Security 依赖树曾固定 `pdfjs-dist@5.6.205`，命中 GHSA-hq66-cqwq-w95j（恶意 PDF 任意 JavaScript 执行）。工作区使用 pnpm override 固定到已修复的 `6.2.108`；Node 24 满足其引擎要求。当前 SDK 0.1.11 继续由生产依赖审计、SDK 服务测试、构建与本地预检守门。
 
 ### 高：Codex Security 的 extract-zip 传递依赖漏洞
 
-2026-08-13 npm 审计新增 GHSA-jmr9-qjv8-65gv：`@openai/codex-security@0.1.8` 固定的 `extract-zip@2.0.1` 对符号链接目标缺少完整验证，恶意 ZIP 可在解压根外写入。公告把修复版标为 `2.0.2`，但 npm registry 当时尚未发布该版本；项目没有降低审计阈值，而是用 pnpm alias 精确替换为 Electron 官方、带 npm provenance 的兼容实现 `@electron-internal/extract-zip@1.0.5`。生产审计恢复为 `No known vulnerabilities found`，Codex Security 0.1.8 真实 preflight、169 项回归与 macOS/Windows CI 作为兼容性守门。
+2026-08-13 npm 审计新增 GHSA-jmr9-qjv8-65gv：当时 Codex Security 依赖树固定的 `extract-zip@2.0.1` 对符号链接目标缺少完整验证，恶意 ZIP 可在解压根外写入。公告把修复版标为 `2.0.2`，但 npm registry 当时尚未发布该版本；项目没有降低审计阈值，而是用 pnpm alias 精确替换为 Electron 官方、带 npm provenance 的兼容实现 `@electron-internal/extract-zip@1.0.5`。该替换在 SDK 0.1.11 下继续保留，并由生产审计、真实 preflight、回归与 macOS/Windows CI 守门。
 
 ### 中：IPC handler 未统一验证调用 WebContents
 

@@ -58,6 +58,10 @@ test('starts with a sandboxed renderer and real project action', async () => {
     expect(runtime.models.length).toBeGreaterThan(0)
     const deepSeekConfigured = typeof process.env.DEEPSEEK_API_KEY === 'string' && process.env.DEEPSEEK_API_KEY.trim().length > 0
     const runtimeModelIds = runtime.models.map((item) => (item as { id?: string }).id)
+    const scheduledModel = runtimeModelIds.includes('gpt-5.6-sol')
+      ? 'gpt-5.6-sol'
+      : runtimeModelIds.find((id): id is string => typeof id === 'string' && !id.startsWith('deepseek-'))
+    expect(scheduledModel).toBeTruthy()
     expect(runtimeModelIds.includes('deepseek-v4-flash')).toBe(deepSeekConfigured)
     expect(runtimeModelIds.includes('deepseek-v4-pro')).toBe(deepSeekConfigured)
 
@@ -120,12 +124,20 @@ test('starts with a sandboxed renderer and real project action', async () => {
       }
       return bridge.getSecurityState()
     }), { timeout: 30_000 }).toMatchObject({
-      runtime: { python: { status: 'ready' }, account: { status: 'authenticated' }, sdkVersion: '0.1.8' },
+      runtime: { python: { status: 'ready' }, sdkVersion: '0.1.11' },
     })
     await security.getByRole('button', { name: '扫描', exact: true }).click()
+    if (deepSeekConfigured) {
+      await security.getByLabel('模型提供商').selectOption('deepseek')
+      await expect(security.getByLabel('DeepSeek 模型')).toHaveValue('deepseek-v4-pro')
+      await expect(security).toContainText('实时显示 token 与人民币估算')
+      await expect(security).toContainText('Flash 与 Pro 均已通过')
+      await expect(security.getByLabel('DeepSeek 模型').locator('option[value="deepseek-v4-flash"]')).toBeEnabled()
+    }
     await security.getByRole('button', { name: '本地预检', exact: true }).click()
     await expect(security).toContainText('预检通过', { timeout: 30_000 })
     await expect(security).toContainText('产物目录已隔离')
+    if (deepSeekConfigured) await expect(security).toContainText('deepseek · deepseek-v4-pro')
     await window.screenshot({ path: 'test-results/aster-security.png' })
     await window.getByRole('button', { name: '关闭安全工作台' }).click()
 
@@ -138,6 +150,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await scheduler.getByLabel('每次运行的持久提示词').fill('Reply with exactly ASTER_SCHEDULED_OK and do not use tools.')
     await scheduler.getByLabel('执行位置').selectOption('local')
     await scheduler.getByLabel('沙箱').selectOption('read-only')
+    await scheduler.getByLabel('模型').selectOption(scheduledModel ?? '')
     await scheduler.getByRole('button', { name: '保存计划任务', exact: true }).click()
     await expect(scheduler).toContainText('E2E 计划验证')
     await scheduler.getByRole('button', { name: '立即运行', exact: true }).click()
@@ -251,16 +264,17 @@ test('starts with a sandboxed renderer and real project action', async () => {
       expect(readFileSync(join(projectPath, 'aster-deepseek-proof.txt'), 'utf8')).toBe('DEEPSEEK_TOOL_OK\n')
     }
 
-    await window.evaluate(async ({ projectId }) => {
+    await window.evaluate(async ({ projectId, model }) => {
       const bridge = Reflect.get(window, 'aster') as {
         startConversation: (input: unknown) => Promise<unknown>
       }
       await bridge.startConversation({
         projectId,
+        model,
         sandbox: 'read-only',
         text: 'Create a file named aster-approval-proof.txt in the project root containing exactly ASTER_APPROVAL_OK followed by a newline. Use apply_patch only and do not run shell commands.',
       })
-    }, { projectId: project.id })
+    }, { projectId: project.id, model: scheduledModel ?? '' })
     await expect(window.getByLabel('待审批操作')).toBeVisible({ timeout: 90_000 })
     await expect(window.getByLabel('待审批操作')).toContainText('允许修改文件？')
     await window.getByRole('button', { name: '允许', exact: true }).click()

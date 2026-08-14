@@ -254,7 +254,10 @@ if (!gotLock) {
     })
     agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)
-    securityService = new SecurityService(database, join(userData, 'security'))
+    securityService = new SecurityService(database, join(userData, 'security'), {
+      deepSeekCredential: () => environmentDeepSeekKey ?? readStoredDeepSeekKey(credentialStore),
+      codexBinary: () => runtime?.getSnapshot().binaryPath ?? null,
+    })
     schedulerService = new SchedulerService(database, (task, projectId, signal) =>
       executeScheduledTask(createdAgentService, createdWorktreeService, task, projectId, signal))
     browserService = new BrowserService(() => mainWindow, (url) => shell.openExternal(url))

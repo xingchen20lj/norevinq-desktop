@@ -131,7 +131,7 @@ Node 没有安装或不在 `PATH`。先确认 `node --version`，不要只检查
 
 ### Codex Security 不可用
 
-这不影响普通构建。真实扫描另外需要 Python 3.10+、账户认证以及 Codex Security/Trusted Access 权限。
+这不影响普通构建。真实扫描另外需要 Python 3.10+。OpenAI 模式需要相应账户认证及 Codex Security/Trusted Access 权限；经 Aster 0.1.0 在线 sealed 扫描验证的 DeepSeek V4 Flash 与 V4 Pro 直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录，但仍会产生 DeepSeek API 费用。Aster 强制 Security 复用已验证的 0.147.0 运行时；Flash 串行审计，Pro 使用有限并行。
 
 ### 在线测试失败
 

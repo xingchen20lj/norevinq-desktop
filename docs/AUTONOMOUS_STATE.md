@@ -8,11 +8,13 @@
 
 ## 当前任务
 
-- 完成开源许可证、社区治理、公开文档、隐私清理和可复现 Codex schema 生成的完整质量门。
+- 完成 Codex Security 直接 DeepSeek Responses provider、隔离凭据环境、实时 token/缓存与人民币费用展示的真实在线验证和发布质量门。
 - 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
 
+- 将公开 `@openai/codex-security` 升级到 0.1.11，并以 Apache-2.0 可审计 pnpm 补丁增加固定 DeepSeek provider、SDK 实例级环境隔离和只读 token usage 回调；补丁不改变扫描提示、sealed contract、sandbox、finding schema 或产物校验，完整差异随仓库分发。
+- 安全工作台可直接选择 DeepSeek V4 Flash 或 V4 Pro，无需 OpenAI 登录；Pro 在约 12 分钟内完成一文件 standard 扫描，Flash 经根因对照后固定复用 Aster Codex 0.147.0、单并发并于 160.9 秒完成同一类扫描，两者都返回 `completed + sealed` 且 usage 非空。扫描卡实时显示输入、总计、缓存命中/未命中、输出与推理 token，并按官方当前/高峰/非高峰价格逐增量累计美元和人民币估算；真实/打包 UI 预检、汇率降级和跨计价时段单测通过。早期 Flash 失败现已归类为旧运行时/并发收敛组合问题，不再误称官方模型限制。
 - 修复同一任务内的模型切换：Renderer 继续任务时现在显式传递 model/provider；同提供商换模型使用 `turn/start.model`，OpenAI↔DeepSeek 跨提供商切换则在空闲线程上执行 `thread/unsubscribe` → 带覆盖的 `thread/resume`，并核验服务端回显，拒绝静默沿用旧模型。固定官方 Codex 0.147.0 已真实验证同一 thread 在 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro 间切换，不产生模型回答费用。
 - 重新生成模型切换修复体验包：Intel x64 包内 app-server 启动 E2E 与 DMG CRC 通过，Apple Silicon 包的 Electron/Codex arm64 架构和 DMG CRC 通过；两种包均只含目标架构的官方 Codex。由于无 Developer ID，仍限定为内部测试包。
 - 修复运行时重启后的历史任务继续发送：当 `turn/start` 返回 `thread not found` 时，仅对这一无副作用失败自动执行 `thread/resume` 并重试一次；这消除了保存 DeepSeek 凭据或 app-server 空闲恢复后看似“DeepSeek API 不可用”的假象。若历史确实被删除则停止重试并给出可操作错误。定向测试与完整 `verify:ci` 通过。
@@ -28,7 +30,7 @@
 - 确认 Codex 自定义模型提供商当前以 Responses API 为正式 wire API，支持通过环境变量提供密钥。
 - 确认本机可用 Codex 内置 Node.js 24.14.0 与 pnpm 11.16.0。
 - 选择 Electron + React + TypeScript 作为初始桌面架构，并记录 ADR。
-- 完成 OpenAI Codex 0.147.0、Codex Security 0.1.8 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`。
+- 完成 OpenAI Codex 0.147.0、Codex Security 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`；Security SDK 当前固定 0.1.11。
 - 使用已有安全凭据真实验证 `deepseek-v4-flash` 的非流式、SSE、函数调用回传和 Web Search；未记录或输出密钥。
 - 记录 `deepseek-v4-pro` 在 2026-08-10 仍不能调用 Responses API；2026-08-13 复核官方 reference/Codex catalog 后确认已开放，当前账户最小真实请求返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `ASTER_PRO_OK`。
 - 完成 `deepseek-v4-pro` 模型目录、能力注册、设置状态和专属在线 Electron E2E；随应用固定的官方 Codex 0.147.0 经 app-server 在 47.9 秒内真实调用 `apply_patch`，创建 `DEEPSEEK_PRO_TOOL_OK\n` 文件并返回 `ASTER_DEEPSEEK_PRO_OK`。
@@ -249,9 +251,9 @@
 
 ## 下一任务
 
-1. 完成本轮工作树 Handoff 恢复的完整质量门与跨平台 CI。
-2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
-3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
+1. 提交并运行本轮 DeepSeek Security 的 macOS/Windows 跨平台 CI。
+2. 统一普通用户界面的 Aster 品牌和助手自称；关于、许可证、上游诊断保留真实 Codex 署名。
+3. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示，并使用签名目标平台安装包复验 Security 长扫描与取消恢复。
 
 ## 已做技术决策
 
@@ -267,6 +269,7 @@
 - GitHub：CLI 只在主进程运行；head/base 远端由登记仓库状态重建，PR 描述走 stdin，显式 push 和用户确认后才允许外部写入，创建结果必须结构化回读验证且保持幂等。
 - 安全扫描输出必须位于被扫描工作树之外，并使用私有权限目录。
 - Codex Security 只接受 completed + sealed SDK 结果；cost limit、中断和 contract 失败保留失败状态，不展示部分 finding。
+- Codex Security 的 DeepSeek 支持采用显式固定 provider 与最小公开补丁；Key 只进入每次 SDK 实例的白名单子进程环境，并从 Python workbench 环境剔除，不宣称是上游 0.1.11 未修改原生能力。
 - Security validate/patch/false-positive/export 使用官方 CLI 参数数组；patch 必须显式确认，renderer 不能提交路径或命令。
 - 计划任务由 Electron 主进程本地调度；不安装后台守护进程，也不伪装成 app-server/CLI 的计划任务 API。
 - 计划任务崩溃后不重放活动 turn；应用重新启动只按 run-once/skip 策略处理下一次到期，避免重复副作用。
@@ -281,16 +284,17 @@
 
 ## 当前失败测试
 
-当前无失败测试。同任务模型/provider 切换、历史任务自动 resume 与目标架构打包裁剪后完整 `verify:ci` 通过：37 个测试文件 185 项、2 项性能基准，覆盖率 80.98/69.53/86.02/87.83，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；生产依赖审计为 0 已知漏洞。上一 `main` 的 macOS 15/Windows 2025 CI 均绿色，本分支跨平台 CI 待提交后验证。
+当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、194 项通过及 1 项跳过，覆盖率 81.12/70.04/86.00/88.00，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；真实完整应用 E2E、开发态与打包态 DeepSeek Security UI/预检均通过。生产依赖审计为 0 已知漏洞，目录包内 Codex 0.147.0 检查通过。本分支跨平台 CI 待提交后验证。
 
 ## 已知问题
 
 - 开发环境仍可发现 ChatGPT 预发布 `0.147.0-alpha.6.5`，但发布包已固定并实际启动稳定 0.147.0；schema 继续按固定版本同步。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
 - 当前 bundle 预算基于 Intel macOS 构建；不同平台 chunk 哈希可不同，但 `check:bundle` 以生产 HTML 的真实入口资产计量。
-- Codex Security 0.1.8 元数据固定 Codex SDK/runtime 0.144.6；发布包为避免额外约 270 MiB 原生副本统一使用 0.147.0，需在使用量/权限恢复后执行 packaged sealed 扫描确认兼容。
+- Codex Security 0.1.11 元数据仍固定 Codex SDK/runtime 0.144.6；发布包为避免额外约 270 MiB 原生副本统一使用 0.147.0，打包预检已通过，仍需在签名目标包执行完整 sealed 长扫描确认兼容。
+- DeepSeek V4 Flash 的早期 Security 多智能体长流程曾分别出现 sealed 后修改和 sealed 后不及时返回；固定复用 Aster Codex 0.147.0 并将并发降为 1 后复验通过。当前保留串行策略，并等待上游 SDK 将内置 Codex 从 0.144.6 升级后再评估提高并发。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
-- Codex Security standard 扫描即使仅 2 个目标文件也超过本次 $2 在线验证上限；提高预算前不能宣称真实 sealed 扫描完成。
+- OpenAI Codex Security standard 扫描即使仅 2 个目标文件也超过此前 $2 在线验证上限；DeepSeek 模式不使用上游未知模型的美元硬上限，而显示官方价格估算并明确由用户控制取消。
 - Stage 20 本地安全 diff 扫描完成源码、验证与攻击路径阶段，但 finalizer 拒绝 `/var` 符号链接形式扫描目录；按单次 finalization 规则保留为 unsealed 证据，不导入产品扫描历史。
 - 自动更新尚无发布者实际控制的 HTTPS 源和平台签名证书；本机只验证元数据/状态机/包内启停，不能宣称真实跨版本升级完成。
 
@@ -303,7 +307,7 @@
 - OpenAI/ChatGPT 凭据：在线 Codex 实测需要；缺失时使用协议测试替身。
 - 当前 ChatGPT/Codex 使用量已耗尽，服务端提示 2026-08-16 11:32 恢复；在此之前只保留既有在线证据并继续离线验证。
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
-- Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
+- Codex Security 权限与模型费用：OpenAI 模式仍受账户 Security/Trusted Access 与费用约束；DeepSeek 模式直接使用 API Key，无需 OpenAI 登录，但会产生 DeepSeek API 费用。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
 - 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
 - GitHub 远端已建立并由系统 keyring 中的维护者账户验证；Aster 不保存或显示其 token。

@@ -37,5 +37,8 @@ Aster 使用独立的 `userData/codex-home`，不读取或修改官方客户端�
 - 临时项目最终存在 `aster-deepseek-proof.txt`，内容精确为 `DEEPSEEK_TOOL_OK\n`，最终 agent 消息精确为 `ASTER_DEEPSEEK_OK`。
 - Pro 临时项目最终存在 `aster-deepseek-pro-proof.txt`，内容精确为 `DEEPSEEK_PRO_TOOL_OK\n`，最终 agent 消息精确为 `ASTER_DEEPSEEK_PRO_OK`；活动时间线真实出现文件修改/命令结构化卡片。
 - credential store、环境优先级、provider 热重启参数和无明文持久化有自动测试。
+- 安全工作台可把同一安全保存的 Key 注入隔离的 Codex Security SDK 实例，以经 Aster 0.1.0 在线 sealed 扫描验证的 V4 Flash 或 V4 Pro 直接调用 DeepSeek Responses，不需要 OpenAI/ChatGPT 登录。普通 app-server 与 Security SDK 使用不同 Codex home 和子进程环境，但 Security 强制复用 Aster 已验证的 Codex 0.147.0 二进制。早期 Flash 在 SDK 内置 0.144.6/并发扫描组合下出现产物收敛异常；固定 0.147.0 并把 Flash 并发降为 1 后，一文件 standard 扫描于 160.9 秒完成并返回 `completed + sealed`。Pro 保留 4 个并发线程。
+- 安全扫描实时汇总输入、缓存命中/未命中、输出及推理 token。费用按 DeepSeek 官方每百万 token 单价逐次累计，并以扫描开始时取得的 USD/CNY 参考汇率显示人民币估算；实际扣费以 DeepSeek 控制台为准。
 - [DeepSeek Responses API Reference](https://api-docs.deepseek.com/api/create-response/)
 - [DeepSeek 官方 Codex 集成](https://api-docs.deepseek.com/quick_start/agent_integrations/codex/)
+- [DeepSeek 官方模型与计费](https://api-docs.deepseek.com/quick_start/pricing/)

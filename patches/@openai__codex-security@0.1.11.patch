@@ -1,0 +1,259 @@
+diff --git a/dist/api.d.ts b/dist/api.d.ts
+index 718a2c9..d66348a 100644
+--- a/dist/api.d.ts
++++ b/dist/api.d.ts
+@@ -2,7 +2,7 @@
+ import { type CodexOptions } from "@openai/codex-sdk";
+ import { CodexLoginHandle, type AccountStatus } from "./auth.js";
+ import { type CodexSecurityConfig, type JsonObject } from "./config.js";
+-import { type ScanCost } from "./cost.js";
++import { type ScanCost, type ScanTokenUsage } from "./cost.js";
+ import { type ScanExpectation } from "./contract.js";
+ import { ScanResult } from "./result.js";
+ import type { SeverityLevel } from "./models.js";
+@@ -61,6 +61,7 @@ export interface ScanOptions extends DeepScanOptions {
+     failureSeverity?: SeverityLevel;
+     maxCostUsd?: number;
+     onCost?: (cost: Readonly<ScanCost>) => void;
++    onUsage?: (usage: Readonly<ScanTokenUsage>) => void;
+     onOutputArchived?: (archiveDir: string) => void;
+     onOutputDirReady?: (scanDir: string) => void;
+     onAuthentication?: (authentication: ScanAuthentication) => void;
+@@ -77,7 +78,7 @@ export interface ScanOptions extends DeepScanOptions {
+ export type ScanAuthMode = "auto" | "chatgpt" | "api-key";
+ export type ScanAuthentication = {
+     method: "api_key";
+-    source: "OPENAI_API_KEY" | "CODEX_API_KEY" | "OPENROUTER_API_KEY" | "FIREWORKS_API_KEY";
++    source: "OPENAI_API_KEY" | "CODEX_API_KEY" | "OPENROUTER_API_KEY" | "FIREWORKS_API_KEY" | "DEEPSEEK_API_KEY";
+     verified: false;
+ } | {
+     method: "stored_credentials";
+@@ -96,7 +97,7 @@ export interface ScanReconnectDetails {
+ export interface ScanWarningDetails {
+     kind: "target_changed";
+ }
+-type ScanObserverName = "onAuthentication" | "onCost" | "onOutputArchived" | "onOutputDirReady" | "onScanStarted" | "onTrustedAccessStatus" | "onReconnect" | "onActivity" | "onProgress" | "onWorkerStatus" | "onWarning";
++type ScanObserverName = "onAuthentication" | "onCost" | "onUsage" | "onOutputArchived" | "onOutputDirReady" | "onScanStarted" | "onTrustedAccessStatus" | "onReconnect" | "onActivity" | "onProgress" | "onWorkerStatus" | "onWarning";
+ export interface ScanPreflight extends DeepScanOptions {
+     repository: string;
+     target: NormalizedTarget;
+diff --git a/dist/api.js b/dist/api.js
+index 1b23e72..a3338c6 100644
+--- a/dist/api.js
++++ b/dist/api.js
+@@ -51,8 +51,14 @@ export class CodexSecurity {
+     #closed = false;
+     #closePromise = null;
+     constructor(config = {}, dependencies = DEFAULT_DEPENDENCIES, runtimeOptions = { surface: "sdk" }) {
+-        this.config = structuredClone(config);
+-        this.#dependencies = dependencies;
++        const { environment, ...runtimeConfig } = config;
++        this.config = structuredClone(runtimeConfig);
++        this.#dependencies = environment === undefined
++            ? dependencies
++            : {
++                ...dependencies,
++                environment: { ...environment },
++            };
+         this.#surface = runtimeOptions.surface;
+     }
+     async run(repository, options = {}) {
+@@ -293,6 +299,9 @@ export class CodexSecurity {
+                     ? undefined
+                     : (activity) => notifyObserver("onActivity", options.onActivity, options.onObserverError, activity),
+                 onProgress: options.onProgress === undefined ? undefined : reportProgress,
++                onUsage: options.onUsage === undefined
++                    ? undefined
++                    : (usage) => notifyObserver("onUsage", options.onUsage, options.onObserverError, usage),
+                 onCost: options.onCost === undefined && options.maxCostUsd === undefined
+                     ? undefined
+                     : (cost) => {
+diff --git a/dist/config.d.ts b/dist/config.d.ts
+index 2782296..36dfd90 100644
+--- a/dist/config.d.ts
++++ b/dist/config.d.ts
+@@ -1,3 +1,4 @@
++import type { ProcessEnvironment } from "./runtime.js";
+ export type JsonPrimitive = string | number | boolean | null;
+ export type JsonValue = JsonPrimitive | JsonValue[] | JsonObject;
+ export interface JsonObject {
+@@ -7,6 +8,7 @@ export interface CodexSecurityConfig {
+     pluginPath?: string;
+     codexOverrides?: JsonObject;
+     pythonPath?: string;
++    environment?: ProcessEnvironment;
+ }
+ export interface ScanModelConfiguration {
+     model: string;
+@@ -24,6 +26,13 @@ export declare const FIREWORKS_CODEX_PROVIDER: {
+     readonly env_key: "FIREWORKS_API_KEY";
+     readonly wire_api: "responses";
+ };
++export declare const DEEPSEEK_CODEX_PROVIDER: {
++    readonly name: "DeepSeek";
++    readonly base_url: "https://api.deepseek.com";
++    readonly env_key: "DEEPSEEK_API_KEY";
++    readonly wire_api: "responses";
++    readonly supports_websockets: false;
++};
+ export declare const EXTERNAL_CODEX_PROVIDERS: {
+     readonly openrouter: {
+         readonly name: "OpenRouter";
+@@ -37,6 +46,13 @@ export declare const EXTERNAL_CODEX_PROVIDERS: {
+         readonly env_key: "FIREWORKS_API_KEY";
+         readonly wire_api: "responses";
+     };
++    readonly deepseek: {
++        readonly name: "DeepSeek";
++        readonly base_url: "https://api.deepseek.com";
++        readonly env_key: "DEEPSEEK_API_KEY";
++        readonly wire_api: "responses";
++        readonly supports_websockets: false;
++    };
+ };
+ export type ExternalModelProvider = keyof typeof EXTERNAL_CODEX_PROVIDERS;
+ export declare function isExternalModelProvider(provider: unknown): provider is ExternalModelProvider;
+diff --git a/dist/config.js b/dist/config.js
+index ae4bd9a..4dc1449 100644
+--- a/dist/config.js
++++ b/dist/config.js
+@@ -15,9 +15,17 @@ export const FIREWORKS_CODEX_PROVIDER = {
+     env_key: "FIREWORKS_API_KEY",
+     wire_api: "responses",
+ };
++export const DEEPSEEK_CODEX_PROVIDER = {
++    name: "DeepSeek",
++    base_url: "https://api.deepseek.com",
++    env_key: "DEEPSEEK_API_KEY",
++    wire_api: "responses",
++    supports_websockets: false,
++};
+ export const EXTERNAL_CODEX_PROVIDERS = {
+     openrouter: OPENROUTER_CODEX_PROVIDER,
+     fireworks: FIREWORKS_CODEX_PROVIDER,
++    deepseek: DEEPSEEK_CODEX_PROVIDER,
+ };
+ export function isExternalModelProvider(provider) {
+     return (typeof provider === "string" &&
+diff --git a/dist/cost.d.ts b/dist/cost.d.ts
+index 7bdcbad..4d8295e 100644
+--- a/dist/cost.d.ts
++++ b/dist/cost.d.ts
+@@ -8,6 +8,14 @@ export interface ScanCost {
+     outputTokens: number;
+     estimatedUsd: number;
+ }
++export interface ScanTokenUsage {
++    inputTokens: number;
++    cachedInputTokens: number;
++    cacheWriteInputTokens: number;
++    outputTokens: number;
++    reasoningOutputTokens: number;
++    totalTokens: number;
++}
+ interface ScanCostTrackerOptions {
+     codexHome: string;
+     model: string;
+@@ -16,6 +24,7 @@ interface ScanCostTrackerOptions {
+     maxCostUsd?: number;
+     expectedFilesTotal?: number;
+     onCost?: (cost: Readonly<ScanCost>) => void;
++    onUsage?: (usage: Readonly<ScanTokenUsage>) => void;
+     onActivity?: (activity: ScanActivity) => void;
+     onProgress?: (progress: ScanProgress) => void;
+     onError?: (error: unknown) => void;
+diff --git a/dist/cost.js b/dist/cost.js
+index 0c1dbfa..c9dd697 100644
+--- a/dist/cost.js
++++ b/dist/cost.js
+@@ -21,6 +21,7 @@ export class ScanCostTracker {
+     #pending = Promise.resolve();
+     #snapshot = { usage: null, cost: null };
+     #lastCost = null;
++    #lastUsage = null;
+     #highestFilesCompleted = 0;
+     #expectedFilesTotal;
+     constructor(options) {
+@@ -36,6 +37,7 @@ export class ScanCostTracker {
+         this.#threadId = threadId;
+         if (this.#options.maxCostUsd === undefined &&
+             this.#options.onCost === undefined &&
++            this.#options.onUsage === undefined &&
+             this.#options.onActivity === undefined &&
+             this.#options.onProgress === undefined) {
+             return;
+@@ -81,7 +83,9 @@ export class ScanCostTracker {
+         if (this.#snapshot.usage !== null)
+             return this.#snapshot;
+         const cost = estimateScanCost(this.#options.model, fallbackUsage);
+-        this.#snapshot = { usage: fallbackUsage ?? null, cost };
++        const usage = tokenUsage(fallbackUsage);
++        this.#snapshot = { usage, cost };
++        this.#reportUsage(usage);
+         this.#reportCost(cost);
+         return this.#snapshot;
+     }
+@@ -176,6 +180,7 @@ export class ScanCostTracker {
+             return;
+         const cost = estimateScanCost(this.#options.model, usage);
+         this.#snapshot = { usage, cost };
++        this.#reportUsage(usage);
+         this.#reportCost(cost);
+     }
+     #reportWorkerActivities(session) {
+@@ -233,6 +238,22 @@ export class ScanCostTracker {
+         this.#lastCost = cost.estimatedUsd;
+         this.#options.onCost?.(cost);
+     }
++    #reportUsage(usage) {
++        if (usage === null)
++            return;
++        const key = `${usage.input_tokens}:${usage.cached_input_tokens}:${usage.cache_write_input_tokens}:${usage.output_tokens}:${usage.reasoning_output_tokens}`;
++        if (key === this.#lastUsage)
++            return;
++        this.#lastUsage = key;
++        this.#options.onUsage?.({
++            inputTokens: usage.input_tokens,
++            cachedInputTokens: usage.cached_input_tokens,
++            cacheWriteInputTokens: usage.cache_write_input_tokens,
++            outputTokens: usage.output_tokens,
++            reasoningOutputTokens: usage.reasoning_output_tokens,
++            totalTokens: usage.total_tokens,
++        });
++    }
+ }
+ export async function* sessionFiles(directory) {
+     let entries;
+@@ -669,4 +690,4 @@ export function formatUsd(value) {
+ function isTokenCount(value) {
+     return typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
+ }
+-//# sourceMappingURL=cost.js.map
+\ No newline at end of file
++//# sourceMappingURL=cost.js.map
+diff --git a/dist/index.d.ts b/dist/index.d.ts
+index d8a7183..be41469 100644
+--- a/dist/index.d.ts
++++ b/dist/index.d.ts
+@@ -1,6 +1,6 @@
+ export { CodexSecurity, createSecurity } from "./api.js";
+ export { estimateScanCost } from "./cost.js";
+-export type { ScanCost } from "./cost.js";
++export type { ScanCost, ScanTokenUsage } from "./cost.js";
+ export type { ScanActivity, ScanActivityStatus } from "./scan-activity.js";
+ export type { CodexSecurityMetadata, DeepScanOptions, ScanAuthMode, ScanAuthentication, ScanOptions, ScanPreflight, ScanReconnectDetails, ScanTrustedAccessStatus, ScanWarningDetails, } from "./api.js";
+ export type { ScanPhase, ScanProgress, ScanWorkerPhase, ScanWorkerStatus, } from "./worker-progress.js";
+diff --git a/dist/runtime.js b/dist/runtime.js
+index 433c837..7969eab 100644
+--- a/dist/runtime.js
++++ b/dist/runtime.js
+@@ -949,7 +949,8 @@ export async function runWorkbench(options, args) {
+             env: Object.fromEntries(Object.entries(options.environment).filter(([name]) => name.toUpperCase() !== "OPENAI_API_KEY" &&
+                 name.toUpperCase() !== "CODEX_API_KEY" &&
+                 name.toUpperCase() !== "OPENROUTER_API_KEY" &&
+-                name.toUpperCase() !== "FIREWORKS_API_KEY")),
++                name.toUpperCase() !== "FIREWORKS_API_KEY" &&
++                name.toUpperCase() !== "DEEPSEEK_API_KEY")),
+             encoding: "utf8",
+             maxBuffer: Infinity,
+             windowsHide: true,

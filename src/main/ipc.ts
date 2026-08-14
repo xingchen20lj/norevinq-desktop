@@ -750,6 +750,8 @@ const securityTargetSchema = z.discriminatedUnion('kind', [
 ])
 const securityScanSchema = z.object({
   projectId: z.uuid(),
+  provider: z.enum(['openai', 'deepseek']).default('openai'),
+  model: z.enum(['deepseek-v4-flash', 'deepseek-v4-pro']).optional(),
   mode: z.enum(['standard', 'deep']),
   target: securityTargetSchema,
   auth: z.enum(['auto', 'chatgpt', 'api-key']),
@@ -763,6 +765,15 @@ const securityScanSchema = z.object({
 }).superRefine((value, context) => {
   if (value.mode === 'deep' && (value.target.kind === 'refs' || value.target.kind === 'working_tree')) {
     context.addIssue({ code: 'custom', message: '深度扫描仅支持仓库或路径目标。', path: ['target'] })
+  }
+  if (value.provider === 'deepseek' && value.model === undefined) {
+    context.addIssue({ code: 'custom', message: 'DeepSeek 安全扫描必须选择模型。', path: ['model'] })
+  }
+  if (value.provider === 'deepseek' && value.maxCostUsd !== undefined) {
+    context.addIssue({ code: 'custom', message: 'DeepSeek 暂不支持 SDK 美元硬预算。', path: ['maxCostUsd'] })
+  }
+  if (value.provider === 'openai' && value.model !== undefined) {
+    context.addIssue({ code: 'custom', message: 'OpenAI 扫描模型由 Security SDK 配置管理。', path: ['model'] })
   }
 })
 const scanIdSchema = z.object({ scanId: z.uuid() })

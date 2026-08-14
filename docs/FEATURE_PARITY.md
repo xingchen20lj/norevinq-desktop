@@ -94,6 +94,7 @@
 | 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
 | 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、固定产物路径、2 MiB 预览、CLI JSON/CSV 与 SDK SARIF；自动测试通过 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
+| 安全 | DeepSeek Responses 独立扫描与实时计费 | 已测试 | 固定 provider、实例环境隔离和 SDK preflight 自动验证；V4 Pro standard 在线扫描约 12 分钟后完整返回 `completed + sealed`；V4 Flash 固定 Aster Codex 0.147.0、单并发后同一夹具于 160.9 秒完整返回 `completed + sealed`；两者均无需 OpenAI 登录且 usage 非空。实时输入/缓存/输出/推理 token 与官方分时价格、带日期汇率的人民币估算通过单元及真实/打包 UI E2E |
 | 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复，extract-zip 高危已替换为 Electron 官方安全兼容实现；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 已测试 | main/Renderer/utility 异常退出本地有界记录；用户明确导出私有 ZIP，只含版本摘要、100 条内崩溃元数据和 1 MiB 二次脱敏日志；不自动上传、不包含对话/项目/密钥/绝对路径 |

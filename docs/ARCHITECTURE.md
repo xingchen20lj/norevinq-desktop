@@ -15,7 +15,7 @@ flowchart LR
   Main --> Git["Git / GitHub CLI 服务"]
   Main --> DB["SQLite 状态库"]
   Main --> Keys["系统凭据保险库"]
-  Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
+  Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.11"]
   Main --> Scheduler["SQLite / RRULE<br/>计划任务队列"]
   Main --> Files["路径沙箱 / 流式协议<br/>文件与产物预览"]
   Main --> Browser["隔离 WebContentsView<br/>loopback 网页预览"]
@@ -39,7 +39,7 @@ flowchart LR
 - `src/main/worktree`：仓库外托管 worktree、数据库恢复、ownership 校验、锁定/删除和受限 include 复制。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。
-- `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.8/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
+- `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.11/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
 - `src/main/scheduler`：IANA 时区/RFC 5545 RRULE、SQLite 持久化队列、错过运行、重试、取消和真实 app-server/worktree 执行。
 - `src/main/files`：项目/worktree 根绑定、逐段 symlink 拒绝、有界文本读取、不透明媒体 token、Range 流和外部打开策略。
 - `src/main/browser`：独立临时 session、loopback URL/子资源策略、原生 WebContentsView 生命周期、权限拒绝、控制台与导航状态。
