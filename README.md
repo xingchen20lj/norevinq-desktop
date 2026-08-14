@@ -16,6 +16,8 @@ Norevinq 是一款面向 macOS 和 Windows 的本地优先桌面智能编程客�
 
 演示视频将依次展示真实的多模型任务、命令面板、模型提供商、安全工作台和计划任务。
 
+https://github.com/user-attachments/assets/2bba3f47-3a63-45a2-9c9e-1ce239e69960
+
 ## 已实现能力
 
 - Codex app-server 生命周期、协议握手、流式活动、审批、追加指令、中断与恢复。
