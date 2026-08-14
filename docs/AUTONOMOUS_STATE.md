@@ -4,16 +4,17 @@
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备（完成）；开源安全阻塞已完成修复复验，正在提交、合并并配置首个公开源码预览。
+阶段 20：桌面打包和发布准备（完成）；首个公开源码预览与 GitHub 安全配置已完成，继续处理功能一致性长尾。
 
 ## 当前任务
 
-- 提交 2026-08-14 sealed 扫描的修复，合并开源准备 PR，将仓库切换为 Public，并立即启用 GitHub 安全功能与 main ruleset。
-- 创建 `v0.1.0` 带注释标签和只含源码的 GitHub Release；确认不生成或上传 DMG、EXE、ZIP、blockmap 或自动更新元数据。
-- 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
+- 逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
+- 保持公开仓库的跨平台 CI、依赖审计、密钥扫描和主分支保护持续有效。
 
 ## 已完成任务
 
+- 开源准备 PR #11 已经 macOS 15、Windows 2025 和离线 Electron smoke 全绿后合并；仓库已切换为 Public，并启用私密漏洞报告、Secret Scanning、Push Protection、Dependabot Alerts/自动安全更新和 `Protect main` ruleset。所有主线变更必须走 PR，禁止强推和删除，并要求 macOS/Windows 状态检查通过。
+- 创建带注释标签 `v0.1.0` 和仅含 GitHub 自动源码归档的预发布；Release 资产为空，Actions 不构建或上传 DMG、EXE、ZIP、blockmap 和自动更新元数据。
 - 完成开源 sealed 扫描 8 项发现的逐项闭环：3 项中风险全部修复；5 项低风险中 4 项修复或由源码分发架构关闭，1 项 Renderer 确认纵深防御风险在补偿控制下明确接受。Git 项目根边界、`core.fsmonitor=false`、Security 最小权限、同句柄文件预览、目录/大 diff 前置预算均有自动回归。
 - 加固后的 Codex Security pnpm 补丁从干净依赖重放成功，真实 SDK preflight 通过；`pnpm verify:ci` 为 214 通过/1 跳过，生产依赖 0 个已知高危漏洞，离线 Electron IPC 对抗与实际目录包 app-server 启动测试通过。
 
@@ -266,9 +267,9 @@
 
 ## 下一任务
 
-1. 提交并推送 Norevinq 更名与源码-only 发布策略，运行 macOS/Windows 跨平台 CI；仓库保持私有，等待维护者明确决定公开时间。
-2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
-3. 使用维护者本地构建的签名目标平台安装包复验 Security 长扫描与取消恢复；不把安装包上传到 GitHub。
+1. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
+2. 继续审计 `docs/FEATURE_PARITY.md` 的部分实现项，并优先完成可形成真实闭环的功能。
+3. 取得平台签名凭据后，使用维护者本地构建的签名目标平台安装包复验 Security 长扫描与取消恢复；不把安装包上传到 GitHub。
 
 ## 已做技术决策
 
@@ -327,7 +328,7 @@
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
 - 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
 - GitHub 远端已建立并由系统 keyring 中的维护者账户验证；Norevinq 不保存或显示其 token。
-- GitHub 主分支保护：私有免费仓库当前不能启用；仓库切换为 Public 后必须按 `docs/OPEN_SOURCE_RELEASE_CHECKLIST.md` 立即建立 ruleset。
+- GitHub 仓库已公开，`Protect main` ruleset、跨平台必需状态检查、Dependabot、Secret Scanning/Push Protection 和私密漏洞报告均已启用。
 
 ## 待验证问题
 
