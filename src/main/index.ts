@@ -258,6 +258,16 @@ if (!gotLock) {
     agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)
     securityService = new SecurityService(database, join(userData, 'security'), {
+      ...(app.isPackaged ? {
+        pluginPath: join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'node_modules',
+          '@openai',
+          'codex-security',
+          '_bundled_plugin',
+        ),
+      } : {}),
       deepSeekCredential: () => environmentDeepSeekKey ?? readStoredDeepSeekKey(credentialStore),
       codexBinary: () => runtime?.getSnapshot().binaryPath ?? null,
     })

@@ -1,4 +1,4 @@
-import { lstat, readdir, rm } from 'node:fs/promises'
+import { cp, lstat, mkdir, readdir, realpath, rm } from 'node:fs/promises'
 import { join } from 'node:path'
 
 const ARCH_NAMES = new Map([
@@ -34,4 +34,25 @@ export default async function afterPack(context) {
     }
     await rm(path, { recursive: true })
   }
+
+  const securityPluginSource = await realpath(join(
+    process.cwd(),
+    'node_modules',
+    '@openai',
+    'codex-security',
+    '_bundled_plugin',
+  ))
+  const sourceMetadata = await lstat(securityPluginSource)
+  if (!sourceMetadata.isDirectory() || sourceMetadata.isSymbolicLink()) {
+    throw new Error(`Codex Security plugin source is not a real directory: ${securityPluginSource}`)
+  }
+  const securityPackageRoot = join(openaiRoot, 'codex-security')
+  const securityPluginDestination = join(securityPackageRoot, '_bundled_plugin')
+  await mkdir(securityPackageRoot, { recursive: true })
+  await cp(securityPluginSource, securityPluginDestination, {
+    errorOnExist: true,
+    force: false,
+    preserveTimestamps: true,
+    recursive: true,
+  })
 }

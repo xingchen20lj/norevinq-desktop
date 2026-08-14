@@ -18,7 +18,7 @@
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 已测试 | 默认不信任、SQLite 持久化、外部技能根目录信任门；单元与 Electron UI 通过 |
 | 项目 | 项目指令 AGENTS.md | 已测试 | 安全预览 + app-server 原生解析；真实 turn 按临时仓库指令返回 `ASTER_INSTRUCTIONS_OK` |
-| 对话 | 新建、读取、继续、重命名、固定、归档 | 已测试 | 真实 app-server 生命周期；重命名、活动/归档双视图、SQLite 固定与首屏补读、重载恢复均通过自动测试和 Electron E2E |
+| 对话 | 新建、读取、继续、重命名、固定、归档 | 已测试 | 真实 app-server 生命周期；归档视图以 `thread/read` 打开且不隐式恢复，活动列表遇到 stale archived session 时受控 unarchive/resume 并同步本地状态；重命名、双视图、SQLite 固定与首屏补读、重载恢复均通过自动测试和 Electron E2E |
 | 对话 | 删除任务 | 已测试 | 明确二次确认、活动 turn/挂起审批失败关闭、SQLite 关联清理和删除后列表重同步；官方 app-server 集成与 Electron E2E 通过 |
 | 对话 | 对话搜索和分页 | 已测试 | `thread/list` cwd/searchTerm/opaque cursor、游标失效保护、分页合并和侧栏搜索/加载更多均通过自动测试 |
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |
@@ -41,9 +41,9 @@
 | 沙箱 | 网络与路径权限 | 已测试 | 官方 0.147.0 `permissionProfile/list` 真实集成；网络/文件读写/path/glob 权限反向审批、逐项子集、turn/session、拒绝与伪造 ID 失败关闭均经单元和 Electron E2E |
 | 模型 | OpenAI API Key 登录 | 已测试 | 官方 0.147.0 隔离 login/read/logout、主进程脱敏状态机和 Electron 登录/退出闭环；Key 不进入 Aster 持久化、快照或日志，真实计费请求沿用既有 OpenAI 在线回归证据 |
 | 模型 | ChatGPT 浏览器/设备码登录 | 已测试 | 官方浏览器 start/cancel 与在线设备码 URL/code/cancel 已验证；HTTPS 域白名单、主进程 loginId、completed/updated、重开/取消和令牌刷新有自动测试，最终用户授权仪式需用户本人完成 |
-| 模型 | 模型列表、切换与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过；同提供商使用 turn model 覆盖，OpenAI↔DeepSeek 在空闲 thread 上 unsubscribe/resume 并核验有效 provider，官方 0.147.0 真实切换契约通过 |
+| 模型 | 模型列表、切换与推理强度 | 已测试 | 真实 model/list、模型/effort 选择器及在线任务 E2E 通过；同提供商使用 turn model 覆盖；跨提供商创建 provider-bound 新 thread，近期用户/助手文本以不可信引用上下文迁移，命令/补丁/推理不重放，旧运行 thread 归档；避免 0.147.0 `thread/resume` 回显切换但实际沿用旧路由以及 raw fork 历史不兼容；DeepSeek→OpenAI→DeepSeek UI 双向回答通过 |
 | 模型 | 自定义 Responses provider | 已测试 | 进程级 `-c` provider 注册，不污染用户全局配置；DeepSeek 真实闭环通过 |
-| DeepSeek | 一级提供商配置 | 已测试 | Flash/Pro 模型选择、provider 路由、设置状态和 app-server Responses 真实运行；同一任务可在 Flash/Pro/OpenAI 间切换且不静默沿用旧 provider；Pro 于 2026-08-13 经官方 reference 与真实端点确认开放 |
+| DeepSeek | 一级提供商配置 | 已测试 | Flash/Pro 模型选择、provider 路由、设置状态和 app-server Responses 真实运行；同一用户任务通过历史迁移在 Flash/Pro/OpenAI 间切换且不静默沿用旧 provider；Pro 于 2026-08-13 经官方 reference 与真实端点确认开放 |
 | DeepSeek | 安全保存 API Key | 已测试 | Electron safeStorage + 0600 原子文件；renderer 不可读回；环境密钥优先 |
 | DeepSeek | 官方 Responses API 流式连接 | 已测试 | 桌面经 app-server 真实收到 reasoning、工具和最终文本事件 |
 | DeepSeek | 工具调用与文件修改闭环 | 已测试 | Flash 与 Pro 均经官方 Codex 0.147.0 custom apply_patch 创建文件；分别精确断言 `DEEPSEEK_TOOL_OK\n` 与 `DEEPSEEK_PRO_TOOL_OK\n` |
@@ -95,14 +95,14 @@
 | 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
 | 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、固定产物路径、2 MiB 预览、CLI JSON/CSV 与 SDK SARIF；自动测试通过 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
-| 安全 | DeepSeek Responses 独立扫描与实时计费 | 已测试 | 固定 provider、实例环境隔离和 SDK preflight 自动验证；V4 Pro standard 在线扫描约 12 分钟后完整返回 `completed + sealed`；V4 Flash 固定 Aster Codex 0.147.0、单并发后同一夹具于 160.9 秒完整返回 `completed + sealed`；两者均无需 OpenAI 登录且 usage 非空。实时输入/缓存/输出/推理 token 与官方分时价格、带日期汇率的人民币估算通过单元及真实/打包 UI E2E |
+| 安全 | DeepSeek Responses 独立扫描与实时计费 | 已测试 | 固定 provider、实例环境隔离和 SDK preflight 自动验证；V4 Pro standard 在线扫描约 12 分钟后完整返回 `completed + sealed`；V4 Flash 固定 Aster Codex 0.147.0、单并发后同一夹具于 160.9 秒完整返回 `completed + sealed`；两者均无需 OpenAI 登录且 usage 非空。实时 token/缓存/人民币估算通过单元及真实 UI；发布包将 SDK bundled plugin 置于真实 `app.asar.unpacked` 路径，manifest 检查和打包应用 DeepSeek 预检通过 |
 | 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复，extract-zip 高危已替换为 Electron 官方安全兼容实现；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |
 | 可观测性 | 结构化日志与敏感信息脱敏 | 已测试 | 递归脱敏 7 项单测；有界轮转已测试 |
 | 可观测性 | 崩溃报告与诊断包 | 已测试 | main/Renderer/utility 异常退出本地有界记录；用户明确导出私有 ZIP，只含版本摘要、100 条内崩溃元数据和 1 MiB 二次脱敏日志；不自动上传、不包含对话/项目/密钥/绝对路径 |
 | 性能 | 首屏加载和代码分割 | 已测试 | 首屏 JS 由 1,204.97 kB 降至 643.29 kB；终端与六个低频工作台按需加载，生产 bundle 预算进入 CI |
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
-| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 37 个测试文件 185 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile/provider 切换集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、Apple Silicon 真机与完整在线回归待验证 |
+| 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 最新完整门禁 38 个通过文件、198 项通过、1 项按凭据跳过；官方 0.147.0 account/thread/goal/permission-profile 与 provider-bound thread 集成、DeepSeek→OpenAI→DeepSeek 模型下拉框真实在线 E2E、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道和打包态 Security 预检通过；本分支远端 CI、Apple Silicon 真机与签名包回归待验证 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；目标架构钩子确保 arm64 包只携带 arm64 官方 Codex，Electron/Codex Mach-O 已验证；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Apple Silicon 真机、Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |
 | 发布 | 开源许可证、构建指南与社区治理 | 已测试 | Apache-2.0、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南、公开发布检查表和隐私安全截图已加入；冻结安装、181 项测试、开源守门、生产构建、目录包和 packaged E2E 通过，法律资源已在真实 `.app` 中回读 |

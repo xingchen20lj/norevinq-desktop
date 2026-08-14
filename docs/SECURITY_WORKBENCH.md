@@ -14,6 +14,8 @@ macOS 正式包的实际默认路径如下：
 - Security SDK state：`~/Library/Application Support/aster-code/security/sdk-state`；
 - Security 扫描产物：`~/Library/Application Support/aster-code/security/scans/<scan-id>`。
 
+发布包把 SDK 的 `_bundled_plugin` 显式复制到 `app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin`，因为 SDK 会对插件根执行 `realpath`，不能从 ASAR 虚拟目录运行。包内审计会验证该目录不是符号链接、没有越过 resources 边界，并回读 `.codex-plugin/plugin.json`；主进程只向 SDK 传入这一精确路径。
+
 Aster 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量 `CODEX_HOME`，启动 Security SDK 时设置独立 `CODEX_SECURITY_STATE_DIR`。默认配置不会读取、覆盖或清理官方 Codex 常用的 `~/.codex`，主 app-server 与 Security SDK 的 Codex 版本也在不同进程和依赖树中。不要手动把 `ASTER_AGENT_HOME` 指向 `~/.codex`，否则会主动取消这层隔离。
 
 路径隔离不代表可以同时修改同一工作区：Aster、官方 Codex 或其他 Git 工具若并发操作同一个真实仓库，仍可能产生普通的文件、索引、分支或锁冲突。项目内 `.codex` 和 `AGENTS.md` 也是仓库内容，会被两个客户端共同看到。建议并行任务使用不同托管工作树，不要在同一工作树同时执行两个写入型智能体。

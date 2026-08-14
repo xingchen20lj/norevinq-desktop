@@ -35,7 +35,7 @@ CSC_IDENTITY_AUTO_DISCOVERY=false pnpm package:mac
 pnpm package:win
 ```
 
-`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready。
+`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready；还会在真实临时 Git 仓库上执行 DeepSeek Security 本地预检。`afterPack` 必须把 Security `_bundled_plugin` 从已解析依赖路径复制到真实 `app.asar.unpacked` 目录，`check:package` 会拒绝缺失、符号链接、越界或 manifest 身份不匹配。
 
 应用注册 `aster-code` 自定义协议，只接受 `aster-code://project/<project-uuid>` 与 `aster-code://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
 

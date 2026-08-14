@@ -31,6 +31,7 @@ if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
   throw new Error(`Packaged Codex version does not match 0.147.0: ${version || '<empty>'}`)
 }
 console.log(`Packaged Codex: ${version} (${binary})`)
+await verifySecurityPlugin(unpackedRoot)
 await verifyProtocolRegistration()
 console.log('Packaged deep-link protocol: aster-code')
 await verifyUpdateConfiguration(resourcesRoot)
@@ -46,6 +47,24 @@ async function findCodexBinaries(directory) {
     }
   }
   return found
+}
+
+async function verifySecurityPlugin(directory) {
+  const pluginRoot = join(directory, 'node_modules', '@openai', 'codex-security', '_bundled_plugin')
+  const pluginMetadata = await lstat(pluginRoot).catch(() => null)
+  if (!pluginMetadata?.isDirectory() || pluginMetadata.isSymbolicLink()) {
+    throw new Error(`Packaged Codex Security plugin is not a real unpacked directory: ${pluginRoot}`)
+  }
+  const manifestPath = join(pluginRoot, '.codex-plugin', 'plugin.json')
+  const manifestMetadata = await lstat(manifestPath).catch(() => null)
+  if (!manifestMetadata?.isFile() || manifestMetadata.isSymbolicLink() || manifestMetadata.size > 64 * 1024) {
+    throw new Error(`Packaged Codex Security manifest is missing or invalid: ${manifestPath}`)
+  }
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  if (manifest?.name !== 'codex-security' || typeof manifest?.version !== 'string') {
+    throw new Error(`Packaged Codex Security manifest has invalid identity: ${manifestPath}`)
+  }
+  console.log(`Packaged Codex Security plugin: ${manifest.version} (${pluginRoot})`)
 }
 
 async function verifyProtocolRegistration() {

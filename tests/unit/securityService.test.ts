@@ -156,6 +156,36 @@ describe('SecurityService', () => {
     fixture.database.close()
   })
 
+  it('pins the real packaged plugin path into both base and DeepSeek SDK instances', async () => {
+    const fixture = createFixture()
+    const configs: (CodexSecurityConfig | undefined)[] = []
+    const sdk = createSdk(() => Promise.reject(new Error('expected fixture stop')))
+    const pluginPath = '/Applications/Aster Code.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin'
+    const service = new SecurityService(fixture.database, fixture.securityRoot, {
+      sdkFactory: (config) => {
+        configs.push(config)
+        return sdk
+      },
+      pluginPath,
+      deepSeekCredential: () => 'configured-for-test',
+      exchangeRateResolver: () => Promise.resolve({ rate: 7, date: '2026-08-14', source: 'fallback' }),
+    })
+    service.startScan({
+      projectId: fixture.projectId,
+      provider: 'deepseek',
+      model: 'deepseek-v4-flash',
+      mode: 'standard',
+      target: { kind: 'repository' },
+      auth: 'api-key',
+    })
+    await waitForScan(service, 'failed')
+    expect(configs).toHaveLength(2)
+    expect(configs[0]?.pluginPath).toBe(pluginPath)
+    expect(configs[1]?.pluginPath).toBe(pluginPath)
+    await service.dispose()
+    fixture.database.close()
+  })
+
   it('uses the patched public SDK preflight with DeepSeek credentials and no OpenAI login', async () => {
     const fixture = createFixture()
     const sdk = new CodexSecurity(createDeepSeekSecurityConfig(

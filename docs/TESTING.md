@@ -11,7 +11,7 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `pnpm test:e2e`：构建后运行真实 Electron 桌面回归；需要可用的 Codex app-server 和相应账户凭据。
 - `pnpm test:e2e:offline`：不调用模型，验证 Electron 启动、主窗口 IPC 和非主 Renderer 拒绝；用于 macOS/Windows CI。
 - `pnpm test:e2e:performance`：用全新 profile 测量真实 Electron 冷启动、DOMContentLoaded 和总工作集。
-- `pnpm test:e2e:packaged`：直接启动打包后的 `.app`/`.exe`，验证包内 Codex 版本、路径、模型、ready 状态及更新渠道启用/禁用诊断。
+- `pnpm test:e2e:packaged`：直接启动打包后的 `.app`/`.exe`，验证包内 Codex 版本、路径、模型、ready 状态及更新渠道启用/禁用诊断；同时以真实 Git 夹具调用 DeepSeek Security 本地预检，证明 SDK bundled plugin 位于可 `realpath` 的 `app.asar.unpacked` 目录。
 - `ASTER_UPDATE_URL='https://updates.invalid/aster-code/' pnpm package:update`：仅用于本地生成元数据测试，验证 app-update/latest/blockmap/SHA-512；`.invalid` 构建不可发布。
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：不调用模型，以确定性 app-server 进程验证任务搜索、分页、重命名、分叉、压缩、归档、恢复、永久删除、单实例任务深链接及网络/路径权限子集审批的完整桌面流程。
 - `pnpm exec playwright test tests/e2e/github-pr.spec.ts`：不访问真实 GitHub；真实 Git 仓库向本地 bare remote 推送 feature 分支，确定性 `gh` 替身验证登录、仓库、Draft PR、正文 stdin、结构化回读、重复创建幂等和无关密钥隔离。
@@ -23,6 +23,8 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：除任务生命周期外，从非当前 `release/base` 分支选择不可变 OID 创建 detached worktree，并验证实际 HEAD/文件内容。
 - 2026-08-11 一次性显式线上回归：Aster Electron 主进程真实创建并回读私有 Draft PR #1；验证 `~/bin/gh` 发现、真实 push、owner/head/base/URL 和在线幂等。该外部写入测试不进入常规 CI，避免在重复运行中修改用户仓库。
 - `ASTER_TEST_LIVE_AUTH=1 pnpm exec vitest run tests/integration/codexThreadLifecycle.test.ts`：在隔离 `CODEX_HOME` 中额外向官方认证服务发起设备码登录并立即取消；不调用模型、不完成用户授权，常规 CI 不依赖该网络检查。
+- `pnpm exec vitest run tests/integration/codexProviderSwitch.test.ts`：存在本机 OpenAI 登录与 `DEEPSEEK_API_KEY` 时，真实创建 OpenAI/DeepSeek provider-bound thread 并完成双向模型回答；缺少任一凭据时跳过，不能用协议回显代替在线成功。
+- `pnpm build && pnpm exec playwright test tests/e2e/provider-switch.spec.ts`：隔离复制现有登录，真实从模型下拉框执行 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro，验证历史上下文迁移且无错误活动卡。直接运行 Playwright 前必须 build，避免 Electron 启动旧 `out/main`。
 - `pnpm check:bundle`：从生产 HTML 校验首屏 JS/CSS 与 Renderer 总资产预算。
 - `pnpm check:workflows`：拒绝非完整提交 SHA 的远程 Action，并验证发布 workflow 的 main/ref/environment/签名守门。
 - `pnpm check:open-source`：检查许可证、社区文件、仓库元数据、稳定 Codex schema 来源、安装包法律资源，并拒绝公开文本中的个人绝对路径或测试目录外的凭据形状值。

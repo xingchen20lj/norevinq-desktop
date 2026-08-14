@@ -51,6 +51,7 @@ type SecuritySdkFactory = (config?: CodexSecurityConfig) => SecuritySdk
 
 export type SecurityServiceOptions = {
   sdkFactory?: SecuritySdkFactory
+  pluginPath?: string
   deepSeekCredential?: () => string | null
   codexBinary?: () => string | null
   environment?: NodeJS.ProcessEnv
@@ -66,6 +67,7 @@ export class SecurityService {
   readonly #stateRoot: string
   readonly #sdk: SecuritySdk
   readonly #sdkFactory: SecuritySdkFactory
+  readonly #pluginPath: string | undefined
   readonly #deepSeekCredential: () => string | null
   readonly #codexBinary: () => string | null
   readonly #requireCodexBinary: boolean
@@ -90,7 +92,8 @@ export class SecurityService {
     preparePrivateDirectory(this.#stateRoot)
     process.env.CODEX_SECURITY_STATE_DIR = this.#stateRoot
     this.#sdkFactory = options.sdkFactory ?? ((config) => new CodexSecurity(config))
-    this.#sdk = this.#sdkFactory()
+    this.#pluginPath = options.pluginPath
+    this.#sdk = this.#sdkFactory(this.#pluginPath ? { pluginPath: this.#pluginPath } : undefined)
     this.#deepSeekCredential = options.deepSeekCredential ?? (() => null)
     this.#codexBinary = options.codexBinary ?? (() => null)
     this.#requireCodexBinary = options.codexBinary !== undefined
@@ -328,13 +331,14 @@ export class SecurityService {
     if (this.#requireCodexBinary && !codexBinary) {
       throw new Error('Aster 智能体运行时尚未就绪；请等待状态变为已就绪后重试安全扫描。')
     }
-    const sdk = this.#sdkFactory(createDeepSeekSecurityConfig(
+    const config = createDeepSeekSecurityConfig(
       model,
       credential,
       this.#stateRoot,
       this.#environment,
       codexBinary,
-    ))
+    )
+    const sdk = this.#sdkFactory(this.#pluginPath ? { ...config, pluginPath: this.#pluginPath } : config)
     this.#ephemeralSdks.add(sdk)
     return { sdk, ephemeral: true }
   }

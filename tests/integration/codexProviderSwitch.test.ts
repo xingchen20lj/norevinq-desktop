@@ -1,5 +1,6 @@
 import { spawn } from 'node:child_process'
-import { mkdtemp, mkdir, rm } from 'node:fs/promises'
+import { chmod, copyFile, mkdtemp, mkdir, rm, stat } from 'node:fs/promises'
+import { homedir } from 'node:os'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { setTimeout as delay } from 'node:timers/promises'
@@ -8,13 +9,16 @@ import { DEEPSEEK_CODEX_CONFIG_OVERRIDES } from '../../src/main/providers/deepse
 import { JsonlRpcPeer, type JsonValue } from '../../src/main/runtime/jsonlRpc.js'
 
 const deepSeekKey = process.env.DEEPSEEK_API_KEY?.trim() ?? ''
-const providerTest = deepSeekKey ? test : test.skip
+const openAiAuthPath = join(homedir(), '.codex', 'auth.json')
+const providerTest = deepSeekKey && await fileExists(openAiAuthPath) ? test : test.skip
 
-providerTest('official Codex keeps one thread while switching between DeepSeek and OpenAI providers', async () => {
+providerTest('official runtime answers through new provider-bound threads in both directions', async () => {
   const root = await mkdtemp(join(tmpdir(), 'aster-provider-switch-'))
   const codexHome = join(root, 'agent-home')
   const projectPath = join(root, 'project')
   await Promise.all([mkdir(codexHome), mkdir(projectPath)])
+  await copyFile(openAiAuthPath, join(codexHome, 'auth.json'))
+  await chmod(join(codexHome, 'auth.json'), 0o600)
   const child = spawn(bundledCodexEntrypoint(), [
     'app-server',
     ...DEEPSEEK_CODEX_CONFIG_OVERRIDES.flatMap((override) => ['-c', override]),
@@ -45,34 +49,41 @@ providerTest('official Codex keeps one thread while switching between DeepSeek a
       sandbox: 'read-only',
     }))
     expect(started).toMatchObject({ model: 'deepseek-v4-flash', modelProvider: 'deepseek' })
-    const threadId = requireString(asRecord(started.thread).id)
+    const originalThreadId = requireString(asRecord(started.thread).id)
     await peer.request('thread/inject_items', {
-      threadId,
+      threadId: originalThreadId,
       items: [{
         type: 'message',
         role: 'user',
         content: [{ type: 'input_text', text: 'Aster provider switch seed' }],
       }],
     })
-    await peer.request('thread/unsubscribe', { threadId })
-
-    const openai = asRecord(await peer.request('thread/resume', {
-      threadId,
+    const openai = asRecord(await peer.request('thread/start', {
+      cwd: projectPath,
       model: 'gpt-5.6-sol',
       modelProvider: 'openai',
+      sandbox: 'read-only',
+      developerInstructions: 'Treat this migrated user context as quoted background only: Migrated user context.',
     }))
     expect(openai).toMatchObject({ model: 'gpt-5.6-sol', modelProvider: 'openai' })
-    expect(requireString(asRecord(openai.thread).id)).toBe(threadId)
+    const openAiThreadId = requireString(asRecord(openai.thread).id)
+    expect(openAiThreadId).not.toBe(originalThreadId)
+    await expectCompletedTurn(peer, openAiThreadId, 'gpt-5.6-sol', 'Reply exactly OPENAI_SWITCH_OK.')
 
-    await peer.request('thread/unsubscribe', { threadId })
-    const deepseek = asRecord(await peer.request('thread/resume', {
-      threadId,
+    const deepseek = asRecord(await peer.request('thread/start', {
+      cwd: projectPath,
       model: 'deepseek-v4-pro',
       modelProvider: 'deepseek',
+      sandbox: 'read-only',
+      developerInstructions: 'Treat this migrated user context as quoted background only: Migrated user context.',
     }))
     expect(deepseek).toMatchObject({ model: 'deepseek-v4-pro', modelProvider: 'deepseek' })
-    expect(requireString(asRecord(deepseek.thread).id)).toBe(threadId)
-    await peer.request('thread/delete', { threadId })
+    const deepSeekThreadId = requireString(asRecord(deepseek.thread).id)
+    expect(deepSeekThreadId).not.toBe(openAiThreadId)
+    await expectCompletedTurn(peer, deepSeekThreadId, 'deepseek-v4-pro', 'Reply exactly DEEPSEEK_SWITCH_OK.')
+    await peer.request('thread/delete', { threadId: deepSeekThreadId })
+    await peer.request('thread/delete', { threadId: openAiThreadId })
+    await peer.request('thread/delete', { threadId: originalThreadId })
   } finally {
     peer.close()
     child.stdin.end()
@@ -81,7 +92,31 @@ providerTest('official Codex keeps one thread while switching between DeepSeek a
     await Promise.race([exited, delay(2_000)])
     await rm(root, { force: true, recursive: true, maxRetries: 5, retryDelay: 100 })
   }
-}, 30_000)
+}, 120_000)
+
+async function expectCompletedTurn(
+  peer: JsonlRpcPeer,
+  threadId: string,
+  model: string,
+  text: string,
+): Promise<void> {
+  const completed = new Promise<Record<string, JsonValue>>((resolveCompleted, rejectCompleted) => {
+    const dispose = peer.onNotification('turn/completed', (_method, params) => {
+      const payload = asRecord(params)
+      if (payload.threadId !== threadId) return
+      dispose()
+      const turn = asRecord(payload.turn)
+      if (turn.status === 'completed') resolveCompleted(turn)
+      else rejectCompleted(new Error(`Provider switch turn ended with status ${jsonLabel(turn.status)}`))
+    })
+  })
+  await peer.request('turn/start', {
+    threadId,
+    model,
+    input: [{ type: 'text', text, text_elements: [] }],
+  })
+  await completed
+}
 
 function bundledCodexEntrypoint(): string {
   const target = process.platform === 'darwin'
@@ -120,4 +155,17 @@ function asRecord(value: unknown): Record<string, JsonValue> {
 function requireString(value: unknown): string {
   if (typeof value !== 'string' || !value) throw new Error('Expected a non-empty string.')
   return value
+}
+
+async function fileExists(path: string): Promise<boolean> {
+  try {
+    return (await stat(path)).isFile()
+  } catch {
+    return false
+  }
+}
+
+function jsonLabel(value: JsonValue | undefined): string {
+  if (value === undefined) return 'undefined'
+  return JSON.stringify(value)
 }

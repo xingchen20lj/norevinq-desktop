@@ -229,6 +229,39 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('repairs a stale active-list entry when the runtime reports an archived session', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.failNextResumeWithArchived = true
+
+    const selected = await service.selectThread('thread-1')
+
+    expect(selected.selectedThreadId).toBe('thread-1')
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'thread/resume', 'thread/unarchive', 'thread/resume', 'thread/goal/get',
+    ])
+    service.dispose()
+    database.close()
+  })
+
+  it('reads archived history without trying to resume it', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId, archived: true })
+
+    const selected = await service.selectThread('thread-1')
+
+    expect(selected.selectedThreadId).toBe('thread-1')
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'thread/read', 'thread/goal/get',
+    ])
+    service.dispose()
+    database.close()
+  })
+
   it('resumes and retries a turn when a restarted runtime has not loaded the selected thread', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
@@ -249,47 +282,73 @@ describe('AgentService', () => {
     database.close()
   })
 
-  it('applies model and provider changes before continuing the same conversation', async () => {
+  it('migrates conversation history before changing model providers in either direction', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()
     const service = new AgentService(runtime, database)
-    await service.loadProject({ projectId })
-
-    await service.startTurn({
-      threadId: 'thread-1',
-      text: 'Use DeepSeek',
-      model: 'deepseek-v4-flash',
-      modelProvider: 'deepseek',
-      reasoningEffort: 'low',
+    runtime.threadListResponses.push({
+      data: [protocolThread([], 'thread-1', 20, 'deepseek')],
+      nextCursor: null,
+      backwardsCursor: null,
     })
-    await service.startTurn({
+    await service.loadProject({ projectId })
+    runtime.emit('turn/started', { threadId: 'thread-1', turn: turn('turn-history', 'inProgress') })
+    runtime.emit('item/completed', {
       threadId: 'thread-1',
-      text: 'Switch back to OpenAI',
+      turnId: 'turn-history',
+      item: { id: 'user-history', type: 'userMessage', content: [{ type: 'text', text: 'portable user text' }] },
+    })
+    runtime.emit('item/completed', {
+      threadId: 'thread-1',
+      turnId: 'turn-history',
+      item: { id: 'command-history', type: 'commandExecution', command: 'do-not-replay', cwd: '/project' },
+    })
+    runtime.emit('item/completed', {
+      threadId: 'thread-1',
+      turnId: 'turn-history',
+      item: { id: 'agent-history', type: 'agentMessage', text: 'portable assistant text', phase: 'final_answer' },
+    })
+    runtime.emit('turn/completed', { threadId: 'thread-1', turn: turn('turn-history', 'completed') })
+
+    const openAi = await service.startTurn({
+      threadId: 'thread-1',
+      text: 'Switch to OpenAI',
       model: 'gpt-5.6-sol',
       modelProvider: 'openai',
       reasoningEffort: 'high',
     })
+    expect(openAi.selectedThreadId).toBe('thread-provider-start-1')
+    const deepSeek = await service.startTurn({
+      threadId: 'thread-provider-start-1',
+      text: 'Switch back to DeepSeek',
+      model: 'deepseek-v4-pro',
+      modelProvider: 'deepseek',
+      reasoningEffort: 'low',
+    })
+    expect(deepSeek.selectedThreadId).toBe('thread-provider-start-2')
 
-    expect(runtime.requests.slice(1).map(({ method }) => method)).toEqual([
-      'thread/unsubscribe', 'thread/resume', 'turn/start',
-      'thread/unsubscribe', 'thread/resume', 'turn/start',
+    const migrationRequests = runtime.requests.filter(({ method }) => method !== 'thread/list' && method !== 'thread/read')
+    expect(migrationRequests.map(({ method }) => method)).toEqual([
+      'thread/start', 'thread/archive', 'turn/start',
+      'thread/start', 'thread/archive', 'turn/start',
     ])
-    expect(runtime.requests[1]?.params).toEqual({ threadId: 'thread-1' })
-    expect(runtime.requests[2]?.params).toEqual({
-      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
-      threadId: 'thread-1', model: 'deepseek-v4-flash', modelProvider: 'deepseek',
+    expect(migrationRequests[0]?.params).toMatchObject({
+      model: 'gpt-5.6-sol', modelProvider: 'openai',
     })
-    expect(runtime.requests[3]?.params).toMatchObject({
-      threadId: 'thread-1', model: 'deepseek-v4-flash', effort: 'low',
+    const firstStartParams = migrationRequests[0]?.params as Record<string, JsonValue> | undefined
+    const migratedInstructions = firstStartParams?.developerInstructions
+    expect(typeof migratedInstructions).toBe('string')
+    if (typeof migratedInstructions === 'string') expect(migratedInstructions).toContain('USER:\nportable user text')
+    expect(migrationRequests[2]?.params).toMatchObject({
+      threadId: 'thread-provider-start-1', model: 'gpt-5.6-sol', effort: 'high',
     })
-    expect(runtime.requests[4]?.params).toEqual({ threadId: 'thread-1' })
-    expect(runtime.requests[5]?.params).toEqual({
-      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
-      threadId: 'thread-1', model: 'gpt-5.6-sol', modelProvider: 'openai',
+    expect(migrationRequests[3]?.params).toMatchObject({
+      model: 'deepseek-v4-pro', modelProvider: 'deepseek',
     })
-    expect(runtime.requests[6]?.params).toMatchObject({
-      threadId: 'thread-1', model: 'gpt-5.6-sol', effort: 'high',
+    expect(migrationRequests[5]?.params).toMatchObject({
+      threadId: 'thread-provider-start-2', model: 'deepseek-v4-pro', effort: 'low',
     })
+    expect(database.getThreadProjectContext('thread-provider-start-2')).toEqual({ projectId, worktreeId: null })
 
     service.dispose()
     database.close()
@@ -604,8 +663,10 @@ class FakeRuntime {
   turnStarts = 0
   turnCompletions = 0
   failNextTurnStartWithMissingThread = false
+  failNextResumeWithArchived = false
   missingThreadPermanently = false
   goal: JsonValue | null = null
+  providerStarts = 0
 
   start(): Promise<unknown> { return Promise.resolve({}) }
 
@@ -615,6 +676,13 @@ class FakeRuntime {
       ? params as Record<string, JsonValue>
       : {}
     const requestedThreadId = typeof parameters.threadId === 'string' ? parameters.threadId : 'thread-1'
+    if (method === 'thread/resume' && this.failNextResumeWithArchived) {
+      this.failNextResumeWithArchived = false
+      return Promise.reject(new JsonRpcError(
+        -32602,
+        `session ${requestedThreadId} is archived. Run codex unarchive ${requestedThreadId} to unarchive it first.`,
+      ))
+    }
     if (this.missingThreadPermanently && (method === 'turn/start' || method === 'thread/resume')) {
       return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
     }
@@ -649,10 +717,15 @@ class FakeRuntime {
       this.goal = null
       return Promise.resolve({} as T)
     }
+    const providerStartThread = method === 'thread/start' && parameters.modelProvider
+      ? protocolThread([], `thread-provider-start-${String(++this.providerStarts)}`, 20, requestedModelProvider)
+      : null
     const responses: Record<string, JsonValue> = {
       'thread/resume': { thread, model: requestedModel, modelProvider: requestedModelProvider },
       'thread/read': { thread },
-      'thread/start': { thread, model: 'gpt-5.4', modelProvider: 'openai' },
+      'thread/start': providerStartThread
+        ? { thread: providerStartThread, model: requestedModel, modelProvider: requestedModelProvider }
+        : { thread, model: 'gpt-5.4', modelProvider: 'openai' },
       'thread/name/set': {},
       'thread/archive': {},
       'thread/unarchive': { thread },

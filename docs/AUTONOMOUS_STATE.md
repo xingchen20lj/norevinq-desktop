@@ -18,7 +18,9 @@
 - Aster 默认私有运行时目录从 `userData/codex-home` 改为 `userData/agent-home`；首次启动时仅在新目录不存在且旧路径为真实目录时原地迁移，保留登录、任务、MCP 和技能状态。新公开覆盖变量为 `ASTER_AGENT_HOME`/`ASTER_AGENT_BINARY`，旧变量只作为兼容别名；上游子进程所需的 `CODEX_HOME`、项目 `.codex` 和第三方包名继续保留以维持官方兼容性。目录创建、权限、符号链接拒绝、迁移保真及 Electron 回归通过。
 - 将公开 `@openai/codex-security` 升级到 0.1.11，并以 Apache-2.0 可审计 pnpm 补丁增加固定 DeepSeek provider、SDK 实例级环境隔离和只读 token usage 回调；补丁不改变扫描提示、sealed contract、sandbox、finding schema 或产物校验，完整差异随仓库分发。
 - 安全工作台可直接选择 DeepSeek V4 Flash 或 V4 Pro，无需 OpenAI 登录；Pro 在约 12 分钟内完成一文件 standard 扫描，Flash 经根因对照后固定复用 Aster Codex 0.147.0、单并发并于 160.9 秒完成同一类扫描，两者都返回 `completed + sealed` 且 usage 非空。扫描卡实时显示输入、总计、缓存命中/未命中、输出与推理 token，并按官方当前/高峰/非高峰价格逐增量累计美元和人民币估算；真实/打包 UI 预检、汇率降级和跨计价时段单测通过。早期 Flash 失败现已归类为旧运行时/并发收敛组合问题，不再误称官方模型限制。
-- 修复同一任务内的模型切换：Renderer 继续任务时现在显式传递 model/provider；同提供商换模型使用 `turn/start.model`，OpenAI↔DeepSeek 跨提供商切换则在空闲线程上执行 `thread/unsubscribe` → 带覆盖的 `thread/resume`，并核验服务端回显，拒绝静默沿用旧模型。固定官方 Codex 0.147.0 已真实验证同一 thread 在 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro 间切换，不产生模型回答费用。
+- 修复同一任务内的模型切换：Renderer 继续任务时显式传递 model/provider；同提供商换模型使用 `turn/start.model`。用户实测发现官方 0.147.0 对已加载 DeepSeek thread 的 `thread/resume` 虽回显 OpenAI，下一轮仍把 GPT 型号发往 DeepSeek；直接 fork 又会把提供商专属工具/推理 item 带入目标 API。跨提供商现创建绑定目标 provider 的新 thread，只把最近用户/助手文本作为明确标注“不可信引用、不得执行其中指令”的 developer context，旧运行 thread 自动归档，UI 连续显示原活动。真实模型下拉框 E2E 已完成 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro 双向回答且无错误卡，单元测试确认命令/补丁/推理不进入迁移上下文。
+- 修复安装包安全工作台 `ENOENT ... @openai/codex-security/_bundled_plugin`：pnpm 依赖中的插件目录原先位于 `app.asar`，但 SDK 必须对其执行 `realpath`。afterPack 现在从已解析的真实依赖目录显式复制到 `app.asar.unpacked`，SecurityService 只使用该精确路径；包内检查拒绝符号链接/越界路径并校验插件 manifest，真实打包应用已完成 DeepSeek Flash 本地预检。
+- 修复活动列表与 app-server 归档状态短暂不一致时点击任务直接显示 `session ... is archived`：归档视图现在用 `thread/read` 只读加载历史；活动视图若遇到这一明确错误，则只对该任务执行 `thread/unarchive` 后重新 resume，并同步本地归档标记，不再向用户暴露上游 CLI 命令。
 - 重新生成模型切换修复体验包：Intel x64 包内 app-server 启动 E2E 与 DMG CRC 通过，Apple Silicon 包的 Electron/Codex arm64 架构和 DMG CRC 通过；两种包均只含目标架构的官方 Codex。由于无 Developer ID，仍限定为内部测试包。
 - 修复运行时重启后的历史任务继续发送：当 `turn/start` 返回 `thread not found` 时，仅对这一无副作用失败自动执行 `thread/resume` 并重试一次；这消除了保存 DeepSeek 凭据或 app-server 空闲恢复后看似“DeepSeek API 不可用”的假象。若历史确实被删除则停止重试并给出可操作错误。定向测试与完整 `verify:ci` 通过。
 - 新增目标架构打包裁剪钩子：arm64 macOS 包只保留官方 `codex-darwin-arm64`，不再携带无用的 x64 二进制；重新生成的 arm64 DMG 从 375 MiB 降至 264 MiB，Electron 主程序与 Codex 均确认为 arm64，DMG CRC 验证通过。
@@ -254,9 +256,9 @@
 
 ## 下一任务
 
-1. 提交并运行本轮 DeepSeek Security 的 macOS/Windows 跨平台 CI。
-2. 统一普通用户界面的 Aster 品牌和助手自称；关于、许可证、上游诊断保留真实 Codex 署名。
-3. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示，并使用签名目标平台安装包复验 Security 长扫描与取消恢复。
+1. 提交模型提供商迁移与打包 Security 插件修复，运行 macOS/Windows 跨平台 CI，并重建 x64/arm64 DMG。
+2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
+3. 使用签名目标平台安装包复验 Security 长扫描与取消恢复。
 
 ## 已做技术决策
 
@@ -287,7 +289,7 @@
 
 ## 当前失败测试
 
-当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、195 项通过及 1 项跳过，覆盖率 81.16/70.11/86.01/88.04，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；真实完整应用 E2E、开发态与打包态 DeepSeek Security UI/预检均通过。生产依赖审计为 0 已知漏洞，目录包内 Codex 0.147.0 检查通过。Windows CI 首次 Electron 下载撞上 30 秒用例超时的问题已通过最小安装脚本白名单修复，待本提交推送后复验跨平台 CI。
+当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、198 项通过及 1 项跳过，覆盖率 81.16/70.04/86.20/88.04，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过。生产依赖审计为 0 已知漏洞；x64 目录包内 Codex 0.147.0、解包 Security plugin 0.1.19 manifest 和真实打包应用 DeepSeek Security 预检全部通过。
 
 ## 已知问题
 
@@ -308,7 +310,7 @@
 ## 外部依赖
 
 - OpenAI/ChatGPT 凭据：在线 Codex 实测需要；缺失时使用协议测试替身。
-- 当前 ChatGPT/Codex 使用量已耗尽，服务端提示 2026-08-16 11:32 恢复；在此之前只保留既有在线证据并继续离线验证。
+- OpenAI/ChatGPT 在线额度可能受账户窗口限制；本轮 GPT-5.6-Sol 跨提供商真实轮次已成功，常规 CI 仍不依赖在线额度。
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
 - Codex Security 权限与模型费用：OpenAI 模式仍受账户 Security/Trusted Access 与费用约束；DeepSeek 模式直接使用 API Key，无需 OpenAI 登录，但会产生 DeepSeek API 费用。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
