@@ -1,5 +1,9 @@
 # Security Policy
 
+## Supported Versions
+
+Aster Code is currently a pre-1.0 preview. Security fixes are applied to the latest `main` branch and the most recent published preview release. Older snapshots are not maintained separately.
+
 ## System and Scope
 
 Aster Code is a local desktop coding-agent client for macOS and Windows. This policy covers application source, preload/IPC contracts, local persistence, app-server and Codex Security adapters, Git/worktree operations, the integrated terminal, file/media preview, and the isolated local-web preview.
@@ -40,4 +44,10 @@ Severity must reflect the local desktop boundary and prerequisites. A repository
 
 ## Reporting
 
-Until a public repository security-advisory endpoint is configured, do not publish suspected vulnerabilities or secrets in public issues. Provide a minimal private reproduction to the repository owner through the deployment's private coordination channel. Never include real API keys, authentication databases, unrelated user files, or destructive proof-of-concept steps.
+Do not publish suspected vulnerabilities or secrets in public issues. Use the repository Security page and select **Report a vulnerability** to create a private GitHub Security Advisory:
+
+https://github.com/xingchen20lj/aster-code-desktop/security/advisories/new
+
+Include the affected version, attacker prerequisites, minimal reproduction, expected security boundary, actual result, impact, and any proposed remediation. Use synthetic data wherever possible. Never include real API keys, authentication databases, unrelated user files, private repository content, or destructive proof-of-concept steps.
+
+If private vulnerability reporting is temporarily unavailable while the repository visibility is being changed, keep the report private and retry after the repository owner enables the Security Advisory endpoint. Do not fall back to a public Issue.

@@ -62,6 +62,10 @@ function binaryCandidates(explicitBinary) {
   const candidates = [
     ...configuredCandidates(explicitBinary, 'explicit', pathValue),
     ...configuredCandidates(process.env.CODEX_BINARY, 'environment', pathValue),
+    {
+      path: join(projectRoot, 'node_modules', '@openai', 'codex', 'bin', 'codex.js'),
+      source: 'project-dependency',
+    },
   ]
   const commandNames = process.platform === 'win32'
     ? ['codex.exe', 'codex.cmd', 'codex.bat', 'codex']
@@ -156,9 +160,7 @@ async function generate(binary, outputDirectory) {
     const manifest = {
       manifestVersion: 1,
       protocolSurface: 'stable',
-      generatedAt: new Date().toISOString(),
       binary: {
-        path: binary.path,
         source: binary.source,
         version: binary.version,
         sha256: await sha256File(binary.path),

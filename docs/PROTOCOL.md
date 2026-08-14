@@ -2,10 +2,10 @@
 
 ## 当前基线
 
-- 生成时间：2026-08-10
-- 本机二进制：`codex-cli 0.147.0-alpha.6.5`
-- Stable schema SHA-256：`6e12bb6cb94d3cd91011bc861c5944ba5db7fbeeb406399a3cb9b9e771c27999`
-- TypeScript bindings SHA-256：`5f10c708c106231e983254987b980f4484a8bd654ba36a2226e6efd5be12cb8c`
+- 同步日期：2026-08-14
+- 锁定项目依赖：`codex-cli 0.147.0`
+- Stable schema SHA-256：`54fd6e4e4849d43f93c8573f325d5bac4bc66a57fabf2433ea1d3cd73d0754b2`
+- TypeScript bindings SHA-256：`045a3a0bda23dec6aa3c62ce464dd84fb9527f9f4f1de4d34eb60b7e77110efe`
 - 生成产物：642 个 TypeScript 文件、285 个 JSON Schema 文件。
 
 完整来源、二进制哈希和文件清单位于 `src/generated/codex/manifest.json`。重新同步：
@@ -14,7 +14,7 @@
 pnpm schema:sync
 ```
 
-工具按显式配置、`CODEX_BINARY`、`PATH`、ChatGPT macOS bundle 的顺序发现二进制；从同一个可执行文件读取版本并生成两类 schema。生成发生在临时目录，完成后原子替换，失败时保留原基线。
+工具按显式配置、`CODEX_BINARY`、锁定的 `node_modules/@openai/codex`、`PATH`、ChatGPT macOS bundle 的顺序发现二进制；默认因此可在全新 clone 安装依赖后复现稳定协议，不依赖贡献者的 ChatGPT 安装。生成清单只记录来源类别、版本和哈希，不记录本机绝对路径或生成时间。生成发生在临时目录，完成后原子替换，失败时保留原基线。
 
 ## Wire 约束
 

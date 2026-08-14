@@ -4,11 +4,20 @@
   "private": true,
   "author": "Aster Code contributors",
   "description": "A local-first desktop coding agent client powered by Codex app-server.",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/xingchen20lj/aster-code-desktop.git"
+  },
+  "bugs": {
+    "url": "https://github.com/xingchen20lj/aster-code-desktop/issues"
+  },
+  "homepage": "https://github.com/xingchen20lj/aster-code-desktop#readme",
   "type": "module",
   "main": "./out/main/index.js",
   "packageManager": "pnpm@11.16.0",
   "engines": {
-    "node": ">=22.13.0"
+    "node": "^22.13.0 || ^24.0.0 || ^26.0.0"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -16,8 +25,9 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check scripts/prepare-package-output.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/check-open-source-readiness.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check scripts/prepare-package-output.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
     "check:workflows": "node scripts/check-workflows.mjs",
+    "check:open-source": "node scripts/check-open-source-readiness.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
     "check:package": "node scripts/check-packaged-runtime.mjs",
     "audit:dependencies": "pnpm audit --prod --audit-level high",
@@ -33,8 +43,8 @@
     "test:e2e:offline": "pnpm build && playwright test tests/e2e/ipc-security.spec.ts",
     "test:e2e:performance": "pnpm build && playwright test tests/e2e/performance.spec.ts",
     "test:e2e:packaged": "pnpm package:dir && pnpm check:package && playwright test tests/e2e/packaged.spec.ts",
-    "verify": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm test && pnpm build && pnpm check:bundle",
-    "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm notices:check && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
+    "verify": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm check:open-source && pnpm test && pnpm build && pnpm check:bundle",
+    "verify:ci": "pnpm typecheck && pnpm lint && pnpm check:scripts && pnpm check:workflows && pnpm check:open-source && pnpm notices:check && pnpm test:coverage && pnpm test:performance && pnpm build && pnpm check:bundle",
     "package:dir": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --dir --publish never",
     "package:mac": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --mac --publish never",
     "package:win": "node scripts/prepare-package-output.mjs && pnpm build && electron-builder --win --publish never",
@@ -98,6 +108,20 @@
       "package.json",
       "!node_modules/@openai/codex-security/node_modules/@openai/codex-*/**",
       "!node_modules/@openai/codex-sdk/node_modules/@openai/codex-*/**"
+    ],
+    "extraResources": [
+      {
+        "from": "LICENSE",
+        "to": "LICENSE.txt"
+      },
+      {
+        "from": "NOTICE",
+        "to": "NOTICE.txt"
+      },
+      {
+        "from": "THIRD_PARTY_NOTICES.md",
+        "to": "THIRD_PARTY_NOTICES.md"
+      }
     ],
     "publish": null,
     "mac": {

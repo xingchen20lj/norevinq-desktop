@@ -1,0 +1,37 @@
+name: 功能建议
+description: 描述希望改善的真实开发工作流
+title: "[Feature]: "
+labels: [enhancement, needs-triage]
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: 当前工作流与问题
+      description: 你正在完成什么任务，现有方式在哪一步造成阻碍？
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: 期望结果
+      description: 请描述可验证的完整闭环，而不只是新增一个按钮或页面。
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: 已尝试的替代方案
+  - type: textarea
+    id: constraints
+    attributes:
+      label: 平台、模型或安全约束
+      description: 例如 macOS/Windows、Codex/DeepSeek、审批或沙箱要求。
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: 提交前确认
+      options:
+        - label: 我已搜索现有 Issue，未找到相同建议。
+          required: true
+        - label: 我没有在公开 Issue 中包含凭据或私人数据。
+          required: true

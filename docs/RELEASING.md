@@ -1,6 +1,6 @@
 # 桌面构建与发布
 
-最后更新：2026-08-11。
+最后更新：2026-08-14。
 
 ## 发布基线
 
@@ -8,6 +8,7 @@
 - 主 Codex runtime 固定为公开 `@openai/codex` 0.147.0，并随平台包内置；
 - Codex Security SDK 固定 0.1.8，其 SDK 元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，因此 Security 的打包兼容性必须通过目标账户 sealed 扫描复验；
 - macOS 目标为 DMG + ZIP，Windows 目标为交互式 per-user NSIS；
+- 源码采用 Apache-2.0；安装包额外携带 `LICENSE.txt`、`NOTICE.txt` 和 `THIRD_PARTY_NOTICES.md`；
 - 构建不会自动发布，所有 builder 命令显式使用 `--publish never`。
 
 官方 OpenAI 文档说明 `codex app-server` 默认使用 stdio/JSONL，并且生成的 schema 与运行的 Codex 版本严格对应。Aster Code 因此直接固定并发现包内 0.147.0，而不是依赖用户 PATH 或 ChatGPT 安装。显式配置和 `CODEX_BINARY` 仍可覆盖包内版本用于诊断。
@@ -113,7 +114,7 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 
 ## 发布清单
 
-1. 更新版本号、CHANGELOG、自主状态和功能一致性表。
+1. 更新版本号、CHANGELOG、自主状态和功能一致性表；公开源码前逐项完成 `OPEN_SOURCE_RELEASE_CHECKLIST.md`。
 2. 同步并审阅 Codex schema；确认 package runtime 与 schema 版本。
 3. 运行 `pnpm verify:ci`、`pnpm audit:dependencies` 和平台 packaged E2E。
 4. 在目标系统安装产物，验证项目、任务、终端、Git、文件预览、DeepSeek 和安全诊断。

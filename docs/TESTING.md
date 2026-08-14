@@ -24,13 +24,14 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `ASTER_TEST_LIVE_AUTH=1 pnpm exec vitest run tests/integration/codexThreadLifecycle.test.ts`：在隔离 `CODEX_HOME` 中额外向官方认证服务发起设备码登录并立即取消；不调用模型、不完成用户授权，常规 CI 不依赖该网络检查。
 - `pnpm check:bundle`：从生产 HTML 校验首屏 JS/CSS 与 Renderer 总资产预算。
 - `pnpm check:workflows`：拒绝非完整提交 SHA 的远程 Action，并验证发布 workflow 的 main/ref/environment/签名守门。
+- `pnpm check:open-source`：检查许可证、社区文件、仓库元数据、稳定 Codex schema 来源、安装包法律资源，并拒绝公开文本中的个人绝对路径或测试目录外的凭据形状值。
 - `pnpm audit:dependencies`：查询当前漏洞数据库并拒绝生产依赖的高严重度问题。
 - `pnpm audit:licenses`：列出生产依赖许可证，发布前用于生成 third-party notices。
 - `pnpm notices:generate` / `pnpm notices:check`：从锁定的生产依赖图生成或校验根目录 `THIRD_PARTY_NOTICES.md`。
 
 覆盖率是回归缺口信号，不等同于功能完成。全局最低门槛为 statements 78%、branches 65%、functions 80%、lines 85%；关键安全边界仍要求针对性断言和真实运行证据。
 
-2026-08-11 GitHub PR 线上修复后基线：34 个测试文件、159 项；statements 80.62%、branches 69.16%、functions 85.40%、lines 87.45%。
+2026-08-14 开源准备分支基线：36 个测试文件、181 项；statements 80.92%、branches 69.48%、functions 85.99%、lines 87.79%。
 
 ## 自动化层级
 

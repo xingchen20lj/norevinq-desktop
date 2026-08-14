@@ -1,14 +1,14 @@
 # 无人值守开发状态
 
-最后更新：2026-08-13（Asia/Shanghai）
+最后更新：2026-08-14（Asia/Shanghai）
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备（完成）；正在执行最终功能一致性逐项审计与体验缺口修复。
+阶段 20：桌面打包和发布准备（完成）；正在执行开源发布准备、最终功能一致性逐项审计与体验缺口修复。
 
 ## 当前任务
 
-- 完成工作树 Handoff 跨进程崩溃恢复状态机及安全恢复 UI 的完整质量门。
+- 完成开源许可证、社区治理、公开文档、隐私清理和可复现 Codex schema 生成的完整质量门。
 - 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
@@ -198,16 +198,16 @@
 - 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
 - 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
 - GitHub PR 线上修复后最终 `verify:ci`：34 个测试文件 159 项、覆盖率 80.62/69.16/85.40/87.45、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
-- 仓库级 Git 身份固定为 `xingchen20lj <71823107+xingchen20lj@users.noreply.github.com>`；从首条提交到 GitHub PR 阶段提交的作者身份均已核对一致，无需重写历史。
-- 按用户授权创建私有仓库 `xingchen20lj/aster-code-desktop` 并首次推送完整 `main`；GitHub 回读确认 `PRIVATE`、默认分支 `main`，本地/远端 SHA 同为 `d154183f41783f2139e07b017800357b36a43ebc`。
-- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位 `/Users/cyber/bin/gh`，未发生外部写入；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
+- 仓库级 Git 身份使用维护者的 GitHub noreply 地址；提交作者身份已核对一致，无需重写历史。
+- 按用户授权创建独立 GitHub 仓库并首次推送完整 `main`；本地与远端提交一致。
+- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位用户级 `gh`；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
 - 第二次真实桌面测试已由 Aster 成功推送 `codex/github-pr-validation` 并创建 Draft PR #1，但创建后验证错误使用 `gh pr list --head owner:branch` 而未识别结果；改为纯分支过滤并严格匹配 `headRepositoryOwner.login`，避免重复创建和 fork 同名分支误认。
-- 第三次真实 Electron 回归通过 Aster 自身重新读取私有 GitHub Draft PR #1，精确验证仓库 `xingchen20lj/aster-code-desktop`、head `codex/github-pr-validation`、base `main`、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
+- 第三次真实 Electron 回归通过 Aster 自身重新读取测试 Draft PR，精确验证目标仓库、head/base、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
 - 实际检查真实 PR 完成态截图：GitHub 登录、origin head/base、Draft 卡片和“在 GitHub 打开”在 1320×840 浅色界面无明显溢出或错位。
 - 首次 GitHub Actions 远端运行准确暴露跨平台 notices 漂移：pnpm 将 Codex 与 `@napi-rs/canvas` 原生 alias 报告为不同的 `darwin-*`/`win32-*` 名称或版本，Windows checkout 还会物化 CRLF；生成器现规范化相同上游组件并以逻辑换行比较，macOS/Windows 输出保持确定性。
 - CI 的 feature branch `push` 与 `pull_request` 双触发已收敛为仅 `main` push + PR，单次 PR 更新不再重复执行两组矩阵并发送重复通知；本地完整 `verify:ci` 再次通过。
 - Windows PR runner 继续暴露出目标平台路径解析、工作树路径大小写、Codex launcher 子进程锁、CRLF、POSIX mode 断言和大小写环境变量等 7 类跨平台问题；产品代码与测试夹具已逐项修复，定向 21 项和本地完整 159 项回归通过。
-- 私有仓库 `main` ruleset/classic branch protection API 均返回 GitHub 403（当前套餐要求升级 GitHub Pro 或公开仓库）；为保护源码隐私未擅自公开，限制已作为外部仓库治理依赖记录。
+- 私有免费仓库的 `main` ruleset/classic branch protection API 返回 GitHub 403；公开后必须立即建立主分支保护，步骤已写入开源发布检查表。
 - Windows 远端 34 个测试文件已全部通过；随后性能夹具暴露出逐条造 3,000 条历史在 Windows 文件系统耗时约 58 秒，而实际查询/批量已读仅 418.5 ms。状态库现提供原子事务批量写入，新增回归后本地 160 项通过，3,000 条夹具与被测操作合计约 105 ms。
 - 事务批量写入后的 Windows 远端 160 项、性能和生产构建通过；Electron 冒烟准确打开安全工作台，但测试定位器同时命中总览卡片与弹窗同名标题，现按语义 dialog 范围限定安全/计划任务断言。
 - PR #1 最终 macOS/Windows 检查及合并后的 `main` 检查均通过；主分支运行 `31462134036` 两个平台为绿色，重复 PR workflow 邮件问题已关闭。
@@ -226,7 +226,7 @@
 - 修复内嵌浏览器覆盖任务和输入框：宽屏改为可拖动/键盘缩放的右侧分栏，窄屏自动底部停靠；1200×760 与 800×640 Electron 布局断言和截图通过。
 - 本阶段完整 `verify:ci`：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算全部通过；Git/浏览器两项专属 Electron E2E 通过。
 - PR #5 首轮 macOS 15 全绿；Windows 2025 准确发现 runner 全局 `core.autocrlf` 使恢复后的测试文本按平台转换为 CRLF，并因断言提前失败导致 SQLite 句柄阻塞临时目录清理。测试仓库现固定 `core.autocrlf=false` 验证字节保真，清理增加 Windows 有界重试；产品仍尊重用户仓库配置。
-- 用户在试用 DMG 打开 `/Users/cyber/test/0811` 时准确发现普通文件夹被 `worktree:list` 当 Git 仓库执行，首页冒泡 `fatal: not a git repository`；实地只读复核确认该路径没有 `.git`。
+- 用户在试用 DMG 打开普通非 Git 文件夹时准确发现 `worktree:list` 冒泡 `fatal: not a git repository`；实地只读复核确认目标路径没有 `.git`。
 - 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Codex 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
 - 完成工作树基线目录与选择器：最多 500 个 HEAD/本地分支/远端分支/标签，annotated tag 解析到 commit；UI 显示类型/ref/短 OID，创建时再次解析并匹配 expected OID，ref 移动失败关闭。
 - SQLite migration v10 持久化所选 `base_ref` 与实际 `base_oid`；真实仓库从非当前 `release/base` 创建 detached worktree，实际 HEAD、旧版本文件和 UI 闭环均经自动测试。
@@ -235,6 +235,10 @@
 - Handoff 修改只有在任务→工作树关联落库成功后才清理恢复 ref；进程重启依据真实任务关联决定回滚源端或提交清理，不盲目重复 apply。
 - 恢复前逐项核对源/目标 HEAD、工作树 tree 与 index tree；崩溃后的人工修改进入 `needsAttention`，保留恢复 ref、阻止工作树移除并在工作树面板提供安全重试，不执行破坏性清理。
 - 真实 Git 测试覆盖 stash marker 尚未固化、目标已 apply 但任务仍在源端、目标在崩溃后又被人工修改三类窗口；Electron E2E 与 1320×840 截图验证恢复提示和重试不删除人工文件。
+- 建立 Apache-2.0 `LICENSE`、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南与公开发布检查表；README 加入真实且无个人路径的产品截图。
+- Codex schema 同步默认改用锁定的 `@openai/codex` 0.147.0 项目依赖，生成清单不再记录本机路径或时间戳；稳定 schema/bindings 已重新生成并通过类型检查。
+- 新增 `check:open-source` CI 守门，检查 21 项公共文件、协议版本、打包法律资源、个人绝对路径和测试目录外凭据形状值。
+- 开源准备质量门：冻结安装、生产依赖审计（0 已知漏洞）、36 个测试文件 181 项、覆盖率 80.92/69.48/85.99/87.79、性能、类型、规范、构建、bundle、目录包与 packaged E2E 全部通过；真实 `.app` 内回读 LICENSE/NOTICE/第三方清单和官方 Codex 0.147.0 ready。
 
 ## 下一任务
 
@@ -295,8 +299,8 @@
 - Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
 - 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
-- GitHub 私有远端已建立并由系统 keyring 中的 `xingchen20lj` 账户验证；Aster 不保存或显示其 token。
-- GitHub 私有仓库主分支保护：当前账户套餐的 ruleset/classic protection API 返回 403；需要升级 GitHub Pro，公开仓库虽可启用但不符合用户要求的私有边界。
+- GitHub 远端已建立并由系统 keyring 中的维护者账户验证；Aster 不保存或显示其 token。
+- GitHub 主分支保护：私有免费仓库当前不能启用；仓库切换为 Public 后必须按 `docs/OPEN_SOURCE_RELEASE_CHECKLIST.md` 立即建立 ruleset。
 
 ## 待验证问题
 

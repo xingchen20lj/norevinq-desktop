@@ -52,7 +52,7 @@
 | Git | 状态、分支、远端 | 已测试 | porcelain v2 NUL、branch/upstream/ahead/behind/remotes；真实仓库与桌面 UI 通过 |
 | Git | stage/unstage/revert 文件和区块 | 已测试 | 文件与区块 stage/unstage/revert 均真实测试；整文件丢弃使用独立 Git ref 可恢复 staged/unstaged/untracked/rename，跨重启桌面恢复通过且不占用用户 stash |
 | Git | commit/push | 已测试 | 桌面真实 commit；本地 bare remote 真实 push/set-upstream 测试 |
-| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读私有 Draft PR #1，在线重复调用未创建第二项 |
+| Git | 创建 PR | 已测试 | GitHub CLI 登录/远端/fork-upstream 预检、显式 push、Draft/正式 PR、结构化 URL 回读、重复创建幂等和 960×640 Electron 闭环通过；Aster 自身真实创建并回读受控 Draft PR，在线重复调用未创建第二项 |
 | Git | 大型仓库增量刷新 | 部分实现 | 单次状态有 8 MiB 边界和手动刷新；文件监听/增量策略待性能阶段 |
 | 工作树 | 创建托管 detached 工作树 | 已测试 | 仓库外 userData 托管根；枚举 HEAD/本地分支/远端分支/标签，UI 显式选基线并以 commit OID 锁定，ref 移动失败关闭；默认 detached、可选新分支，真实旧分支基线/E2E 通过 |
 | 工作树 | 本地与工作树 Handoff | 已测试 | 任务上下文 SQLite 持久化、后续 turn cwd、确认 UI，以及 staged/unstaged/untracked 的 Local↔worktree 真实 Git 迁移和冲突回滚均通过自动测试；目标脏时失败关闭 |
@@ -103,3 +103,4 @@
 | 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 本地 36 个测试文件 172 项及 V8 全局门槛；官方 Codex 0.147.0 无模型 account/thread/goal/permission-profile 集成、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道与普通目录包、挂载 DMG E2E 通过；最近 `main` macOS/Windows CI 绿色，本分支远端 CI、目标真机与完整在线回归待验证 |
 | 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |
+| 发布 | 开源许可证、构建指南与社区治理 | 已测试 | Apache-2.0、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南、公开发布检查表和隐私安全截图已加入；冻结安装、181 项测试、开源守门、生产构建、目录包和 packaged E2E 通过，法律资源已在真实 `.app` 中回读 |
