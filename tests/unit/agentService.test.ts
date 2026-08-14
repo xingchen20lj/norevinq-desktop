@@ -11,6 +11,7 @@ import type {
   JsonValue,
 } from '../../src/main/runtime/jsonlRpc.js'
 import { StateDatabase } from '../../src/main/state/database.js'
+import { JsonRpcError } from '../../src/main/runtime/jsonlRpc.js'
 
 const temporaryPaths: string[] = []
 
@@ -217,6 +218,43 @@ describe('AgentService', () => {
     expect(runtime.requests.map(({ method }) => method)).toEqual([
       'thread/list', 'thread/resume', 'thread/goal/get', 'turn/steer', 'turn/interrupt',
     ])
+    service.dispose()
+    database.close()
+  })
+
+  it('resumes and retries a turn when a restarted runtime has not loaded the selected thread', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.failNextTurnStartWithMissingThread = true
+
+    await service.startTurn({ threadId: 'thread-1', text: 'Continue after restart' })
+
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'turn/start', 'thread/resume', 'turn/start',
+    ])
+    expect(runtime.turnStarts).toBe(2)
+    expect(runtime.turnCompletions).toBe(1)
+    expect(service.getSnapshot().selectedThreadId).toBe('thread-1')
+
+    service.dispose()
+    database.close()
+  })
+
+  it('returns an actionable error when the persisted task history was actually removed', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    runtime.missingThreadPermanently = true
+
+    await expect(service.startTurn({ threadId: 'thread-1', text: 'Continue missing task' }))
+      .rejects.toThrow('task history is no longer available')
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list', 'turn/start', 'thread/resume',
+    ])
+
     service.dispose()
     database.close()
   })
@@ -512,6 +550,8 @@ class FakeRuntime {
   readonly #handlers = new Map<string, JsonRpcRequestHandler>()
   turnStarts = 0
   turnCompletions = 0
+  failNextTurnStartWithMissingThread = false
+  missingThreadPermanently = false
   goal: JsonValue | null = null
 
   start(): Promise<unknown> { return Promise.resolve({}) }
@@ -522,6 +562,13 @@ class FakeRuntime {
       ? params as Record<string, JsonValue>
       : {}
     const requestedThreadId = typeof parameters.threadId === 'string' ? parameters.threadId : 'thread-1'
+    if (this.missingThreadPermanently && (method === 'turn/start' || method === 'thread/resume')) {
+      return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
+    }
+    if (method === 'turn/start' && this.failNextTurnStartWithMissingThread) {
+      this.failNextTurnStartWithMissingThread = false
+      return Promise.reject(new JsonRpcError(-32602, `thread not found: ${requestedThreadId}`))
+    }
     const thread = protocolThread(
       method === 'thread/resume' ? [turn('turn-old', 'completed')] : [],
       requestedThreadId,

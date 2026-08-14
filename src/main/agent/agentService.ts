@@ -22,7 +22,12 @@ import type {
   ThreadGoal,
   ThreadGoalStatus,
 } from '../../shared/conversation.js'
-import type { JsonRpcNotificationHandler, JsonRpcRequestHandler, JsonValue } from '../runtime/jsonlRpc.js'
+import {
+  JsonRpcError,
+  type JsonRpcNotificationHandler,
+  type JsonRpcRequestHandler,
+  type JsonValue,
+} from '../runtime/jsonlRpc.js'
 import type { StateDatabase } from '../state/database.js'
 import type { MoveWorktreeChangesInput, MoveWorktreeChangesResult } from '../../shared/worktree.js'
 import { createAgentActivityState, reduceAgentActivity } from './activityReducer.js'
@@ -447,7 +452,14 @@ export class AgentService {
     this.#requireVisibleThread(input.threadId)
     if (this.#handoffThreads.has(input.threadId)) throw new Error('Wait for the conversation handoff to finish.')
     await this.#runtime.start()
-    await this.#startTurn({ ...input, text: requirePrompt(input.text) })
+    const turnInput = { ...input, text: requirePrompt(input.text) }
+    try {
+      await this.#startTurn(turnInput)
+    } catch (error) {
+      if (!isThreadNotFoundError(error)) throw error
+      await this.#resumeThreadForTurn(input.threadId)
+      await this.#startTurn(turnInput)
+    }
     this.#update({ selectedThreadId: input.threadId, error: null })
     return this.#snapshot
   }
@@ -509,6 +521,20 @@ export class AgentService {
     } catch (error) {
       this.#runtime.markTurnCompleted()
       throw error
+    }
+  }
+
+  async #resumeThreadForTurn(threadId: string): Promise<void> {
+    try {
+      const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
+      const thread = asRecord(result.thread)
+      if (requireString(thread.id, 'thread.id') !== threadId) {
+        throw new Error('Codex resumed a different conversation.')
+      }
+      this.#hydrateThread(thread)
+    } catch (error) {
+      if (!isThreadNotFoundError(error)) throw error
+      throw new Error('This task history is no longer available. Start a new task to continue.', { cause: error })
     }
   }
 
@@ -805,6 +831,10 @@ function requirePrompt(text: string): string {
   if (!trimmed) throw new Error('Task instructions cannot be empty.')
   if (trimmed.length > 100_000) throw new Error('Task instructions exceed the 100,000 character limit.')
   return trimmed
+}
+
+function isThreadNotFoundError(error: unknown): boolean {
+  return error instanceof JsonRpcError && /\bthread not found\b/i.test(error.message)
 }
 
 function requireThreadName(value: string): string {

@@ -25,7 +25,7 @@
     "build": "electron-vite build",
     "typecheck": "tsc --build --pretty false",
     "lint": "eslint . --max-warnings=0",
-    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/check-open-source-readiness.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check scripts/prepare-package-output.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
+    "check:scripts": "node --check scripts/sync-codex-schema.mjs && node --check scripts/check-bundle-budget.mjs && node --check scripts/check-packaged-runtime.mjs && node --check scripts/generate-third-party-notices.mjs && node --check scripts/check-workflows.mjs && node --check scripts/check-open-source-readiness.mjs && node --check scripts/update-release-config.mjs && node --check scripts/package-update-release.mjs && node --check scripts/prepare-package-output.mjs && node --check scripts/after-pack.mjs && node --check tests/helpers/fakeCodexLifecycle.mjs && node --check tests/helpers/fakeGh.mjs",
     "check:workflows": "node scripts/check-workflows.mjs",
     "check:open-source": "node scripts/check-open-source-readiness.mjs",
     "check:bundle": "node scripts/check-bundle-budget.mjs",
@@ -99,6 +99,7 @@
       }
     ],
     "asar": true,
+    "afterPack": "scripts/after-pack.mjs",
     "artifactName": "${productName}-${version}-${os}-${arch}.${ext}",
     "directories": {
       "output": "release"

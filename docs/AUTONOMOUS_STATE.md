@@ -13,6 +13,8 @@
 
 ## 已完成任务
 
+- 修复运行时重启后的历史任务继续发送：当 `turn/start` 返回 `thread not found` 时，仅对这一无副作用失败自动执行 `thread/resume` 并重试一次；这消除了保存 DeepSeek 凭据或 app-server 空闲恢复后看似“DeepSeek API 不可用”的假象。若历史确实被删除则停止重试并给出可操作错误。定向测试与完整 `verify:ci` 通过。
+- 新增目标架构打包裁剪钩子：arm64 macOS 包只保留官方 `codex-darwin-arm64`，不再携带无用的 x64 二进制；重新生成的 arm64 DMG 从 375 MiB 降至 264 MiB，Electron 主程序与 Codex 均确认为 arm64，DMG CRC 验证通过。
 - 新增 macOS 完全卸载说明，覆盖独立 userData、Aster Codex home、Security 扫描产物、托管工作树元数据、偏好、缓存、深链接、TCC 和 `safeStorage` 钥匙串项目，并明确系统日志/备份不属于应用可保证清除的边界。
 - 使用 Codex Security plugin 0.1.19 完成并密封标准单次部分覆盖扫描；确认默认 Aster Codex/Security 路径不与官方 `~/.codex` 冲突，同时将当前无签名 DMG 限定为可信项目内部体验包。扫描发现 3 项中等和 5 项低风险待修复问题，利用细节不写入未来公开仓库。
 
@@ -277,7 +279,7 @@
 
 ## 当前失败测试
 
-当前无失败测试。工作树 Handoff 恢复阶段完整 `verify:ci` 通过：36 个测试文件 181 项、2 项性能基准，覆盖率 80.96/69.49/86.10/87.82，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；恢复/生命周期/非 Git 三项真实 Electron E2E 通过，生产依赖审计为 0 已知漏洞。上一 `main` 的 macOS 15/Windows 2025 CI 均绿色，本分支跨平台 CI 待提交后验证。
+当前无失败测试。历史任务自动 resume 与目标架构打包裁剪后完整 `verify:ci` 通过：36 个测试文件 183 项、2 项性能基准，覆盖率 80.96/69.46/86.02/87.85，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；生产依赖审计为 0 已知漏洞。上一 `main` 的 macOS 15/Windows 2025 CI 均绿色，本分支跨平台 CI 待提交后验证。
 
 ## 已知问题
 
