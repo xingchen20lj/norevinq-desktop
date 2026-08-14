@@ -1,18 +1,18 @@
 {
-  "name": "aster-code",
+  "name": "norevinq",
   "version": "0.1.0",
   "private": true,
-  "author": "xingchen20lj and Aster Code contributors",
+  "author": "xingchen20lj and Norevinq contributors",
   "description": "A local-first desktop coding agent with OpenAI and DeepSeek model providers.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/xingchen20lj/aster-code-desktop.git"
+    "url": "git+https://github.com/xingchen20lj/norevinq-desktop.git"
   },
   "bugs": {
-    "url": "https://github.com/xingchen20lj/aster-code-desktop/issues"
+    "url": "https://github.com/xingchen20lj/norevinq-desktop/issues"
   },
-  "homepage": "https://github.com/xingchen20lj/aster-code-desktop#readme",
+  "homepage": "https://github.com/xingchen20lj/norevinq-desktop#readme",
   "type": "module",
   "main": "./out/main/index.js",
   "packageManager": "pnpm@11.16.0",
@@ -88,13 +88,13 @@
     "vitest": "4.1.10"
   },
   "build": {
-    "appId": "dev.astercode.desktop",
-    "productName": "Aster Code",
+    "appId": "io.github.xingchen20lj.norevinq",
+    "productName": "Norevinq",
     "protocols": [
       {
-        "name": "Aster Code",
+        "name": "Norevinq",
         "schemes": [
-          "aster-code"
+          "norevinq"
         ]
       }
     ],

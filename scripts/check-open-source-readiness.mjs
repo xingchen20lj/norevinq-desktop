@@ -31,6 +31,7 @@ const requiredFiles = [
   '.github/ISSUE_TEMPLATE/bug_report.yml',
   '.github/ISSUE_TEMPLATE/feature_request.yml',
   'docs/BUILDING.md',
+  'docs/BRANDING.md',
   'docs/OPEN_SOURCE_RELEASE_CHECKLIST.md',
   'docs/assets/screenshots/command-palette.png',
   'docs/assets/screenshots/provider-settings.png',
@@ -58,7 +59,7 @@ const codexVersion = packageJson.dependencies?.['@openai/codex']
 
 if (packageJson.license !== 'Apache-2.0') errors.push('package.json license must be Apache-2.0')
 if (packageJson.packageManager !== 'pnpm@11.16.0') errors.push('packageManager must remain pinned')
-if (packageJson.repository?.url !== 'git+https://github.com/xingchen20lj/aster-code-desktop.git') {
+if (packageJson.repository?.url !== 'git+https://github.com/xingchen20lj/norevinq-desktop.git') {
   errors.push('package.json repository metadata is missing or unexpected')
 }
 if (manifest.binary?.source !== 'project-dependency') {
@@ -86,7 +87,16 @@ const { stdout } = await runFile('git', [
   '-z',
 ], { cwd: projectRoot, encoding: 'buffer', maxBuffer: 32 * 1024 * 1024 })
 
-const files = stdout.toString('utf8').split('\0').filter(Boolean)
+const files = []
+for (const relativePath of stdout.toString('utf8').split('\0').filter(Boolean)) {
+  try {
+    await stat(resolve(projectRoot, relativePath))
+    files.push(relativePath)
+  } catch {
+    // A tracked file deleted in the working tree remains visible to git ls-files
+    // until it is staged; readiness checks should evaluate the proposed tree.
+  }
+}
 const localPathPatterns = [
   /\/Users\/[A-Za-z0-9._-]+\//,
   /\/var\/folders\//,

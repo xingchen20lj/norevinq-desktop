@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe('GitService', () => {
   it('runs init, status, stage, unstage, commit, remote and push in a real isolated repository', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const remotePath = join(root, 'remote.git')
@@ -53,7 +53,7 @@ describe('GitService', () => {
   }, 30_000)
 
   it('rejects absolute, escaping, and option-like paths before running Git', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -67,8 +67,44 @@ describe('GitService', () => {
     database.close()
   })
 
+  it('refuses to expand a selected nested project into an ancestor repository', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-boundary-'))
+    temporaryPaths.push(root)
+    runGit(root, ['init', '-b', 'main'])
+    const projectPath = join(root, 'selected-project')
+    mkdirSync(projectPath)
+    writeFileSync(join(root, 'private-sibling.txt'), 'must stay outside the selected project\n')
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+
+    const status = await service.getStatus({ projectId: project.id })
+    expect(status.initialized).toBe(false)
+    expect(status.root).toBeNull()
+    expect(status.files).toEqual([])
+    expect(status.error).toContain('Git 仓库根目录')
+    expect(JSON.stringify(status)).not.toContain('private-sibling.txt')
+    database.close()
+  })
+
+  it('does not execute a repository-controlled core.fsmonitor helper during passive status', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-fsmonitor-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const marker = join(root, 'fsmonitor-ran')
+    runGit(projectPath, ['init', '-b', 'main'])
+    runGit(projectPath, ['config', 'core.fsmonitor', `sh -c 'printf compromised > "${marker}"'`])
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+
+    expect((await service.getStatus({ projectId: project.id })).initialized).toBe(true)
+    expect(existsSync(marker)).toBe(false)
+    database.close()
+  })
+
   it('removes embedded credentials and query data from remote URLs before returning renderer state', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -89,7 +125,7 @@ describe('GitService', () => {
   })
 
   it('discards and restores a whole file without losing staged or unstaged content', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-discard-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -123,7 +159,7 @@ describe('GitService', () => {
   }, 30_000)
 
   it('recovers untracked files and keeps the recovery point when a target is occupied', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-discard-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -153,7 +189,7 @@ describe('GitService', () => {
   }, 30_000)
 
   it('preserves an existing user stash while discarding and restoring a renamed file', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-git-discard-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-discard-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -175,7 +211,7 @@ describe('GitService', () => {
     expect(readFileSync(join(projectPath, 'old.txt'), 'utf8')).toBe('baseline\n')
     expect(existsSync(join(projectPath, 'new.txt'))).toBe(false)
     expect(runGitOutput(projectPath, ['stash', 'list'])).toContain('user-owned-stash')
-    expect(runGitOutput(projectPath, ['stash', 'list'])).not.toContain('aster-discard-v1')
+    expect(runGitOutput(projectPath, ['stash', 'list'])).not.toContain('norevinq-discard-v1')
 
     const discardId = discarded.discards[0]?.id
     if (!discardId) throw new Error('Expected a recoverable discard id.')
@@ -194,8 +230,8 @@ function runGit(cwd: string, args: string[]): void {
 
 function configureTestRepository(cwd: string): void {
   runGit(cwd, ['config', 'core.autocrlf', 'false'])
-  runGit(cwd, ['config', 'user.name', 'Aster Test'])
-  runGit(cwd, ['config', 'user.email', 'aster@example.invalid'])
+  runGit(cwd, ['config', 'user.name', 'Norevinq Test'])
+  runGit(cwd, ['config', 'user.email', 'norevinq@example.invalid'])
 }
 
 function runGitOutput(cwd: string, args: string[]): string {

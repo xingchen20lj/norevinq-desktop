@@ -28,18 +28,21 @@ import type { ConversationSnapshot } from '../shared/conversation.js'
 import { FileService } from './files/fileService.js'
 import { serveFilePreview } from './files/fileProtocol.js'
 import { BrowserService } from './browser/browserService.js'
-import { extractAsterDeepLinks, parseAsterDeepLink } from './app/deepLinks.js'
+import { extractNorevinqDeepLinks, parseNorevinqDeepLink } from './app/deepLinks.js'
 import { IPC_CHANNELS } from '../shared/contracts.js'
 import { UpdateService } from './update/updateService.js'
 import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
 import { DiagnosticsService } from './diagnostics/diagnosticsService.js'
 import { AccountService } from './account/accountService.js'
-import { prepareAsterAgentHome } from './runtime/codexHome.js'
+import { prepareNorevinqAgentHome } from './runtime/codexHome.js'
+import { prepareNorevinqUserData } from './app/userDataMigration.js'
 
 protocol.registerSchemesAsPrivileged([{
-  scheme: 'aster-file',
+  scheme: 'norevinq-file',
   privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true },
 }])
+
+if (app.isPackaged) app.setPath('userData', prepareNorevinqUserData(app.getPath('userData')))
 
 const isDevelopment = !app.isPackaged
 let mainWindow: BrowserWindow | null = null
@@ -63,7 +66,7 @@ let browserService: BrowserService | null = null
 let updateService: UpdateService | null = null
 let diagnosticsService: DiagnosticsService | null = null
 let rendererReady = false
-const pendingDeepLinks = extractAsterDeepLinks(process.argv)
+const pendingDeepLinks = extractNorevinqDeepLinks(process.argv)
 
 process.on('uncaughtExceptionMonitor', (error, origin) => {
   recordCrashSafely({
@@ -186,7 +189,7 @@ function windowIntersectsDisplay(value: PersistedWindowState): boolean {
 }
 
 const gotLock = app.requestSingleInstanceLock()
-if (app.isPackaged) app.setAsDefaultProtocolClient('aster-code')
+if (app.isPackaged) app.setAsDefaultProtocolClient('norevinq')
 if (!gotLock) {
   app.quit()
 } else {
@@ -195,30 +198,33 @@ if (!gotLock) {
       if (mainWindow.isMinimized()) mainWindow.restore()
       mainWindow.focus()
     }
-    for (const url of extractAsterDeepLinks(commandLine)) routeDeepLink(url)
+    for (const url of extractNorevinqDeepLinks(commandLine)) routeDeepLink(url)
   })
 
   void app.whenReady().then(async () => {
     const userData = app.getPath('userData')
-    const agentHome = prepareAsterAgentHome(
+    const agentHome = prepareNorevinqAgentHome(
       userData,
-      process.env.ASTER_AGENT_HOME ?? process.env.ASTER_CODEX_HOME,
+      process.env.NOREVINQ_AGENT_HOME
+        ?? process.env.ASTER_AGENT_HOME
+        ?? process.env.NOREVINQ_CODEX_HOME
+        ?? process.env.ASTER_CODEX_HOME,
     )
     process.env.CODEX_HOME = agentHome
-    database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
+    database = new StateDatabase(join(userData, 'norevinq.sqlite3'))
     const createdFileService = new FileService(database, {
       openPath: (path) => shell.openPath(path),
       trustedArtifactRoots: [join(agentHome, 'generated_images')],
     })
     fileService = createdFileService
-    protocol.handle('aster-file', (request) => serveFilePreview(request, createdFileService))
+    protocol.handle('norevinq-file', (request) => serveFilePreview(request, createdFileService))
     const credentialStore = new CredentialStore(join(userData, 'credentials.json'), {
       isEncryptionAvailable: () => safeStorage.isEncryptionAvailable(),
       encryptString: (value) => safeStorage.encryptString(value),
       decryptString: (value) => safeStorage.decryptString(value),
     })
     runtimeLogger = createLogger({
-      component: 'aster-agent-runtime',
+      component: 'norevinq-agent-runtime',
       filePath: join(userData, 'logs', 'runtime.jsonl'),
       rotation: new SizeLimitedRotation(),
     })
@@ -386,12 +392,12 @@ function readStoredDeepSeekKey(credentials: CredentialStore): string | null {
 }
 
 function routeDeepLink(url: string): void {
-  if (!url.toLowerCase().startsWith('aster-code:')) return
+  if (!url.toLowerCase().startsWith('norevinq:')) return
   if (!database || !mainWindow || !rendererReady) {
     if (pendingDeepLinks.length < 8 && !pendingDeepLinks.includes(url)) pendingDeepLinks.push(url)
     return
   }
-  const target = parseAsterDeepLink(url, database)
+  const target = parseNorevinqDeepLink(url, database)
   if (target) mainWindow.webContents.send(IPC_CHANNELS.deepLinkOpened, target)
 }
 

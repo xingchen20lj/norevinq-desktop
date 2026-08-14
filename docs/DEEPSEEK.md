@@ -2,7 +2,7 @@
 
 ## 运行方式
 
-Aster 使用独立的 `userData/agent-home`，不读取或修改官方客户端的 `~/.codex/config.toml`。启动 app-server 时使用进程级 `-c` 参数注册 `model_providers.deepseek`：
+Norevinq 使用独立的 `userData/agent-home`，不读取或修改官方客户端的 `~/.codex/config.toml`。启动 app-server 时使用进程级 `-c` 参数注册 `model_providers.deepseek`：
 
 - `base_url="https://api.deepseek.com"`
 - `env_key="DEEPSEEK_API_KEY"`
@@ -26,7 +26,7 @@ Aster 使用独立的 `userData/agent-home`，不读取或修改官方客户端�
 | Stateful/Background Responses | 否 | 否 | 客户端保存并回放完整历史 |
 | WebSocket Responses | 否 | 否 | 使用 SSE |
 
-`deepseek-v4-pro` 在 2026-08-10 的首次探测中仍返回 HTTP 400；截至 2026-08-13，官方 Responses reference 和 Codex catalog 已将 Pro 列为支持模型，当前账户的最小非流式请求也真实返回 `completed` 和精确输出 `ASTER_PRO_OK`。Aster 因此正式显示 Flash 与 Pro 两个可选模型，不切换到 Chat Completions。
+`deepseek-v4-pro` 在 2026-08-10 的首次探测中仍返回 HTTP 400；截至 2026-08-13，官方 Responses reference 和 Codex catalog 已将 Pro 列为支持模型，当前账户的最小非流式请求也真实返回 `completed` 和精确输出 `NOREVINQ_PRO_OK`。Norevinq 因此正式显示 Flash 与 Pro 两个可选模型，不切换到 Chat Completions。
 
 ## 验证证据
 
@@ -34,10 +34,10 @@ Aster 使用独立的 `userData/agent-home`，不读取或修改官方客户端�
 - `deepseek-v4-pro` 已用当前安全环境凭据真实验证 Responses 非流式完成；专属 Electron E2E 又经随应用固定的官方 Codex 0.147.0 完成真实 `apply_patch` 闭环，耗时 47.9 秒。
 - Electron E2E 真实选择 `modelProvider=deepseek`、`model=deepseek-v4-flash`、`effort=low`。
 - 模型产生 reasoning 活动并调用 custom `apply_patch`；app-server 可能将该 custom tool 归一为 commandExecution 或 fileChange，UI 均以结构化活动展示。
-- 临时项目最终存在 `aster-deepseek-proof.txt`，内容精确为 `DEEPSEEK_TOOL_OK\n`，最终 agent 消息精确为 `ASTER_DEEPSEEK_OK`。
-- Pro 临时项目最终存在 `aster-deepseek-pro-proof.txt`，内容精确为 `DEEPSEEK_PRO_TOOL_OK\n`，最终 agent 消息精确为 `ASTER_DEEPSEEK_PRO_OK`；活动时间线真实出现文件修改/命令结构化卡片。
+- 临时项目最终存在 `norevinq-deepseek-proof.txt`，内容精确为 `DEEPSEEK_TOOL_OK\n`，最终 agent 消息精确为 `NOREVINQ_DEEPSEEK_OK`。
+- Pro 临时项目最终存在 `norevinq-deepseek-pro-proof.txt`，内容精确为 `DEEPSEEK_PRO_TOOL_OK\n`，最终 agent 消息精确为 `NOREVINQ_DEEPSEEK_PRO_OK`；活动时间线真实出现文件修改/命令结构化卡片。
 - credential store、环境优先级、provider 热重启参数和无明文持久化有自动测试。
-- 安全工作台可把同一安全保存的 Key 注入隔离的 Codex Security SDK 实例，以经 Aster 0.1.0 在线 sealed 扫描验证的 V4 Flash 或 V4 Pro 直接调用 DeepSeek Responses，不需要 OpenAI/ChatGPT 登录。普通 app-server 与 Security SDK 使用不同 Codex home 和子进程环境，但 Security 强制复用 Aster 已验证的 Codex 0.147.0 二进制。早期 Flash 在 SDK 内置 0.144.6/并发扫描组合下出现产物收敛异常；固定 0.147.0 并把 Flash 并发降为 1 后，一文件 standard 扫描于 160.9 秒完成并返回 `completed + sealed`。Pro 保留 4 个并发线程。
+- 安全工作台可把同一安全保存的 Key 注入隔离的 Codex Security SDK 实例，以经 Norevinq 0.1.0 在线 sealed 扫描验证的 V4 Flash 或 V4 Pro 直接调用 DeepSeek Responses，不需要 OpenAI/ChatGPT 登录。普通 app-server 与 Security SDK 使用不同 Codex home 和子进程环境，但 Security 强制复用 Norevinq 已验证的 Codex 0.147.0 二进制。早期 Flash 在 SDK 内置 0.144.6/并发扫描组合下出现产物收敛异常；固定 0.147.0 并把 Flash 并发降为 1 后，一文件 standard 扫描于 160.9 秒完成并返回 `completed + sealed`。Pro 保留 4 个并发线程。
 - 安全扫描实时汇总输入、缓存命中/未命中、输出及推理 token。费用按 DeepSeek 官方每百万 token 单价逐次累计，并以扫描开始时取得的 USD/CNY 参考汇率显示人民币估算；实际扣费以 DeepSeek 控制台为准。
 - [DeepSeek Responses API Reference](https://api-docs.deepseek.com/api/create-response/)
 - [DeepSeek 官方 Codex 集成](https://api-docs.deepseek.com/quick_start/agent_integrations/codex/)

@@ -23,12 +23,12 @@ describe('file preview protocol', () => {
   })
 
   it('streams only the requested bytes with restrictive response headers', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-file-protocol-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-file-protocol-'))
     temporaryPaths.push(root)
     const path = join(root, 'media.bin')
     writeFileSync(path, '0123456789')
     const metadata = lstatSync(path)
-    const response = serveFilePreview(new Request(`aster-file://preview/${token}`, {
+    const response = serveFilePreview(new Request(`norevinq-file://preview/${token}`, {
       headers: { Range: 'bytes=2-5' },
     }), {
       resolvePreviewToken: () => ({
@@ -50,9 +50,9 @@ describe('file preview protocol', () => {
 
   it('rejects expired tokens, unsupported methods, and unsatisfiable ranges', () => {
     const missing = { resolvePreviewToken: () => null }
-    expect(serveFilePreview(new Request(`aster-file://preview/${token}`), missing).status).toBe(404)
-    expect(serveFilePreview(new Request(`aster-file://preview/${token}`, { method: 'POST' }), missing).status).toBe(404)
-    const root = mkdtempSync(join(tmpdir(), 'aster-file-protocol-'))
+    expect(serveFilePreview(new Request(`norevinq-file://preview/${token}`), missing).status).toBe(404)
+    expect(serveFilePreview(new Request(`norevinq-file://preview/${token}`, { method: 'POST' }), missing).status).toBe(404)
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-file-protocol-'))
     temporaryPaths.push(root)
     const path = join(root, 'audio.bin')
     writeFileSync(path, '12345')
@@ -67,7 +67,7 @@ describe('file preview protocol', () => {
         expiresAt: Date.now() + 1_000,
       }),
     }
-    const response = serveFilePreview(new Request(`aster-file://preview/${token}`, { headers: { Range: 'bytes=9-10' } }), resolver)
+    const response = serveFilePreview(new Request(`norevinq-file://preview/${token}`, { headers: { Range: 'bytes=9-10' } }), resolver)
     expect(response.status).toBe(416)
     expect(response.headers.get('content-range')).toBe('bytes */5')
   })

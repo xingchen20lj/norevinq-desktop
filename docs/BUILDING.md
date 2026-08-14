@@ -1,6 +1,6 @@
 # 新手构建指南
 
-本指南用于从一份全新 Git clone 运行和打包 Aster Code。建议在需要发布的平台上构建：macOS 产物在 macOS 构建，Windows 产物在 Windows 构建。
+本指南用于从一份全新 Git clone 运行和打包 Norevinq。建议在需要发布的平台上构建：macOS 产物在 macOS 构建，Windows 产物在 Windows 构建。
 
 ## 1. 准备环境
 
@@ -36,8 +36,8 @@ corepack prepare pnpm@11.16.0 --activate
 ## 2. 克隆与安装
 
 ```bash
-git clone https://github.com/xingchen20lj/aster-code-desktop.git
-cd aster-code-desktop
+git clone https://github.com/xingchen20lj/norevinq-desktop.git
+cd norevinq-desktop
 pnpm install --frozen-lockfile
 ```
 
@@ -81,8 +81,8 @@ CSC_IDENTITY_AUTO_DISCOVERY=false pnpm package:mac
 输出包括：
 
 ```text
-release/Aster Code-<version>-mac-<arch>.dmg
-release/Aster Code-<version>-mac-<arch>.zip
+release/Norevinq-<version>-mac-<arch>.dmg
+release/Norevinq-<version>-mac-<arch>.zip
 ```
 
 无签名 DMG 可能触发 Gatekeeper 警告，只适合开发验证。公开分发需要 Developer ID Application 证书与 Apple 公证权限。
@@ -95,7 +95,7 @@ release/Aster Code-<version>-mac-<arch>.zip
 pnpm package:win
 ```
 
-输出为 `release/Aster Code-<version>-win-<arch>.exe`。未签名安装器可能触发 SmartScreen；公开分发需要代码签名证书。
+输出为 `release/Norevinq-<version>-win-<arch>.exe`。未签名安装器可能触发 SmartScreen；公开分发需要代码签名证书。
 
 ### 只生成应用目录
 
@@ -106,14 +106,11 @@ pnpm check:package
 
 该命令适合快速检查打包内容，但不会生成可分发安装器。
 
-## 6. GitHub Actions 打包
+## 6. GitHub 发布边界
 
-仓库包含两个工作流：
+GitHub 只运行 `CI` 工作流，在 push/PR 时于 macOS 和 Windows 验证源码。仓库不在 GitHub Actions 中生成或上传 DMG、ZIP、EXE，也不在 GitHub Releases 提供预编译安装包。
 
-- `CI`：push/PR 时在 macOS 和 Windows 验证源码；
-- `Desktop release artifacts`：手动生成平台安装产物。
-
-在 GitHub 的 Actions 页面选择 `Desktop release artifacts`。内部测试可将 `require_signing` 设为 `false`；正式发布必须保持 `true`，并在受保护的 `release` environment 配置签名凭据和 HTTPS 更新地址。工作流只上传 Actions Artifact，不会自动创建 GitHub Release。
+需要安装包的用户应在目标平台按第 5 节从源码本地构建。维护者如在 GitHub 之外提供签名安装包，必须单独公布来源、校验和与签名身份，不能把第三方构建称为本仓库官方安装包。
 
 ## 7. 常见问题
 
@@ -131,7 +128,7 @@ Node 没有安装或不在 `PATH`。先确认 `node --version`，不要只检查
 
 ### Codex Security 不可用
 
-这不影响普通构建。真实扫描另外需要 Python 3.10+。OpenAI 模式需要相应账户认证及 Codex Security/Trusted Access 权限；经 Aster 0.1.0 在线 sealed 扫描验证的 DeepSeek V4 Flash 与 V4 Pro 直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录，但仍会产生 DeepSeek API 费用。Aster Security 使用已验证的 0.147.0 运行时；Flash 串行审计，Pro 使用有限并行。macOS Deep Scan 会在官方外层安全沙箱保持生效的前提下取消 discovery worker 的重复 Seatbelt，否则 macOS 会因嵌套沙箱返回 `Operation not permitted`。真实一文件对照已完成 discovery、validation、attack path、reporting 和 sealed 闭环。
+这不影响普通构建。真实扫描另外需要 Python 3.10+。OpenAI 模式需要相应账户认证及 Codex Security/Trusted Access 权限；经 Norevinq 0.1.0 在线 sealed 扫描验证的 DeepSeek V4 Flash 与 V4 Pro 直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录，但仍会产生 DeepSeek API 费用。Norevinq Security 使用已验证的 0.147.0 运行时；Flash 串行审计，Pro 使用有限并行。macOS Deep Scan 会在官方外层安全沙箱保持生效的前提下取消 discovery worker 的重复 Seatbelt，否则 macOS 会因嵌套沙箱返回 `Operation not permitted`。真实一文件对照已完成 discovery、validation、attack path、reporting 和 sealed 闭环。
 
 ### 在线测试失败
 

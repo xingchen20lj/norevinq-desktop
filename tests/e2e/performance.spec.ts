@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { performance as nodePerformance } from 'node:perf_hooks'
 
 test('records bounded cold-start and process-memory baselines', async () => {
-  const profile = mkdtempSync(join(tmpdir(), 'aster-performance-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-performance-e2e-'))
   const startedAt = nodePerformance.now()
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {

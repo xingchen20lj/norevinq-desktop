@@ -15,7 +15,7 @@
 
 主进程逐段 `lstat`，拒绝绝对路径、NUL、`..` 和任何符号链接组件；随后用 `realpath` 再确认目标仍位于项目或托管 worktree 根目录。符号链接会显示在文件树中，但不能遍历或预览。
 
-图片、音视频和 PDF 通过 `aster-file://preview/<opaque-token>` 加载：
+图片、音视频和 PDF 通过 `norevinq-file://preview/<opaque-token>` 加载：
 
 - token 是随机 UUID，15 分钟过期，最多保留 128 个；URL 不含本地路径。
 - 协议只接受 GET/HEAD，支持单段 HTTP byte range、HEAD、206 和 416。
@@ -25,5 +25,5 @@
 ## 验证证据
 
 - 单元测试覆盖路径逃逸、绝对路径、符号链接、无扩展名文本、二进制识别、2 MiB 截断、图片/PDF上限、token 过期、外部打开限制和 byte range。
-- Electron E2E 从真实 app-server 文件变更活动打开 `ASTER_APPROVAL_OK` 文本，并通过自定义协议解码真实 1×1 PNG，断言 `naturalWidth=1`。
+- Electron E2E 从真实 app-server 文件变更活动打开 `NOREVINQ_APPROVAL_OK` 文本，并通过自定义协议解码真实 1×1 PNG，断言 `naturalWidth=1`。
 - 1320×840 浅色文本与图片截图已检查；文件树、标题、预览区和系统打开按钮无明显溢出。

@@ -146,7 +146,7 @@ describe('SecurityService', () => {
         return sdk
       },
       deepSeekCredential: () => 'sk-deepseek-isolated-test-secret',
-      codexBinary: () => '/opt/aster/codex-0.147.0',
+      codexBinary: () => '/opt/norevinq/codex-0.147.0',
       environment: {
         PATH: '/usr/bin',
         GITHUB_TOKEN: 'must-not-propagate',
@@ -167,7 +167,7 @@ describe('SecurityService', () => {
     const config = configs[0]
     expect(config?.codexOverrides).toMatchObject({ model: 'deepseek-v4-pro', model_provider: 'deepseek' })
     expect(config?.environment).toMatchObject({ PATH: '/usr/bin', DEEPSEEK_API_KEY: 'sk-deepseek-isolated-test-secret' })
-    expect(config?.environment).toHaveProperty('CODEX_CLI_PATH', '/opt/aster/codex-0.147.0')
+    expect(config?.environment).toHaveProperty('CODEX_CLI_PATH', '/opt/norevinq/codex-0.147.0')
     expect(config?.environment).not.toHaveProperty('GITHUB_TOKEN')
     expect(config?.environment).not.toHaveProperty('OPENAI_API_KEY')
     expect(config?.environment).not.toHaveProperty('CODEX_API_KEY')
@@ -183,7 +183,7 @@ describe('SecurityService', () => {
     const fixture = createFixture()
     const configs: (CodexSecurityConfig | undefined)[] = []
     const sdk = createSdk(() => Promise.reject(new Error('expected fixture stop')))
-    const pluginPath = '/Applications/Aster Code.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin'
+    const pluginPath = '/Applications/Norevinq.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin'
     const service = new SecurityService(fixture.database, fixture.securityRoot, {
       sdkFactory: (config) => {
         configs.push(config)
@@ -261,23 +261,23 @@ describe('SecurityService', () => {
   })
 
   it.skipIf(process.platform === 'win32')('uses a private macOS Deep Scan wrapper that only relaxes the redundant worker sandbox', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-security-wrapper-test-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-security-wrapper-test-'))
     temporaryPaths.push(root)
     const realCodex = join(root, 'real-codex')
     const argsOutput = join(root, 'args.txt')
-    writeFileSync(realCodex, '#!/bin/bash\nprintf "%s\\n" "$@" > "$ASTER_TEST_ARGS_OUTPUT"\n', { mode: 0o700 })
+    writeFileSync(realCodex, '#!/bin/bash\nprintf "%s\\n" "$@" > "$NOREVINQ_TEST_ARGS_OUTPUT"\n', { mode: 0o700 })
     chmodSync(realCodex, 0o700)
     const wrapper = prepareMacDeepScanCodexWrapper(join(root, 'state'), realCodex, 'darwin')
     expect(statSync(wrapper).mode & 0o777).toBe(0o700)
 
     execFileSync(wrapper, ['exec', '--experimental-json', '--sandbox', 'read-only', '--skip-git-repo-check'], {
-      env: { ...process.env, CODEX_SECURITY_SCAN_ID: 'scan-test', ASTER_TEST_ARGS_OUTPUT: argsOutput },
+      env: { ...process.env, CODEX_SECURITY_SCAN_ID: 'scan-test', NOREVINQ_TEST_ARGS_OUTPUT: argsOutput },
     })
     expect(readFileSync(argsOutput, 'utf8')).toContain('danger-full-access')
     expect(readFileSync(argsOutput, 'utf8')).not.toContain('read-only')
 
     execFileSync(wrapper, ['exec', '--experimental-json', '--sandbox', 'read-only'], {
-      env: { ...process.env, ASTER_TEST_ARGS_OUTPUT: argsOutput },
+      env: { ...process.env, NOREVINQ_TEST_ARGS_OUTPUT: argsOutput },
     })
     expect(readFileSync(argsOutput, 'utf8')).toContain('read-only')
   })
@@ -293,7 +293,7 @@ function createFixture(): {
   projectId: string
   securityRoot: string
 } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-security-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-security-test-'))
   temporaryPaths.push(root)
   const projectPath = join(root, 'project')
   mkdirSync(projectPath)

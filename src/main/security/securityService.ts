@@ -236,7 +236,7 @@ export class SecurityService {
     const scan = this.#requireCompletedScan(input.scanId)
     const scanDir = join(this.#outputRoot, scan.id)
     const extension = input.format === 'sarif' ? 'sarif' : input.format
-    const outputPath = join(scanDir, 'exports', `aster-findings.${extension}`)
+    const outputPath = join(scanDir, 'exports', `norevinq-findings.${extension}`)
     mkdirSync(dirname(outputPath), { recursive: true, mode: 0o700 })
     await this.#cliRunner(scan.projectPath, [
       'export', scanDir, '--export-format', input.format, '--output', outputPath,
@@ -349,7 +349,7 @@ export class SecurityService {
     if (!model || !isDeepSeekSecurityModel(model)) throw new Error('DeepSeek 安全扫描模型无效。')
     const codexBinary = this.#codexBinary()
     if (this.#requireCodexBinary && !codexBinary) {
-      throw new Error('Aster 智能体运行时尚未就绪；请等待状态变为已就绪后重试安全扫描。')
+      throw new Error('Norevinq 智能体运行时尚未就绪；请等待状态变为已就绪后重试安全扫描。')
     }
     const effectiveCodexBinary = request.mode === 'deep' && codexBinary
       ? prepareMacDeepScanCodexWrapper(this.#stateRoot, codexBinary, this.#platform)
@@ -371,7 +371,7 @@ export class SecurityService {
     if (!this.#deepSeekCredential()) throw new Error('尚未配置 DeepSeek API Key；请先前往设置保存凭据。')
     if (!request.model || !isDeepSeekSecurityModel(request.model)) throw new Error('请选择有效的 DeepSeek 安全扫描模型。')
     if (request.maxCostUsd !== undefined) {
-      throw new Error('Aster 安全引擎尚无 DeepSeek 官方计价器，不能为该扫描提供可靠的美元硬上限。')
+      throw new Error('Norevinq 安全引擎尚无 DeepSeek 官方计价器，不能为该扫描提供可靠的美元硬上限。')
     }
   }
 
@@ -451,7 +451,7 @@ function initialRuntime(sdk: SecuritySdk, deepSeekConfigured: boolean): Security
     access: 'unknown',
     deepseek: {
       configured: deepSeekConfigured,
-      integration: 'aster-sdk-extension',
+      integration: 'norevinq-sdk-extension',
       models: [...DEEPSEEK_SECURITY_MODELS],
     },
   }
@@ -613,7 +613,7 @@ export function prepareMacDeepScanCodexWrapper(
   assertSafeRuntimePath(canonicalBinary)
   const binaryMetadata = lstatSync(canonicalBinary)
   if (!binaryMetadata.isFile() || binaryMetadata.isSymbolicLink() || (binaryMetadata.mode & 0o111) === 0) {
-    throw new Error('Aster 智能体运行时不是可执行的普通文件。')
+    throw new Error('Norevinq 智能体运行时不是可执行的普通文件。')
   }
   const wrapperRoot = join(stateRoot, 'deep-worker-runtime')
   preparePrivateDirectory(wrapperRoot)
@@ -636,7 +636,7 @@ export function prepareMacDeepScanCodexWrapper(
 function assertSafeRuntimePath(path: string): void {
   for (let index = 0; index < path.length; index += 1) {
     const code = path.charCodeAt(index)
-    if (code <= 0x1f || code === 0x7f) throw new Error('Aster 智能体运行时路径包含不安全字符。')
+    if (code <= 0x1f || code === 0x7f) throw new Error('Norevinq 智能体运行时路径包含不安全字符。')
   }
 }
 
@@ -645,7 +645,7 @@ set -eu
 wrapper_dir="$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)"
 IFS= read -r real_codex < "$wrapper_dir/real-codex-path"
 if [[ ! -x "$real_codex" ]]; then
-  echo "Aster Deep Scan runtime is unavailable." >&2
+  echo "Norevinq Deep Scan runtime is unavailable." >&2
   exit 126
 fi
 args=("$@")

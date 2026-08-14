@@ -23,14 +23,14 @@ afterEach(() => {
 describe('FileService', () => {
   it('lists bounded project files and previews UTF-8 text without exposing absolute paths', () => {
     const fixture = createFixture()
-    writeFileSync(join(fixture.root, 'hello.ts'), 'export const proof = "ASTER_FILE_OK"\n')
+    writeFileSync(join(fixture.root, 'hello.ts'), 'export const proof = "NOREVINQ_FILE_OK"\n')
     writeFileSync(join(fixture.root, 'README'), 'plain text without an extension\n')
     const service = new FileService(fixture.database)
     const directory = service.listDirectory({ projectId: fixture.projectId, path: '' })
     expect(directory.entries.map(({ path }) => path)).toEqual(['hello.ts', 'README'])
     expect(directory.entries.every(({ path }) => !path.startsWith(fixture.root))).toBe(true)
     expect(service.readPreview({ projectId: fixture.projectId, path: 'hello.ts' })).toMatchObject({
-      kind: 'text', content: 'export const proof = "ASTER_FILE_OK"\n', truncated: false,
+      kind: 'text', content: 'export const proof = "NOREVINQ_FILE_OK"\n', truncated: false,
     })
     expect(service.readPreview({ projectId: fixture.projectId, path: 'README' })).toMatchObject({
       kind: 'text', content: 'plain text without an extension\n',
@@ -52,6 +52,19 @@ describe('FileService', () => {
     fixture.database.close()
   })
 
+  it('bounds directory enumeration before loading every entry', () => {
+    const fixture = createFixture()
+    for (let index = 0; index < 501; index += 1) {
+      writeFileSync(join(fixture.root, `entry-${String(index).padStart(3, '0')}.txt`), '')
+    }
+    const service = new FileService(fixture.database)
+
+    const directory = service.listDirectory({ projectId: fixture.projectId, path: '' })
+    expect(directory.entries).toHaveLength(500)
+    expect(directory.truncated).toBe(true)
+    fixture.database.close()
+  })
+
   it('issues opaque expiring media URLs and never serializes project paths into them', () => {
     const fixture = createFixture()
     writeFileSync(join(fixture.root, 'proof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
@@ -59,7 +72,7 @@ describe('FileService', () => {
     const service = new FileService(fixture.database, { now: () => now })
     const preview = service.readPreview({ projectId: fixture.projectId, path: 'proof.png' })
     expect(preview.kind).toBe('image')
-    expect(preview.url).toMatch(/^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    expect(preview.url).toMatch(/^norevinq-file:\/\/preview\/[0-9a-f-]{36}$/u)
     expect(preview.url).not.toContain(fixture.root)
     const token = preview.url?.split('/').at(-1) ?? ''
     expect(service.resolvePreviewToken(token)?.path).toBe(join(realpathSync(fixture.root), 'proof.png'))
@@ -68,7 +81,7 @@ describe('FileService', () => {
     fixture.database.close()
   })
 
-  it('issues inline image previews only for active projects or the trusted Aster artifact directory', () => {
+  it('issues inline image previews only for active projects or the trusted Norevinq artifact directory', () => {
     const fixture = createFixture()
     const artifacts = join(fixture.root, '..', 'agent-home', 'generated_images')
     mkdirSync(artifacts, { recursive: true })
@@ -85,14 +98,14 @@ describe('FileService', () => {
       name: 'generated image.webp', mimeType: 'image/webp',
     })
     expect(service.readAgentImage({ projectId: fixture.projectId, path: generatedImage }).url)
-      .toMatch(/^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
+      .toMatch(/^norevinq-file:\/\/preview\/[0-9a-f-]{36}$/u)
     fixture.database.close()
   })
 
   it('rejects agent image paths outside trusted roots and active content such as SVG', () => {
     const fixture = createFixture()
     const artifacts = join(fixture.root, '..', 'agent-home', 'generated_images')
-    const outside = mkdtempSync(join(tmpdir(), 'aster-agent-image-outside-'))
+    const outside = mkdtempSync(join(tmpdir(), 'norevinq-agent-image-outside-'))
     temporaryPaths.push(outside)
     mkdirSync(artifacts, { recursive: true })
     const outsideImage = join(outside, 'outside.png')
@@ -108,7 +121,7 @@ describe('FileService', () => {
 
   it('rejects traversal, absolute paths, and every symbolic-link component', () => {
     const fixture = createFixture()
-    const outside = mkdtempSync(join(tmpdir(), 'aster-files-outside-'))
+    const outside = mkdtempSync(join(tmpdir(), 'norevinq-files-outside-'))
     temporaryPaths.push(outside)
     writeFileSync(join(outside, 'secret.txt'), 'not available')
     symlinkSync(outside, join(fixture.root, 'escape'))
@@ -148,7 +161,7 @@ describe('FileService', () => {
 })
 
 function createFixture(): { root: string; projectId: string; database: StateDatabase } {
-  const fixture = mkdtempSync(join(tmpdir(), 'aster-files-test-'))
+  const fixture = mkdtempSync(join(tmpdir(), 'norevinq-files-test-'))
   temporaryPaths.push(fixture)
   const root = join(fixture, 'project')
   mkdirSync(root)

@@ -102,7 +102,7 @@ describe('log redaction', () => {
 
 describe('JsonlLogger', () => {
   it('writes structured, serialized JSONL with redaction applied to message and data', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-log-test-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-log-test-'))
     temporaryPaths.push(root)
     const filePath = join(root, 'logs', 'main.jsonl')
     const logger = new JsonlLogger({
@@ -139,7 +139,7 @@ describe('JsonlLogger', () => {
   })
 
   it('exposes file size information to a rotation strategy', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-log-rotation-test-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-log-rotation-test-'))
     temporaryPaths.push(root)
     const contexts: { currentBytes: number; incomingBytes: number }[] = []
     const logger = new JsonlLogger({

@@ -26,5 +26,5 @@
 
 - 真实仓库覆盖两个相距较远的 tracked hunk，并逐项验证 stage、unstage、revert 只作用于选中区块。
 - 覆盖过期快照拒绝、untracked revert 拒绝、带空格且末尾无换行的新文件精确暂存，以及外部符号链接不跟随。
-- Electron E2E 打开智能体真实创建的文件，切换 split view、选择新增行、把评论真实追加给 Codex 并收到 `ASTER_REVIEW_OK`，再按区块暂存并 commit。
+- Electron E2E 打开智能体真实创建的文件，切换 split view、选择新增行、把评论真实追加给 Codex 并收到 `NOREVINQ_REVIEW_OK`，再按区块暂存并 commit。
 - 实际检查 1320×840 浅色 split 截图，未见面板溢出、对齐或对比度问题。

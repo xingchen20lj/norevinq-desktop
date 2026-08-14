@@ -115,7 +115,7 @@ describe('DiagnosticsService', () => {
 })
 
 function createFixture(): { root: string; crashPath: string; logPath: string } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-diagnostics-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-diagnostics-'))
   temporaryDirectories.push(root)
   const diagnostics = join(root, 'diagnostics')
   const logs = join(root, 'logs')

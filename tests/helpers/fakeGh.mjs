@@ -11,14 +11,14 @@ if (args[0] === '--version') {
 }
 
 if (args[0] === 'auth' && args[1] === 'status') {
-  process.stdout.write('Logged in to github.com as aster-fixture\n')
+  process.stdout.write('Logged in to github.com as norevinq-fixture\n')
   process.exit(0)
 }
 
 if (args[0] === 'repo' && args[1] === 'view') {
   process.stdout.write(JSON.stringify({
-    nameWithOwner: 'aster-fixture/project',
-    url: 'https://github.com/aster-fixture/project',
+    nameWithOwner: 'norevinq-fixture/project',
+    url: 'https://github.com/norevinq-fixture/project',
     defaultBranchRef: { name: 'main' },
   }))
   process.exit(0)
@@ -32,7 +32,7 @@ if (args[0] === 'pr' && args[1] === 'list') {
     process.stdout.write(JSON.stringify([{
       number: 42,
       title: state.title,
-      url: 'https://github.com/aster-fixture/project/pull/42',
+      url: 'https://github.com/norevinq-fixture/project/pull/42',
       state: 'OPEN',
       isDraft: state.draft,
       baseRefName: state.base,
@@ -52,12 +52,12 @@ if (args[0] === 'pr' && args[1] === 'create') {
     base: option('--base'),
     head: option('--head'),
     draft: args.includes('--draft'),
-    unrelatedSecretPresent: typeof process.env.ASTER_UNRELATED_SECRET === 'string',
+    unrelatedSecretPresent: typeof process.env.NOREVINQ_UNRELATED_SECRET === 'string',
     deepSeekKeyPresent: typeof process.env.DEEPSEEK_API_KEY === 'string',
     openAiKeyPresent: typeof process.env.OPENAI_API_KEY === 'string',
   }
   writeFileSync(statePath, `${JSON.stringify(value)}\n`, { mode: 0o600 })
-  process.stdout.write('https://github.com/aster-fixture/project/pull/42\n')
+  process.stdout.write('https://github.com/norevinq-fixture/project/pull/42\n')
   process.exit(0)
 }
 

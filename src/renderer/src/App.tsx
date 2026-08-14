@@ -127,10 +127,10 @@ export function App(): React.JSX.Element {
   const [updates, setUpdates] = useState<UpdateSnapshot | null>(null)
   const [diagnostics, setDiagnostics] = useState<DiagnosticsSnapshot | null>(null)
   const [commandOpen, setCommandOpen] = useState(false)
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('aster-sidebar-collapsed') === 'true')
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => window.localStorage.getItem('norevinq-sidebar-collapsed') === 'true')
   const [integrations, setIntegrations] = useState<IntegrationSnapshot | null>(null)
   const [themePreference, setThemePreference] = useState<ThemePreference>(() => {
-    const saved = window.localStorage.getItem('aster-theme')
+    const saved = window.localStorage.getItem('norevinq-theme')
     return saved === 'dark' || saved === 'light' || saved === 'system' ? saved : 'system'
   })
   const [systemTheme, setSystemTheme] = useState<Theme>(() => window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark')
@@ -143,7 +143,7 @@ export function App(): React.JSX.Element {
   const selectedModel = runtime?.models.find(({ id }) => id === model) ?? null
 
   function openFiles(path: string | null = null): void {
-    if (browserOpen) void window.aster.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
+    if (browserOpen) void window.norevinq.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
     setBrowserOpen(false)
     const root = selectedWorktree?.path ?? selectedProject?.path ?? null
     setInitialFilePath(path && root ? projectRelativeArtifactPath(path, root) : path)
@@ -152,10 +152,10 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme
-    window.localStorage.setItem('aster-theme', themePreference)
+    window.localStorage.setItem('norevinq-theme', themePreference)
   }, [theme, themePreference])
 
-  useEffect(() => { window.localStorage.setItem('aster-sidebar-collapsed', String(sidebarCollapsed)) }, [sidebarCollapsed])
+  useEffect(() => { window.localStorage.setItem('norevinq-sidebar-collapsed', String(sidebarCollapsed)) }, [sidebarCollapsed])
 
   useEffect(() => {
     const query = window.matchMedia('(prefers-color-scheme: light)')
@@ -165,7 +165,7 @@ export function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    void window.aster.getBootstrapState().then((state) => {
+    void window.norevinq.getBootstrapState().then((state) => {
       setBootstrap(state)
       setRuntime(state.runtime)
       setProviders(state.providers)
@@ -177,18 +177,18 @@ export function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onAccountChanged(setAccount)
-    void window.aster.getAccountState().then(setAccount).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    const unsubscribe = window.norevinq.onAccountChanged(setAccount)
+    void window.norevinq.getAccountState().then(setAccount).catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onUpdateChanged(setUpdates)
-    void window.aster.getUpdateState().then(setUpdates).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    const unsubscribe = window.norevinq.onUpdateChanged(setUpdates)
+    void window.norevinq.getUpdateState().then(setUpdates).catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
 
-  useEffect(() => window.aster.onDeepLink(setPendingDeepLink), [])
+  useEffect(() => window.norevinq.onDeepLink(setPendingDeepLink), [])
 
   useEffect(() => {
     if (!pendingDeepLink || !bootstrap || runtime?.phase !== 'ready') return
@@ -203,8 +203,8 @@ export function App(): React.JSX.Element {
     setThreadSearch('')
     setShowArchived(false)
     void (target.kind === 'thread'
-      ? window.aster.openDeepLink(target)
-      : window.aster.loadProjectConversations({ projectId: project.id }))
+      ? window.norevinq.openDeepLink(target)
+      : window.norevinq.loadProjectConversations({ projectId: project.id }))
       .then((snapshot) => {
         if (snapshot) setConversations(snapshot)
         setNewTask(target.kind !== 'thread')
@@ -214,8 +214,8 @@ export function App(): React.JSX.Element {
   }, [bootstrap, pendingDeepLink, runtime?.phase])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onBrowserChanged(setBrowser)
-    void window.aster.getBrowserState().then(setBrowser)
+    const unsubscribe = window.norevinq.onBrowserChanged(setBrowser)
+    void window.norevinq.getBrowserState().then(setBrowser)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
@@ -235,7 +235,7 @@ export function App(): React.JSX.Element {
       } else if (event.key === 'Escape' && !commandOpen) {
         if (renameOpen) setRenameOpen(false)
         else if (goalOpen) setGoalOpen(false)
-        else if (browserOpen) { void window.aster.closeBrowser(); setBrowserOpen(false) }
+        else if (browserOpen) { void window.norevinq.closeBrowser(); setBrowserOpen(false) }
         else if (filesOpen) setFilesOpen(false)
         else if (terminalOpen) setTerminalOpen(false)
         else if (gitOpen) setGitOpen(false)
@@ -250,36 +250,36 @@ export function App(): React.JSX.Element {
   }, [browserOpen, commandOpen, filesOpen, gitOpen, goalOpen, renameOpen, schedulerOpen, securityOpen, selectedProject, settingsOpen, terminalOpen, worktreeOpen])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onSecurityChanged(setSecurity)
-    void window.aster.getSecurityState().then(setSecurity)
+    const unsubscribe = window.norevinq.onSecurityChanged(setSecurity)
+    void window.norevinq.getSecurityState().then(setSecurity)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
 
   useEffect(() => {
     if (!securityOpen) return
-    void window.aster.refreshSecurityRuntime().then(setSecurity)
+    void window.norevinq.refreshSecurityRuntime().then(setSecurity)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [securityOpen])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onSchedulerChanged(setScheduler)
-    void window.aster.getSchedulerState().then(setScheduler)
+    const unsubscribe = window.norevinq.onSchedulerChanged(setScheduler)
+    void window.norevinq.getSchedulerState().then(setScheduler)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onIntegrationChanged(setIntegrations)
-    void window.aster.getIntegrationState().then(setIntegrations)
+    const unsubscribe = window.norevinq.onIntegrationChanged(setIntegrations)
+    void window.norevinq.getIntegrationState().then(setIntegrations)
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
     return unsubscribe
   }, [])
 
   useEffect(() => {
-    const unsubscribeRuntime = window.aster.onRuntimeStatus(setRuntime)
-    const unsubscribeConversations = window.aster.onConversationChanged(setConversations)
-    void window.aster.getRuntimeStatus().then(setRuntime).catch((reason: unknown) => setError(toErrorMessage(reason)))
+    const unsubscribeRuntime = window.norevinq.onRuntimeStatus(setRuntime)
+    const unsubscribeConversations = window.norevinq.onConversationChanged(setConversations)
+    void window.norevinq.getRuntimeStatus().then(setRuntime).catch((reason: unknown) => setError(toErrorMessage(reason)))
     return () => {
       unsubscribeRuntime()
       unsubscribeConversations()
@@ -287,10 +287,10 @@ export function App(): React.JSX.Element {
   }, [])
 
   useEffect(() => {
-    const unsubscribe = window.aster.onTerminalEvent((event) => {
+    const unsubscribe = window.norevinq.onTerminalEvent((event) => {
       setTerminalState((current) => reduceTerminalEvent(current, event))
     })
-    void window.aster.getTerminalState().then((state) => {
+    void window.norevinq.getTerminalState().then((state) => {
       setTerminalState(state)
       setSelectedTerminalId((current) => current ?? state.sessions[0]?.id ?? null)
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
@@ -313,7 +313,7 @@ export function App(): React.JSX.Element {
     setError(null)
     setThreadSearch('')
     setShowArchived(false)
-    void window.aster.loadProjectConversations({ projectId: selectedProject.id })
+    void window.norevinq.loadProjectConversations({ projectId: selectedProject.id })
       .then((snapshot) => {
         setConversations(snapshot)
         setNewTask(snapshot.selectedThreadId === null)
@@ -325,8 +325,8 @@ export function App(): React.JSX.Element {
     if (!selectedProject) { setGitStatus(null); setWorktrees([]); setSelectedWorktree(null); return }
     setSelectedWorktree(null)
     void Promise.all([
-      window.aster.getGitStatus({ projectId: selectedProject.id }),
-      window.aster.listWorktrees({ projectId: selectedProject.id }),
+      window.norevinq.getGitStatus({ projectId: selectedProject.id }),
+      window.norevinq.listWorktrees({ projectId: selectedProject.id }),
     ]).then(([git, items]) => { setGitStatus(git); setWorktrees(items) })
       .catch((reason: unknown) => setError(toErrorMessage(reason)))
   }, [selectedProject])
@@ -340,7 +340,7 @@ export function App(): React.JSX.Element {
 
   useEffect(() => {
     if (!settingsOpen || !selectedProject || runtime?.phase !== 'ready') return
-    void window.aster.loadIntegrations({
+    void window.norevinq.loadIntegrations({
       projectId: selectedProject.id,
       ...(selectedThread ? { threadId: selectedThread.id } : {}),
     }).catch((reason: unknown) => setError(toErrorMessage(reason)))
@@ -358,7 +358,7 @@ export function App(): React.JSX.Element {
     setIsOpening(true)
     setError(null)
     try {
-      const project = await window.aster.selectProject()
+      const project = await window.norevinq.selectProject()
       if (!project) return
       setSelectedProject(project)
       setNewTask(true)
@@ -377,7 +377,7 @@ export function App(): React.JSX.Element {
     setError(null)
     setNewTask(false)
     try {
-      setConversations(await window.aster.selectConversation({ threadId }))
+      setConversations(await window.norevinq.selectConversation({ threadId }))
     } catch (reason) {
       setError(toErrorMessage(reason))
     }
@@ -398,7 +398,7 @@ export function App(): React.JSX.Element {
     setThreadActionBusy(true)
     setError(null)
     try {
-      const snapshot = await window.aster.handoffConversation({
+      const snapshot = await window.norevinq.handoffConversation({
         threadId: selectedThread.id,
         targetWorktreeId: item?.id ?? null,
         moveChanges: true,
@@ -419,7 +419,7 @@ export function App(): React.JSX.Element {
     const searchTerm = options.searchTerm ?? threadSearch
     setError(null)
     try {
-      const snapshot = await window.aster.loadProjectConversations({
+      const snapshot = await window.norevinq.loadProjectConversations({
         projectId: selectedProject.id,
         archived,
         ...(searchTerm.trim() ? { searchTerm: searchTerm.trim() } : {}),
@@ -454,7 +454,7 @@ export function App(): React.JSX.Element {
     setProjectPinBusy(project.id)
     setError(null)
     try {
-      const nextProjects = await window.aster.setProjectPinned({ projectId: project.id, pinned: !project.pinned })
+      const nextProjects = await window.norevinq.setProjectPinned({ projectId: project.id, pinned: !project.pinned })
       setBootstrap((current) => current ? { ...current, projects: nextProjects } : current)
       setSelectedProject((current) => current?.id === project.id
         ? nextProjects.find(({ id }) => id === project.id) ?? current
@@ -467,7 +467,7 @@ export function App(): React.JSX.Element {
   }
 
   async function toggleThreadPinned(threadId: string, pinned: boolean): Promise<void> {
-    await runThreadAction(() => window.aster.setConversationPinned({ threadId, pinned: !pinned }))
+    await runThreadAction(() => window.norevinq.setConversationPinned({ threadId, pinned: !pinned }))
   }
 
   function openGoalDialog(): void {
@@ -487,7 +487,7 @@ export function App(): React.JSX.Element {
       setError('目标 token 预算必须是正整数。')
       return
     }
-    await runThreadAction(() => window.aster.setThreadGoal({
+    await runThreadAction(() => window.norevinq.setThreadGoal({
       threadId: selectedThread.id,
       objective: goalObjective,
       status: goalStatus,
@@ -498,7 +498,7 @@ export function App(): React.JSX.Element {
 
   async function clearGoal(): Promise<void> {
     if (!selectedThread || !selectedGoal || !window.confirm('清除此任务的长期目标？')) return
-    await runThreadAction(() => window.aster.clearThreadGoal({ threadId: selectedThread.id }))
+    await runThreadAction(() => window.norevinq.clearThreadGoal({ threadId: selectedThread.id }))
     setGoalOpen(false)
   }
 
@@ -510,30 +510,30 @@ export function App(): React.JSX.Element {
 
   async function confirmRename(): Promise<void> {
     if (!selectedThread || !renameDraft.trim()) return
-    await runThreadAction(() => window.aster.renameConversation({ threadId: selectedThread.id, name: renameDraft }))
+    await runThreadAction(() => window.norevinq.renameConversation({ threadId: selectedThread.id, name: renameDraft }))
     setRenameOpen(false)
   }
 
   async function forkSelectedThread(): Promise<void> {
     if (!selectedThread) return
-    await runThreadAction(() => window.aster.forkConversation({ threadId: selectedThread.id }))
+    await runThreadAction(() => window.norevinq.forkConversation({ threadId: selectedThread.id }))
   }
 
   async function compactSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Aster 会保留摘要并继续使用同一任务。')) return
-    await runThreadAction(() => window.aster.compactConversation({ threadId: selectedThread.id }))
+    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Norevinq 会保留摘要并继续使用同一任务。')) return
+    await runThreadAction(() => window.norevinq.compactConversation({ threadId: selectedThread.id }))
   }
 
   async function archiveSelectedThread(): Promise<void> {
     if (!selectedThread) return
     await runThreadAction(() => conversations?.listArchived
-      ? window.aster.unarchiveConversation({ threadId: selectedThread.id })
-      : window.aster.archiveConversation({ threadId: selectedThread.id }))
+      ? window.norevinq.unarchiveConversation({ threadId: selectedThread.id })
+      : window.norevinq.archiveConversation({ threadId: selectedThread.id }))
   }
 
   async function deleteSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('永久删除此任务及其 Aster 历史？此操作无法撤销。')) return
-    await runThreadAction(() => window.aster.deleteConversation({ threadId: selectedThread.id }))
+    if (!selectedThread || !window.confirm('永久删除此任务及其 Norevinq 历史？此操作无法撤销。')) return
+    await runThreadAction(() => window.norevinq.deleteConversation({ threadId: selectedThread.id }))
   }
 
   async function submit(): Promise<void> {
@@ -545,7 +545,7 @@ export function App(): React.JSX.Element {
     try {
       let snapshot: ConversationSnapshot
       if (newTask || !selectedThread) {
-        snapshot = await window.aster.startConversation({
+        snapshot = await window.norevinq.startConversation({
           projectId: selectedProject.id,
           ...(selectedWorktree ? { worktreeId: selectedWorktree.id } : {}),
           text,
@@ -555,9 +555,9 @@ export function App(): React.JSX.Element {
         })
         setNewTask(false)
       } else if (activeTurn && activityState.turnId) {
-        snapshot = await window.aster.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
+        snapshot = await window.norevinq.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
       } else {
-        snapshot = await window.aster.startTurn({
+        snapshot = await window.norevinq.startTurn({
           threadId: selectedThread.id,
           text,
           ...(model ? { model, modelProvider: providerForModel(model) } : {}),
@@ -576,7 +576,7 @@ export function App(): React.JSX.Element {
   async function interrupt(): Promise<void> {
     if (!selectedThread || !activityState?.turnId) return
     try {
-      await window.aster.interruptTurn({ threadId: selectedThread.id, turnId: activityState.turnId })
+      await window.norevinq.interruptTurn({ threadId: selectedThread.id, turnId: activityState.turnId })
     } catch (reason) {
       setError(toErrorMessage(reason))
     }
@@ -585,11 +585,11 @@ export function App(): React.JSX.Element {
   async function openTerminal(forceNew = false): Promise<void> {
     if (!selectedProject) return
     if (browserOpen) {
-      await window.aster.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
+      await window.norevinq.closeBrowser().catch((reason: unknown) => setError(toErrorMessage(reason)))
       setBrowserOpen(false)
     }
     if (runtime?.phase !== 'ready') {
-      setError('Aster 智能体引擎尚未就绪，无法启动终端。')
+      setError('Norevinq 智能体引擎尚未就绪，无法启动终端。')
       return
     }
     const worktreeId = selectedWorktree?.id ?? null
@@ -599,7 +599,7 @@ export function App(): React.JSX.Element {
       && session.worktreeId === worktreeId
       && session.threadId === threadId) : undefined
     try {
-      const session = existing ?? await window.aster.createTerminal({
+      const session = existing ?? await window.norevinq.createTerminal({
         projectId: selectedProject.id,
         ...(worktreeId ? { worktreeId } : {}),
         ...(threadId ? { threadId } : {}),
@@ -612,7 +612,7 @@ export function App(): React.JSX.Element {
   }
 
   async function appendTerminalContext(sessionId: string): Promise<void> {
-    const context = await window.aster.getTerminalContext({ sessionId })
+    const context = await window.norevinq.getTerminalContext({ sessionId })
     const text = [
       '请分析下面由我明确共享的当前终端输出，并据此继续任务。',
       `终端目录：${context.cwd}`,
@@ -626,14 +626,14 @@ export function App(): React.JSX.Element {
 
   const shortcutModifier = bootstrap?.platform === 'darwin' ? '⌘' : 'Ctrl+'
   const commands: CommandAction[] = [
-    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Aster 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
+    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Norevinq 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
     { id: 'open-project', label: '打开项目', detail: '使用系统目录选择器添加本地项目', run: openProject },
     { id: 'files', label: '文件与产物', detail: '浏览当前项目或工作树中的真实文件', disabled: !selectedProject, run: () => openFiles() },
     { id: 'terminal', label: '打开终端', detail: '打开绑定当前任务上下文的 app-server PTY', shortcut: `${shortcutModifier}\``, disabled: !selectedProject, run: openTerminal },
     { id: 'browser', label: '本地网页预览', detail: '打开受限 loopback WebContentsView', run: () => { setFilesOpen(false); setTerminalOpen(false); setBrowserOpen(true) } },
     { id: 'git', label: 'Git 工作区', detail: '查看状态、差异、暂存和提交', disabled: !selectedProject, run: () => setGitOpen(true) },
     { id: 'scheduler', label: '计划任务', detail: '管理自动化与运行收件箱', run: () => setSchedulerOpen(true) },
-    { id: 'security', label: 'Aster 安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
+    { id: 'security', label: 'Norevinq 安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
     { id: 'settings', label: '设置', detail: '提供商、MCP、技能和配置', run: () => setSettingsOpen(true) },
     { id: 'theme-system', label: '外观：跟随系统', detail: '实时跟随操作系统深浅外观', run: () => setThemePreference('system') },
     { id: 'theme-light', label: '外观：浅色', detail: '固定使用浅色主题', run: () => setThemePreference('light') },
@@ -650,8 +650,8 @@ export function App(): React.JSX.Element {
     setIsSubmitting(true)
     try {
       const snapshot = activeTurn && activityState.turnId
-        ? await window.aster.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
-        : await window.aster.startTurn({
+        ? await window.norevinq.steerTurn({ threadId: selectedThread.id, turnId: activityState.turnId, text })
+        : await window.norevinq.startTurn({
           threadId: selectedThread.id,
           text,
           ...(model ? { model, modelProvider: providerForModel(model) } : {}),
@@ -672,7 +672,7 @@ export function App(): React.JSX.Element {
         <div className="window-drag-region" />
         <div className="brand-row">
           <div className="brand-mark"><Code2 size={17} strokeWidth={2.2} /></div>
-          <span>Aster Code</span>
+          <span>Norevinq</span>
           <button className="icon-button sidebar-search" aria-label="命令面板" onClick={() => setCommandOpen(true)}><Search size={16} /></button>
         </div>
 
@@ -766,12 +766,12 @@ export function App(): React.JSX.Element {
         <header className="topbar">
           <div className="topbar-title">
             <span>{selectedThread?.name ?? selectedProject?.name ?? '欢迎'}</span>
-            {selectedProject && <button className="context-pill" onClick={() => { if (browserOpen) void window.aster.closeBrowser(); setBrowserOpen(false); setGitOpen((value) => !value) }} aria-label="Git 状态">
+            {selectedProject && <button className="context-pill" onClick={() => { if (browserOpen) void window.norevinq.closeBrowser(); setBrowserOpen(false); setGitOpen((value) => !value) }} aria-label="Git 状态">
               <GitBranch size={13} />{gitStatus?.branch ?? (gitStatus?.initialized ? 'Detached' : 'Local')}
               {gitStatus && gitStatus.files.length > 0 && <b>{gitStatus.files.length}</b>}
             </button>}
-            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? 'Aster 智能体引擎状态'}>
-              <span className="runtime-dot" /> Aster {runtimeLabel(runtime)}
+            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? 'Norevinq 智能体引擎状态'}>
+              <span className="runtime-dot" /> Norevinq {runtimeLabel(runtime)}
             </span>
           </div>
           <div className="topbar-actions">
@@ -813,7 +813,7 @@ export function App(): React.JSX.Element {
           <div className="composer-shell">
             <textarea
               aria-label="任务输入"
-              placeholder={selectedProject ? (activeTurn ? '追加指令到正在运行的任务…' : '描述你希望 Aster Code 完成的任务…') : '请先打开一个本地项目'}
+              placeholder={selectedProject ? (activeTurn ? '追加指令到正在运行的任务…' : '描述你希望 Norevinq 完成的任务…') : '请先打开一个本地项目'}
               disabled={!selectedProject || runtime?.phase !== 'ready'}
               value={composer}
               onChange={(event) => setComposer(event.target.value)}
@@ -928,7 +928,7 @@ export function App(): React.JSX.Element {
       {goalOpen && <div className="thread-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGoalOpen(false) }}>
         <form className="thread-dialog goal-dialog" role="dialog" aria-label="长期目标" onSubmit={(event) => { event.preventDefault(); void saveGoal() }}>
           <h2>长期目标</h2>
-          <p>目标由 Aster 智能体引擎持久化，可在后续任务中继续跟踪用量与状态。</p>
+          <p>目标由 Norevinq 智能体引擎持久化，可在后续任务中继续跟踪用量与状态。</p>
           <label><span>目标</span><textarea autoFocus aria-label="目标内容" maxLength={10_000} rows={5} value={goalObjective} onChange={(event) => setGoalObjective(event.target.value)} /></label>
           <label><span>状态</span><select aria-label="目标状态" value={goalStatus} onChange={(event) => setGoalStatus(event.target.value as ThreadGoalStatus)}>
             <option value="active">进行中</option>
@@ -974,12 +974,12 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     let cancelled = false
     setBaseCatalog(null)
     setBaseRef('HEAD')
-    void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => {
+    void window.norevinq.listWorktreeBases({ projectId: project.id }).then((catalog) => {
       if (!cancelled) setBaseCatalog(catalog)
     }).catch((reason: unknown) => {
       if (!cancelled) onError(toErrorMessage(reason))
     })
-    void window.aster.listWorktreeRecoveries({ projectId: project.id }).then((items) => {
+    void window.norevinq.listWorktreeRecoveries({ projectId: project.id }).then((items) => {
       if (!cancelled) setRecoveries(items)
     }).catch((reason: unknown) => {
       if (!cancelled) onError(toErrorMessage(reason))
@@ -1001,7 +1001,7 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     setBusy(true)
     onError(null)
     try {
-      const created = await window.aster.createWorktree({
+      const created = await window.norevinq.createWorktree({
         projectId: project.id,
         baseRef: selectedBase.ref,
         expectedBaseOid: selectedBase.oid,
@@ -1020,11 +1020,11 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
     setBusy(true)
     onError(null)
     try {
-      setRecoveries(await window.aster.retryWorktreeRecovery({ recoveryId }))
-      update(await window.aster.listWorktrees({ projectId: project.id }))
+      setRecoveries(await window.norevinq.retryWorktreeRecovery({ recoveryId }))
+      update(await window.norevinq.listWorktrees({ projectId: project.id }))
     } catch (reason) {
       onError(toErrorMessage(reason))
-      setRecoveries(await window.aster.listWorktreeRecoveries({ projectId: project.id }).catch(() => recoveries))
+      setRecoveries(await window.norevinq.listWorktreeRecoveries({ projectId: project.id }).catch(() => recoveries))
     } finally {
       setBusy(false)
     }
@@ -1039,20 +1039,20 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
       {recovery.error && <small>{recovery.error}</small>}
       <button disabled={busy} onClick={() => void retryRecovery(recovery.id)}>安全重试</button>
     </div>)}
-    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Aster 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
+    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Norevinq 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
       {baseCatalog?.repositoryInitialized && baseCatalog.bases.length === 0 && <div className="worktree-init-note"><strong>Git 仓库还没有提交</strong><span>请先创建首次提交，再从提交基线建立隔离工作树。</span></div>}
-      <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
+      <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.norevinq.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
       {baseCatalog?.truncated && <p className="worktree-warning">基线列表已限制为前 500 项。</p>}
-      <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选新分支：aster/feature-name" /><button disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} onClick={() => void create()}><Plus size={13} />创建</button></div>
+      <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选新分支：norevinq/feature-name" /><button disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} onClick={() => void create()}><Plus size={13} />创建</button></div>
     </>}
     <button disabled={busy} className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => void select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
     {items.map((item) => <div className={`worktree-row ${selected?.id === item.id ? 'selected' : ''}`} key={item.id}>
       <button disabled={busy || item.missing} className="worktree-select" onClick={() => void select(item)}><GitBranch size={14} /><span><strong>{item.branch ?? `Detached ${item.headOid?.slice(0, 7) ?? ''}`}</strong><small title={item.path}>基线 {item.baseRef} · {(item.baseOid ?? item.headOid)?.slice(0, 7) ?? '未知'} · {item.path}</small></span></button>
       <div className="worktree-actions">
-        <button disabled={busy || item.missing} onClick={() => void act(() => item.locked ? window.aster.unlockWorktree({ worktreeId: item.id }) : window.aster.lockWorktree({ worktreeId: item.id }))}>{item.locked ? '解锁' : '锁定'}</button>
+        <button disabled={busy || item.missing} onClick={() => void act(() => item.locked ? window.norevinq.unlockWorktree({ worktreeId: item.id }) : window.norevinq.lockWorktree({ worktreeId: item.id }))}>{item.locked ? '解锁' : '锁定'}</button>
         <button disabled={busy || item.locked} onClick={() => void act(async () => {
           if (selected?.id === item.id) await select(null)
-          return window.aster.removeWorktree({ worktreeId: item.id })
+          return window.norevinq.removeWorktree({ worktreeId: item.id })
         })}>移除</button>
       </div>
     </div>)}
@@ -1127,19 +1127,19 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
   async function review(mode: 'working' | 'staged'): Promise<void> {
     setBusy(true)
     onError(null)
-    try { setDiff(await window.aster.getDiff({ projectId: project.id, mode })) }
+    try { setDiff(await window.norevinq.getDiff({ projectId: project.id, mode })) }
     catch (reason) { onError(toErrorMessage(reason)) }
     finally { setBusy(false) }
   }
 
   async function discardFile(path: string): Promise<void> {
-    if (!window.confirm(`丢弃 ${path} 的全部已暂存和未暂存修改？Aster 会先创建可恢复快照。`)) return
-    await act(() => window.aster.discardGitFile({ projectId: project.id, path }))
+    if (!window.confirm(`丢弃 ${path} 的全部已暂存和未暂存修改？Norevinq 会先创建可恢复快照。`)) return
+    await act(() => window.norevinq.discardGitFile({ projectId: project.id, path }))
   }
 
   async function restoreDiscard(discardId: string, path: string): Promise<void> {
     if (!window.confirm(`恢复 ${path} 的已暂存和未暂存修改？目标路径必须没有新的修改。`)) return
-    await act(() => window.aster.restoreGitDiscard({ projectId: project.id, discardId }))
+    await act(() => window.norevinq.restoreGitDiscard({ projectId: project.id, discardId }))
   }
 
   async function checkGitHub(pushRemote = githubPushRemote, baseRemote = githubBaseRemote): Promise<void> {
@@ -1147,7 +1147,7 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
     onError(null)
     setGitHubMessage(null)
     try {
-      const next = await window.aster.getGitHubStatus({
+      const next = await window.norevinq.getGitHubStatus({
         projectId: project.id,
         ...(pushRemote ? { pushRemote } : {}),
         ...(baseRemote ? { baseRemote } : {}),
@@ -1172,7 +1172,7 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
     onError(null)
     setGitHubMessage(null)
     try {
-      const result = await window.aster.createGitHubPullRequest({
+      const result = await window.norevinq.createGitHubPullRequest({
         projectId: project.id,
         title: githubTitle.trim(),
         body: githubBody,
@@ -1184,7 +1184,7 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
       })
       setGitHub(result.status)
       setGitHubMessage(result.created ? `已创建 PR #${String(result.pullRequest.number)}` : `PR #${String(result.pullRequest.number)} 已存在`)
-      update(await window.aster.getGitStatus({ projectId: project.id }))
+      update(await window.norevinq.getGitStatus({ projectId: project.id }))
     } catch (reason) {
       onError(toErrorMessage(reason))
     } finally {
@@ -1198,18 +1198,18 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
       snapshot={diff}
       close={() => setDiff(null)}
       replace={setDiff}
-      refreshRepository={async () => update(await window.aster.getGitStatus({ projectId: project.id }))}
+      refreshRepository={async () => update(await window.norevinq.getGitStatus({ projectId: project.id }))}
       onComment={onComment}
       onError={onError}
-    /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.aster.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
-      <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.aster.getGitStatus({ projectId: project.id }))}>刷新</button></div>
+    /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{snapshot?.error ?? `${project.name} 还不是 Git 仓库。`}</p>{!snapshot?.error && <button className="primary-button" disabled={busy} onClick={() => void act(() => window.norevinq.initializeGit({ projectId: project.id }))}>初始化仓库</button>}</div> : <>
+      <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.norevinq.getGitStatus({ projectId: project.id }))}>刷新</button></div>
       <div className="diff-actions"><button disabled={busy || unstaged.length === 0} onClick={() => void review('working')}>审阅未暂存</button><button disabled={busy || staged.length === 0} onClick={() => void review('staged')}>审阅已暂存</button></div>
-      <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.aster.unstageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => file.worktreeStatus === '.' ? discardFile(file.path) : Promise.resolve()} showSecondary={(file) => file.worktreeStatus === '.'} />
-      <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.aster.stageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => discardFile(file.path)} />
+      <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.norevinq.unstageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => file.worktreeStatus === '.' ? discardFile(file.path) : Promise.resolve()} showSecondary={(file) => file.worktreeStatus === '.'} />
+      <GitFileGroup title="更改" files={unstaged} actionLabel="暂存" action={(path) => act(() => window.norevinq.stageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => discardFile(file.path)} />
       {snapshot.discards.length > 0 && <section className="git-discard-group" aria-label="可恢复的丢弃"><h3>可恢复的丢弃<span>{snapshot.discards.length}</span></h3>{snapshot.discards.map((discard) => <div className="git-discard" key={discard.id}><div><strong title={discard.path}>{discard.path}</strong><span>{new Date(discard.createdAt).toLocaleString()}</span></div><button disabled={busy} onClick={() => void restoreDiscard(discard.id, discard.path)}>恢复</button></div>)}</section>}
       {snapshot.files.length === 0 && <div className="git-clean"><Check size={16} />工作区干净</div>}
       <div className="commit-box"><textarea aria-label="提交说明" value={message} onChange={(event) => setMessage(event.target.value)} placeholder="提交说明" rows={3} /><button disabled={busy || !message.trim() || staged.length === 0} onClick={() => void act(async () => {
-        const next = await window.aster.commitGit({ projectId: project.id, message })
+        const next = await window.norevinq.commitGit({ projectId: project.id, message })
         setMessage('')
         return next
       })}><GitCommitHorizontal size={14} />提交</button></div>
@@ -1217,7 +1217,7 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
         const remote = snapshot.upstream?.split('/')[0] ?? snapshot.remotes[0]?.name
         const branch = snapshot.branch
         if (!remote || !branch) return
-        void act(() => window.aster.pushGit({
+        void act(() => window.norevinq.pushGit({
           projectId: project.id,
           remote,
           branch,
@@ -1280,7 +1280,7 @@ function DiffReview({ snapshot, close, replace, refreshRepository, onComment, on
     setBusyHunk(hunkId)
     onError(null)
     try {
-      replace(await window.aster.applyDiffHunk({
+      replace(await window.norevinq.applyDiffHunk({
         projectId: snapshot.projectId,
         snapshotId: snapshot.id,
         hunkId,
@@ -1476,14 +1476,14 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
     <div className="hero-orbit" aria-hidden="true"><div className="hero-core"><Sparkles size={27} /></div></div>
     <p className="eyebrow">LOCAL-FIRST CODING AGENT</p>
     <h1>{selectedProject ? `开始处理 ${selectedProject.name}` : '把复杂开发工作交给智能体'}</h1>
-    <p className="hero-subtitle">{selectedProject?.path ?? 'Aster 本地优先智能编程工作台'}</p>
+    <p className="hero-subtitle">{selectedProject?.path ?? 'Norevinq 本地优先智能编程工作台'}</p>
     {!selectedProject && <button className="primary-button" onClick={() => void openProject()} disabled={isOpening}>
       <FolderOpen size={17} /> {isOpening ? '正在打开…' : '打开本地项目'}
     </button>}
     <div className="capability-grid">
-      <article><Bot size={20} /><div><h2>Aster 任务</h2><p>{runtime?.version ? `${String(runtime.models.length)} 个模型 · 智能体引擎 ${runtimeLabel(runtime)}` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
+      <article><Bot size={20} /><div><h2>Norevinq 任务</h2><p>{runtime?.version ? `${String(runtime.models.length)} 个模型 · 智能体引擎 ${runtimeLabel(runtime)}` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
       <article><GitBranch size={20} /><div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div><span className="status-chip connected">已接入</span></article>
-      <article><ShieldCheck size={20} /><div><h2>Aster 安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
+      <article><ShieldCheck size={20} /><div><h2>Norevinq 安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
     </div>
   </div>
 }
@@ -1506,7 +1506,7 @@ function ActivityTimeline({ state, goal, projectId, worktreeId, openFile }: {
     {!state || state.activities.length === 0
       ? <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
       : state.activities.map((activity) => <ActivityCard activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
-    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Aster 正在工作</div>}
+    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Norevinq 正在工作</div>}
   </div>
 }
 
@@ -1575,13 +1575,13 @@ function IntegrationRequestPanel({ request, onError }: {
       if (request.kind === 'mcpElicitation') {
         let content: IntegrationJson | undefined
         if (action === 'accept' && request.mode !== 'url') content = JSON.parse(formJson) as IntegrationJson
-        await window.aster.resolveIntegrationRequest({
+        await window.norevinq.resolveIntegrationRequest({
           requestId: request.id,
           action,
           ...(content === undefined ? {} : { content }),
         })
       } else {
-        await window.aster.resolveIntegrationRequest({
+        await window.norevinq.resolveIntegrationRequest({
           requestId: request.id,
           action,
           ...(action === 'accept'
@@ -1600,7 +1600,7 @@ function IntegrationRequestPanel({ request, onError }: {
     <div className="integration-request-heading">
       <Wrench size={16} />
       <div>
-        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Aster 请求补充信息'}</strong>
+        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Norevinq 请求补充信息'}</strong>
         <p>{request.kind === 'mcpElicitation' ? request.message : request.questions[0]?.question}</p>
       </div>
     </div>
@@ -1627,7 +1627,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
     new Set(approval.permissions.map(({ id }) => id)))
   async function decide(decision: ApprovalDecision): Promise<void> {
     try {
-      await window.aster.resolveApproval({
+      await window.norevinq.resolveApproval({
         requestId: approval.requestId,
         decision,
         ...(approval.kind === 'permissions' ? { grantedPermissionIds: [...selectedPermissions] } : {}),
@@ -1636,7 +1636,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
     catch (reason) { onError(toErrorMessage(reason)) }
   }
   return <section className="approval-panel" aria-label="待审批操作">
-    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Aster 请求继续执行受保护操作。'}</p>
+    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Norevinq 请求继续执行受保护操作。'}</p>
       {approval.kind === 'permissions' && <div className="permission-request-list">{approval.permissions.map((permission) => <label key={permission.id}>
         <input type="checkbox" checked={selectedPermissions.has(permission.id)} onChange={(event) => {
           const checked = event.currentTarget.checked
@@ -1659,7 +1659,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
 function activityLabel(activity: AgentActivity): string {
   switch (activity.type) {
     case 'userMessage': return '你的指令'
-    case 'agentMessage': return 'Aster'
+    case 'agentMessage': return 'Norevinq'
     case 'reasoning': return '推理'
     case 'command': return '命令'
     case 'fileChange': return '文件变更'

@@ -1,6 +1,6 @@
 import { execFile, type ExecException } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { lstatSync } from 'node:fs'
+import { lstatSync, realpathSync, statSync } from 'node:fs'
 import { isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -20,7 +20,7 @@ import { parsePorcelainV2Z } from './statusParser.js'
 const execFileAsync = promisify(execFile)
 const MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 const DEFAULT_TIMEOUT_MS = 30_000
-const DISCARD_REF_PREFIX = 'refs/aster/discards/'
+const DISCARD_REF_PREFIX = 'refs/norevinq/discards/'
 const MAX_DISCARD_SNAPSHOTS = 32
 
 export class GitService {
@@ -35,7 +35,14 @@ export class GitService {
     const project = this.#requireProject(input.projectId)
     try {
       const rootResult = await this.#git(project.path, ['rev-parse', '--show-toplevel'])
-      const root = rootResult.stdout.trim()
+      const selectedRoot = realpathSync(project.path)
+      const root = realpathSync(rootResult.stdout.trim())
+      if (!sameDirectoryIdentity(root, selectedRoot)) {
+        return emptySnapshot(
+          input.projectId,
+          '所选项目位于另一个 Git 仓库内。为防止读取或修改项目目录外的文件，请改为打开该 Git 仓库根目录。',
+        )
+      }
       const [statusResult, remoteResult, discards] = await Promise.all([
         this.#git(project.path, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']),
         this.#git(project.path, ['remote', '-v']),
@@ -99,7 +106,7 @@ export class GitService {
     })))
     const id = randomUUID()
     const metadata = Buffer.from(JSON.stringify({ path: file.path, paths: trackedAtHead }), 'utf8').toString('base64url')
-    const subject = `aster-discard-v1:${id}:${metadata}`
+    const subject = `norevinq-discard-v1:${id}:${metadata}`
     // For a rename, passing both the destination and the now-missing source
     // makes `git stash` reject the pathspec. Capturing the destination still
     // records both sides of the rename in the stash commit; Git only leaves
@@ -142,7 +149,7 @@ export class GitService {
     const ref = `${DISCARD_REF_PREFIX}${input.discardId}`
     // Keep the recovery ref on any apply failure. Git may leave conflict
     // markers behind; automatically cleaning them could erase a concurrent
-    // edit made outside Aster between the clean-target check and this apply.
+    // edit made outside Norevinq between the clean-target check and this apply.
     await this.#git(projectPath, ['stash', 'apply', '--index', ref], 120_000)
     await this.#git(projectPath, ['update-ref', '-d', ref])
     return this.getStatus({ projectId: input.projectId })
@@ -175,7 +182,7 @@ export class GitService {
 
   async #git(cwd: string, args: string[], timeout = DEFAULT_TIMEOUT_MS): Promise<{ stdout: string; stderr: string }> {
     try {
-      return await execFileAsync('git', args, {
+      return await execFileAsync('git', ['-c', 'core.fsmonitor=false', ...args], {
         cwd,
         encoding: 'utf8',
         maxBuffer: MAX_OUTPUT_BYTES,
@@ -194,21 +201,21 @@ export class GitService {
     for (const line of result.stdout.split('\n')) {
       if (!line) continue
       const [shortRef, createdAt, subject] = line.split('\0')
-      const id = shortRef?.slice('aster/discards/'.length)
-      const match = subject ? /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(subject) : null
+      const id = shortRef?.slice('norevinq/discards/'.length)
+      const match = subject ? /norevinq-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(subject) : null
       const encoded = match?.[1]
       if (!id || !createdAt || !encoded || !/^[0-9a-f-]{36}$/u.test(id)) continue
       try {
         const parsed = parseDiscardMetadata(encoded)
         snapshots.push({ id, path: parsed.path, createdAt })
-      } catch { /* Ignore malformed refs outside Aster's format. */ }
+      } catch { /* Ignore malformed refs outside Norevinq's format. */ }
     }
     return snapshots.sort((left, right) => right.createdAt.localeCompare(left.createdAt))
   }
 
   async #readDiscardMetadata(cwd: string, id: string): Promise<DiscardMetadata> {
     const result = await this.#git(cwd, ['show', '-s', '--format=%s', `${DISCARD_REF_PREFIX}${id}`])
-    const encoded = /aster-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(result.stdout.trim())?.[1]
+    const encoded = /norevinq-discard-v1:[0-9a-f-]{36}:([A-Za-z0-9_-]+)/u.exec(result.stdout.trim())?.[1]
     if (!encoded) throw new Error('Recoverable discard metadata is invalid.')
     return parseDiscardMetadata(encoded)
   }
@@ -246,6 +253,15 @@ type DiscardMetadata = { path: string; paths: DiscardPathMetadata[] }
 function pathExists(path: string): boolean {
   try { lstatSync(path); return true }
   catch { return false }
+}
+
+function sameDirectoryIdentity(left: string, right: string): boolean {
+  const leftMetadata = statSync(left, { bigint: true })
+  const rightMetadata = statSync(right, { bigint: true })
+  return leftMetadata.isDirectory()
+    && rightMetadata.isDirectory()
+    && leftMetadata.dev === rightMetadata.dev
+    && leftMetadata.ino === rightMetadata.ino
 }
 
 function parseDiscardMetadata(encoded: string): DiscardMetadata {
@@ -311,7 +327,7 @@ function sanitizeRemoteUrl(value: string): string {
   }
 }
 
-function emptySnapshot(projectId: string): GitRepositorySnapshot {
+function emptySnapshot(projectId: string, error: string | null = null): GitRepositorySnapshot {
   return {
     projectId,
     initialized: false,
@@ -325,7 +341,7 @@ function emptySnapshot(projectId: string): GitRepositorySnapshot {
     files: [],
     discards: [],
     remotes: [],
-    error: null,
+    error,
   }
 }
 

@@ -13,7 +13,7 @@ afterEach(() => {
 
 describe('SizeLimitedRotation', () => {
   it('rotates bounded log files before the next write', async () => {
-    const directory = mkdtempSync(join(tmpdir(), 'aster-log-test-'))
+    const directory = mkdtempSync(join(tmpdir(), 'norevinq-log-test-'))
     temporaryPaths.push(directory)
     mkdirSync(directory, { recursive: true })
     const path = join(directory, 'runtime.jsonl')

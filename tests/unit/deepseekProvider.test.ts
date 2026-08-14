@@ -30,22 +30,22 @@ describe('DeepSeek Codex provider launch configuration', () => {
     expect(hasDeepSeekEnvironment({})).toBe(false)
   })
 
-  it('pins Security to the selected Aster runtime and serializes Flash investigators', () => {
+  it('pins Security to the selected Norevinq runtime and serializes Flash investigators', () => {
     const flash = createDeepSeekSecurityConfig(
       'deepseek-v4-flash',
       'test-only-key',
       '/private/security',
       { PATH: '/usr/bin' },
-      '/opt/aster/codex-0.147.0',
+      '/opt/norevinq/codex-0.147.0',
     )
     const pro = createDeepSeekSecurityConfig(
       'deepseek-v4-pro',
       'test-only-key',
       '/private/security',
       { PATH: '/usr/bin' },
-      '/opt/aster/codex-0.147.0',
+      '/opt/norevinq/codex-0.147.0',
     )
-    expect(flash.environment).toMatchObject({ CODEX_CLI_PATH: '/opt/aster/codex-0.147.0' })
+    expect(flash.environment).toMatchObject({ CODEX_CLI_PATH: '/opt/norevinq/codex-0.147.0' })
     expect(flash.codexOverrides).toMatchObject({
       features: { multi_agent_v2: { enabled: true, max_concurrent_threads_per_session: 1 } },
     })

@@ -16,7 +16,7 @@ afterEach(async () => {
 })
 
 test('official Codex app-server exposes account state, permission profiles, and the thread lifecycle', async () => {
-  const root = await mkdtemp(join(tmpdir(), 'aster-codex-lifecycle-'))
+  const root = await mkdtemp(join(tmpdir(), 'norevinqx-lifecycle-'))
   temporaryRoots.push(root)
   const codexHome = join(root, 'agent-home')
   const projectPath = join(root, 'project')
@@ -43,7 +43,7 @@ test('official Codex app-server exposes account state, permission profiles, and 
 
   try {
     await peer.request('initialize', {
-      clientInfo: { name: 'aster-code-integration-test', version: '0.1.0' },
+      clientInfo: { name: 'norevinq-integration-test', version: '0.1.0' },
       capabilities: {},
     })
     await peer.notify('initialized')
@@ -52,7 +52,7 @@ test('official Codex app-server exposes account state, permission profiles, and 
     expect(account.account === null || typeof account.account === 'object').toBe(true)
     const apiKeyLogin = asRecord(await peer.request('account/login/start', {
       type: 'apiKey',
-      apiKey: 'sk-test-aster-not-a-real-key',
+      apiKey: 'sk-test-norevinq-not-a-real-key',
     }))
     expect(apiKeyLogin.type).toBe('apiKey')
     const apiKeyAccount = asRecord(await peer.request('account/read', { refreshToken: false }))
@@ -68,7 +68,7 @@ test('official Codex app-server exposes account state, permission profiles, and 
     expect(browserLoginUrl.hostname === 'chatgpt.com' || browserLoginUrl.hostname.endsWith('.openai.com')).toBe(true)
     const canceledLogin = asRecord(await peer.request('account/login/cancel', { loginId: browserLoginId }))
     expect(['canceled', 'notFound']).toContain(canceledLogin.status)
-    if (process.env.ASTER_TEST_LIVE_AUTH === '1') {
+    if (process.env.NOREVINQ_TEST_LIVE_AUTH === '1') {
       const deviceLogin = asRecord(await peer.request('account/login/start', { type: 'chatgptDeviceCode' }))
       const deviceLoginId = requireId(deviceLogin.loginId)
       const verificationUrl = new URL(requireId(deviceLogin.verificationUrl))
@@ -99,13 +99,13 @@ test('official Codex app-server exposes account state, permission profiles, and 
       items: [{
         type: 'message',
         role: 'user',
-        content: [{ type: 'input_text', text: 'Aster lifecycle seed' }],
+        content: [{ type: 'input_text', text: 'Norevinq lifecycle seed' }],
       }],
     })
 
-    await peer.request('thread/name/set', { threadId: originalId, name: 'Aster lifecycle proof' })
+    await peer.request('thread/name/set', { threadId: originalId, name: 'Norevinq lifecycle proof' })
     const named = asRecord(await peer.request('thread/read', { includeTurns: true, threadId: originalId }))
-    expect(asRecord(named.thread).name).toBe('Aster lifecycle proof')
+    expect(asRecord(named.thread).name).toBe('Norevinq lifecycle proof')
     const setGoal = asRecord(await peer.request('thread/goal/set', {
       threadId: originalId,
       objective: 'Prove the official goal lifecycle',

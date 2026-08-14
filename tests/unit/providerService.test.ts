@@ -14,7 +14,7 @@ afterEach(() => {
 
 describe('ProviderService', () => {
   it('stores a DeepSeek key in the OS vault adapter and restarts with process-only configuration', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-provider-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-provider-'))
     temporaryPaths.push(root)
     const credentials = new CredentialStore(join(root, 'credentials.json'), {
       isEncryptionAvailable: () => true,
@@ -42,7 +42,7 @@ describe('ProviderService', () => {
   })
 
   it('keeps an environment credential authoritative over the saved vault value', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-provider-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-provider-'))
     temporaryPaths.push(root)
     const credentials = new CredentialStore(join(root, 'credentials.json'), {
       isEncryptionAvailable: () => true,

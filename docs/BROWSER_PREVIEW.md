@@ -1,6 +1,6 @@
 # 本地网页预览
 
-Aster Code 使用 Electron `WebContentsView` 承载本地开发网页，不在主 Renderer 中使用拥有同一页面上下文的 iframe。网页渲染进程没有 Node 集成、预加载桥或 Aster IPC。
+Norevinq 使用 Electron `WebContentsView` 承载本地开发网页，不在主 Renderer 中使用拥有同一页面上下文的 iframe。网页渲染进程没有 Node 集成、预加载桥或 Norevinq IPC。
 
 ## 导航范围
 
@@ -30,6 +30,6 @@ Aster Code 使用 Electron `WebContentsView` 承载本地开发网页，不在�
 ## 验证证据
 
 - 单元测试覆盖 localhost、`.localhost`、127/8、::1、公共/凭据/非 Web URL 拒绝，以及外部子资源策略。
-- Electron E2E 启动真实 `127.0.0.1` HTTP 服务，原生 view 加载页面并同步 `Aster Browser Proof` 标题，捕获 `ASTER_BROWSER_LOG`，验证 `/next` 导航与后退，以及公共 URL 拒绝和关闭销毁。
+- Electron E2E 启动真实 `127.0.0.1` HTTP 服务，原生 view 加载页面并同步 `Norevinq Browser Proof` 标题，捕获 `NOREVINQ_BROWSER_LOG`，验证 `/next` 导航与后退，以及公共 URL 拒绝和关闭销毁。
 - Playwright 的 Renderer `page.screenshot()` 不合成 `WebContentsView` 的原生子表面，因此截图中的 slot 占位不作为网页像素证据；标题、控制台、历史和独立 WebContents 实际加载是当前自动验证依据。
 - 通用 Computer Use 仍依赖非公开能力，本地预览不伪装为网页操作智能体。

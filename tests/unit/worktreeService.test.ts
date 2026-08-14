@@ -16,7 +16,7 @@ afterEach(() => {
 
 describe('WorktreeService', () => {
   it('treats a plain project folder as Local-only instead of surfacing a Git fatal error', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-worktree-plain-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-worktree-plain-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -319,14 +319,14 @@ function createRepository(): {
   projectPath: string
   managedRoot: string
 } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-worktree-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-worktree-'))
   temporaryPaths.push(root)
   const projectPath = mkdtempSync(join(root, 'project-'))
   const managedRoot = join(root, 'managed')
   runGit(projectPath, ['init', '-b', 'main'])
   runGit(projectPath, ['config', 'core.autocrlf', 'false'])
-  runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-  runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+  runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+  runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
   writeFileSync(join(projectPath, 'README.md'), '# worktree\n')
   runGit(projectPath, ['add', 'README.md'])
   runGit(projectPath, ['commit', '-m', 'test: baseline'])

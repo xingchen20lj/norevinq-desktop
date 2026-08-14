@@ -4,13 +4,13 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 test('allows the main frame and rejects another renderer at the IPC boundary', async () => {
-  const profile = mkdtempSync(join(tmpdir(), 'aster-ipc-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-ipc-e2e-'))
   const application = await electron.launch({ args: ['.', `--user-data-dir=${profile}`] })
   try {
     const window = await application.firstWindow()
-    await expect(window).toHaveTitle('Aster Code')
+    await expect(window).toHaveTitle('Norevinq')
     const bootstrap = await window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getBootstrapState: () => Promise<{ appVersion: string; platform: string }>
       }
       return bridge.getBootstrapState()
@@ -24,12 +24,12 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
     await expect(window.getByText('开发构建不会连接发布更新源。')).toBeVisible()
     await expect(window.getByText('不会自动上传。', { exact: false })).toBeVisible()
     await expect(window.getByRole('button', { name: '导出诊断包' })).toBeVisible()
-    await window.screenshot({ path: 'test-results/aster-update-settings.png' })
+    await window.screenshot({ path: 'test-results/norevinq-update-settings.png' })
     await window.getByRole('button', { name: '关闭设置' }).click()
     await window.getByRole('button', { name: '安全', exact: true }).click()
-    const securityWorkbench = window.getByRole('dialog', { name: 'Aster 安全工作台' })
-    await expect(securityWorkbench.getByRole('heading', { name: 'Aster 安全工作台' })).toBeVisible()
-    await window.getByRole('button', { name: '关闭 Aster 安全工作台' }).click()
+    const securityWorkbench = window.getByRole('dialog', { name: 'Norevinq 安全工作台' })
+    await expect(securityWorkbench.getByRole('heading', { name: 'Norevinq 安全工作台' })).toBeVisible()
+    await window.getByRole('button', { name: '关闭 Norevinq 安全工作台' }).click()
     await window.getByRole('button', { name: '计划任务', exact: true }).click()
     const schedulerWorkbench = window.getByRole('dialog', { name: '计划任务工作台' })
     await expect(schedulerWorkbench.getByRole('heading', { name: '计划任务' })).toBeVisible()
@@ -52,7 +52,7 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
     await separator.focus()
     await window.keyboard.press('ArrowRight')
     await expect.poll(async () => (await browser.boundingBox())?.width ?? 0).toBeLessThan(widthBeforeKeyboardResize)
-    await window.screenshot({ path: 'test-results/aster-browser-split.png' })
+    await window.screenshot({ path: 'test-results/norevinq-browser-split.png' })
     await window.setViewportSize({ width: 800, height: 640 })
     await expect.poll(async () => {
       const [composerBounds, browserBounds] = await Promise.all([
@@ -62,16 +62,16 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
       if (!composerBounds || !browserBounds) return false
       return composerBounds.y + composerBounds.height <= browserBounds.y + 1
     }).toBe(true)
-    await window.screenshot({ path: 'test-results/aster-browser-bottom.png' })
+    await window.screenshot({ path: 'test-results/norevinq-browser-bottom.png' })
     await browser.getByRole('button', { name: '关闭网页预览' }).click()
     await expect(browser).toHaveCount(0)
     await window.getByRole('button', { name: '命令面板' }).click()
     await expect(window.getByRole('dialog', { name: '命令面板' })).toBeVisible()
     await window.keyboard.press('Escape')
 
-    if (process.env.ASTER_REQUIRE_CODEX_RUNTIME === '1') {
+    if (process.env.NOREVINQ_REQUIRE_CODEX_RUNTIME === '1') {
       await expect.poll(() => window.evaluate(async () => {
-        const bridge = Reflect.get(window, 'aster') as {
+        const bridge = Reflect.get(window, 'norevinq') as {
           getRuntimeStatus: () => Promise<{ phase: string }>
         }
         return (await bridge.getRuntimeStatus()).phase
@@ -107,7 +107,7 @@ test('allows the main frame and rejects another renderer at the IPC boundary', a
       emitter.emit('render-process-gone', {}, contents, { reason: 'crashed', exitCode: 88 })
     })
     const diagnostics = await window.evaluate(async () => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         getDiagnosticsState: () => Promise<{ retainedCrashCount: number; automaticUpload: boolean }>
       }
       return bridge.getDiagnosticsState()

@@ -107,7 +107,7 @@ export class DiagnosticsService {
     const manifest = {
       schemaVersion: 1,
       generatedAt: this.#clock().toISOString(),
-      product: 'Aster Code',
+      product: 'Norevinq',
       appVersion: this.#options.appVersion,
       platform: this.#options.platform,
       arch: this.#options.arch,
@@ -215,7 +215,7 @@ async function requireSafeDestination(path: string): Promise<void> {
 }
 
 async function writeAtomic(path: string, bytes: Uint8Array): Promise<void> {
-  const temporary = join(dirname(path), `.aster-diagnostics-${String(process.pid)}-${randomUUID()}.tmp`)
+  const temporary = join(dirname(path), `.norevinq-diagnostics-${String(process.pid)}-${randomUUID()}.tmp`)
   const descriptor = await open(temporary, 'wx', 0o600)
   try {
     await descriptor.writeFile(bytes)

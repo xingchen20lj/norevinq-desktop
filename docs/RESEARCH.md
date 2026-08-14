@@ -20,7 +20,7 @@
 - `account/read` 返回当前账户和当前 provider 是否要求 OpenAI 认证；账户响应不包含可供客户端读回的 API Key 或 OAuth token。
 - `account/login/start` 的稳定模式包括 `apiKey`、Codex 托管的 ChatGPT 浏览器 OAuth 和 `chatgptDeviceCode`；托管模式由 Codex 持久化并刷新 token。
 - 浏览器/设备码成功或失败通过 `account/login/completed` 通知，账户切换通过 `account/updated`；托管登录可按主进程保存的 `loginId` 取消。
-- `chatgptAuthTokens` 明确是实验性、面向已拥有 ChatGPT token 生命周期的宿主；Aster 不启用该模式，也不尝试从 ChatGPT 或本机其他应用提取 token。
+- `chatgptAuthTokens` 明确是实验性、面向已拥有 ChatGPT token 生命周期的宿主；Norevinq 不启用该模式，也不尝试从 ChatGPT 或本机其他应用提取 token。
 - ChatGPT 账户可通过 `account/rateLimits/read` 与 updated 通知显示用量窗口；API Key 模式不应伪装成 ChatGPT 用量。
 
 来源：
@@ -36,7 +36,7 @@
 
 - 官方端点：`POST https://api.deepseek.com/responses`。
 - 认证：`Authorization: Bearer $DEEPSEEK_API_KEY`。
-- 2026-08-10 首次调查时只有 `deepseek-v4-flash` 可用，Pro 真实返回 HTTP 400。2026-08-13 官方 reference 已把 `deepseek-v4-pro` 加入 `/responses` 模型枚举，官方 Codex catalog 也标为 `supported_in_api=true`；当前账户的最小请求真实返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `ASTER_PRO_OK`。
+- 2026-08-10 首次调查时只有 `deepseek-v4-flash` 可用，Pro 真实返回 HTTP 400。2026-08-13 官方 reference 已把 `deepseek-v4-pro` 加入 `/responses` 模型枚举，官方 Codex catalog 也标为 `supported_in_api=true`；当前账户的最小请求真实返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `NOREVINQ_PRO_OK`。
 - 已用当前环境安全配置的凭据完成最小在线验证：非流式响应、SSE、函数调用、`function_call_output` 第二轮闭环和服务端 Web Search。
 - SSE 以语义事件传输，终态是 `response.completed`、`response.incomplete` 或 `response.failed`，没有 `[DONE]`。
 - 支持 function tools、Codex 特例 `apply_patch` custom tool、推理和 server-side Web Search。
@@ -72,12 +72,12 @@
 ## GitHub CLI Pull Request
 
 - 本机公开 GitHub CLI 为 2.97.0，已通过系统 keyring 登录；产品不读取、保存或显示 token。
-- `gh pr create` 在当前分支尚未完整推送时默认可能提示选择远端或创建 fork。Aster 先通过 Git 服务显式 push/set-upstream，并始终传入 `--repo`、`--base`、`--head`、`--title` 和 `--body-file -`，因此不依赖交互提示或隐式 push/fork。
+- `gh pr create` 在当前分支尚未完整推送时默认可能提示选择远端或创建 fork。Norevinq 先通过 Git 服务显式 push/set-upstream，并始终传入 `--repo`、`--base`、`--head`、`--title` 和 `--body-file -`，因此不依赖交互提示或隐式 push/fork。
 - `--body-file -` 是官方 stdin 入口，可避免 PR 描述出现在本机进程参数。官方明确说明 `--dry-run` 仍可能推送，因此不作为只读预检。
 - 预检采用 `gh auth status --hostname`、`gh repo view --json nameWithOwner,url,defaultBranchRef` 与 `gh pr list --state open --json ...`；创建成功后再次结构化读取 PR，并在主进程验证 HTTPS host、owner/repository 和数字编号路径。
 - fork 工作流把 push/head remote 与 base/upstream remote 分开；两者必须位于同一 GitHub host。同项目并发创建合并为单个在途操作，已有 open PR 时返回既有结果。
 - 当前 `gh pr create --head` 接受 `owner:branch`，但 `gh pr list --head` 应使用纯分支名；为避免 fork 中同名分支误认，列表 JSON 还必须包含并校验 `headRepositoryOwner.login`。
-- Electron GUI 可能不继承登录 shell PATH；实际本机 `gh` 位于 `~/bin`。Aster 通过绝对 PATH、用户 bin、Homebrew 和 Windows 标准安装位置发现，不把本机路径写进发布包。
+- Electron GUI 可能不继承登录 shell PATH；实际本机 `gh` 位于 `~/bin`。Norevinq 通过绝对 PATH、用户 bin、Homebrew 和 Windows 标准安装位置发现，不把本机路径写进发布包。
 
 来源：
 
@@ -90,13 +90,13 @@
 
 - 当前项目固定：`@openai/codex-security@0.1.11`，ESM，Node `^22.13 || ^24 || ^26`，扫描还要求 Python 3.10+。
 - SDK 支持 repository/path/committed diff/working tree、standard/deep、preflight、预算、进度、取消和密封 artifacts。
-- 0.1.11 的依赖元数据仍锁定 `@openai/codex`/SDK 0.144.6；Aster 的 DeepSeek Security 路径显式设置 `CODEX_CLI_PATH`，复用随应用验证的 0.147.0 二进制，同时保持独立 Codex home、配置和进程环境。
+- 0.1.11 的依赖元数据仍锁定 `@openai/codex`/SDK 0.144.6；Norevinq 的 DeepSeek Security 路径显式设置 `CODEX_CLI_PATH`，复用随应用验证的 0.147.0 二进制，同时保持独立 Codex home、配置和进程环境。
 - 历史、误报、部分导出、validate 和 patch 仍主要由 CLI 提供；不能直接绑定私有 workbench SQLite schema。
 - SDK 公开可安装不代表账户拥有扫描权限；认证缺失、Security access 缺失和 Trusted Access 未授予是不同状态。
-- 官方 SDK 文档允许通过 `codexOverrides` 配置其他 provider，并公开示例 Bedrock、OpenRouter 与 Fireworks；文档没有列出或认证 DeepSeek，也没有“Security 仅支持 DeepSeek Pro”的声明。Aster 的 DeepSeek 集成是可审计扩展，模型状态必须由真实 sealed 契约测试证明。
+- 官方 SDK 文档允许通过 `codexOverrides` 配置其他 provider，并公开示例 Bedrock、OpenRouter 与 Fireworks；文档没有列出或认证 DeepSeek，也没有“Security 仅支持 DeepSeek Pro”的声明。Norevinq 的 DeepSeek 集成是可审计扩展，模型状态必须由真实 sealed 契约测试证明。
 - 本机 SDK 真实诊断：Node 24、隔离 Python 3.12、ChatGPT 存储登录均可用；preflight 返回 `gpt-5.6-sol`/`xhigh` 且产物目录位于仓库外。
 - 真实路径扫描已进入 discovery，说明认证、插件和模型链路可工作；以 `maxCostUsd=2` 运行时 SDK 在估算 $2.010621 后抛出 `ScanCostLimitExceededError`。该输出未 sealed，产品必须保留失败状态且不得导入其中的部分 finding。
-- DeepSeek V4 Pro 在一文件 standard 扫描中约 12 分钟返回 `completed + sealed`。V4 Flash 的早期 0.144.6/并发对照发生收敛异常；固定 Aster 0.147.0 且并发为 1 后，同类真实扫描于 160.9 秒返回 `completed + sealed`，说明早期现象不能归因成官方模型限制。
+- DeepSeek V4 Pro 在一文件 standard 扫描中约 12 分钟返回 `completed + sealed`。V4 Flash 的早期 0.144.6/并发对照发生收敛异常；固定 Norevinq 0.147.0 且并发为 1 后，同类真实扫描于 160.9 秒返回 `completed + sealed`，说明早期现象不能归因成官方模型限制。
 
 来源：
 
@@ -110,7 +110,7 @@
 - 任务可在 Local 或隔离 worktree 中运行；独立自动化每次创建新任务，也可从已有任务上下文创建继续型自动化。
 - 高级调度使用 RFC 5545 RRULE；运行结果进入带未读状态的收件箱。
 - 官方建议保留默认沙箱边界。无人值守运行不能在中途等待审批；组织策略不允许 `never` 时应明确失败，而非静默提升权限。
-- 因此 Aster Code 在主进程实现本地 RRULE/SQLite 调度器，并把实际执行交给 app-server。它不伪装成 Codex CLI 的调度管理接口，也不声称应用退出后仍能后台运行。
+- 因此 Norevinq 在主进程实现本地 RRULE/SQLite 调度器，并把实际执行交给 app-server。它不伪装成 Codex CLI 的调度管理接口，也不声称应用退出后仍能后台运行。
 
 来源：
 
@@ -118,7 +118,7 @@
 
 ## Electron 自动更新
 
-- 当前稳定 `electron-updater` 为 6.8.9；Aster Code 使用 electron-builder 26.15.3 生成同一套 `app-update.yml`、`latest-mac.yml`/`latest.yml`、SHA-512 和 blockmap。
+- 当前稳定 `electron-updater` 为 6.8.9；Norevinq 使用 electron-builder 26.15.3 生成同一套 `app-update.yml`、`latest-mac.yml`/`latest.yml`、SHA-512 和 blockmap。
 - macOS 自动更新要求应用已签名，并需要 DMG 与 ZIP；Windows 使用现有 NSIS 目标。未签名内部包不生成更新渠道，避免把不可验证产物发布为升级版本。
 - 运行时不接受 Renderer 或用户输入更新 URL，只读取签名包内的 `app-update.yml`。发布构建只接受无凭据、无 query/fragment 的 HTTPS base URL。
 - 正式包在启动 30 秒后检查，并每 6 小时检查；发现新版本后由用户确认下载，下载完成可立即安装或在正常退出时安装。禁用预发布、降级和 NSIS web installer。
@@ -127,7 +127,7 @@
 ## 崩溃记录与诊断导出
 
 - Electron `app` 稳定公开 `render-process-gone` 与 `child-process-gone`，后者不包含 Renderer；两者都给出 reason/exitCode，可区分 crash、OOM、killed、launch failure 和 clean exit。来源：[Electron app API](https://www.electronjs.org/docs/latest/api/app#event-render-process-gone)。
-- Node `uncaughtExceptionMonitor` 在默认崩溃行为前触发，不会像 `uncaughtException` handler 那样改变退出语义；Aster 只做同步、best-effort 本地记录，绝不尝试在未定义进程状态中恢复。来源：[Node.js process API](https://nodejs.org/docs/latest-v24.x/api/process.html#event-uncaughtexceptionmonitor)。
+- Node `uncaughtExceptionMonitor` 在默认崩溃行为前触发，不会像 `uncaughtException` handler 那样改变退出语义；Norevinq 只做同步、best-effort 本地记录，绝不尝试在未定义进程状态中恢复。来源：[Node.js process API](https://nodejs.org/docs/latest-v24.x/api/process.html#event-uncaughtexceptionmonitor)。
 - 不启用第三方自动遥测或隐式上传。崩溃 journal 最多保留 100 条，ZIP 只在用户选择保存位置后生成，对日志字段密钥、自由文本密钥与本地绝对路径再次脱敏。
 
 来源：

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -16,13 +16,13 @@ afterEach(() => {
 
 describe('DiffService', () => {
   it('returns bounded working and staged patches including untracked text and binary markers', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
     runGit(projectPath, ['config', 'core.autocrlf', 'false'])
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+    runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
     writeFileSync(join(projectPath, 'tracked.txt'), 'before\n')
     runGit(projectPath, ['add', 'tracked.txt'])
     runGit(projectPath, ['commit', '-m', 'baseline'])
@@ -51,13 +51,13 @@ describe('DiffService', () => {
   }, 30_000)
 
   it('stages, unstages, and explicitly reverts only server-cached hunks', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-actions-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-actions-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
     runGit(projectPath, ['config', 'core.autocrlf', 'false'])
-    runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-    runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+    runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+    runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
     const baseline = Array.from({ length: 24 }, (_, index) => `line-${String(index + 1)}`)
     writeFileSync(join(projectPath, 'tracked.txt'), `${baseline.join('\n')}\n`)
     runGit(projectPath, ['add', 'tracked.txt'])
@@ -105,7 +105,7 @@ describe('DiffService', () => {
   }, 30_000)
 
   it('stages an untracked file with spaces and refuses destructive untracked revert', async () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-diff-untracked-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-untracked-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     runGit(projectPath, ['init', '-b', 'main'])
@@ -133,6 +133,42 @@ describe('DiffService', () => {
     expect(runGit(projectPath, ['show', ':new file.txt'])).toBe('safe')
     database.close()
   }, 30_000)
+
+  it('rejects diff access when the selected project is only a nested directory of a repository', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-boundary-'))
+    temporaryPaths.push(root)
+    runGit(root, ['init', '-b', 'main'])
+    const projectPath = join(root, 'selected-project')
+    mkdirSync(projectPath)
+    writeFileSync(join(root, 'outside-selected.txt'), 'outside\n')
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const git = new GitService(database)
+    const diffs = new DiffService(database, git)
+
+    await expect(diffs.getDiff(project.id, 'working')).rejects.toThrow('not a Git repository')
+    database.close()
+  })
+
+  it('marks oversized sparse untracked files as truncated without reading them into memory', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-diff-large-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    runGit(projectPath, ['init', '-b', 'main'])
+    const hugePath = join(projectPath, 'huge-sparse.txt')
+    writeFileSync(hugePath, '')
+    truncateSync(hugePath, 128 * 1024 * 1024)
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const git = new GitService(database)
+    const diffs = new DiffService(database, git)
+
+    const snapshot = await diffs.getDiff(project.id, 'working')
+    expect(snapshot.files).toContainEqual(expect.objectContaining({
+      path: 'huge-sparse.txt', truncated: true, patch: '', hunks: [],
+    }))
+    database.close()
+  })
 })
 
 function runGit(cwd: string, args: string[]): string {

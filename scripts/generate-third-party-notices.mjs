@@ -34,7 +34,7 @@ const packages = Object.values(report)
 const lines = [
   '# Third-Party Notices',
   '',
-  'Aster Code includes the production dependencies listed below. This file is generated from the locked pnpm dependency graph; package license files remain included with their distributed packages.',
+  'Norevinq includes the production dependencies listed below. This file is generated from the locked pnpm dependency graph; package license files remain included with their distributed packages.',
   '',
   'Run `pnpm notices:generate` after changing production dependencies. CI runs `pnpm notices:check` to detect drift.',
   '',

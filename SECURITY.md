@@ -2,11 +2,11 @@
 
 ## Supported Versions
 
-Aster Code is currently a pre-1.0 preview. Security fixes are applied to the latest `main` branch and the most recent published preview release. Older snapshots are not maintained separately.
+Norevinq is currently a pre-1.0 preview. Security fixes are applied to the latest `main` branch and the most recent published preview release. Older snapshots are not maintained separately.
 
 ## System and Scope
 
-Aster Code is a local desktop coding-agent client for macOS and Windows. This policy covers application source, preload/IPC contracts, local persistence, app-server and Codex Security adapters, Git/worktree operations, the integrated terminal, file/media preview, and the isolated local-web preview.
+Norevinq is a local desktop coding-agent client for macOS and Windows. This policy covers application source, preload/IPC contracts, local persistence, app-server and Codex Security adapters, Git/worktree operations, the integrated terminal, file/media preview, and the isolated local-web preview.
 
 The product is not an internet service. Remote model responses, MCP servers, repository contents, Git metadata, terminal output, local web pages, filenames, generated patches, Security artifacts, and all Renderer-originated IPC payloads are untrusted inputs.
 
@@ -20,7 +20,7 @@ An attacker may control a repository and its filenames, symlinks, Git data, diff
 
 ## Security Invariants
 
-- Only the current main-window top frame may invoke Aster IPC handlers; preview and future auxiliary WebContents fail closed.
+- Only the current main-window top frame may invoke Norevinq IPC handlers; preview and future auxiliary WebContents fail closed.
 - Renderer payloads are schema-validated and cannot supply executable shell strings or arbitrary local paths to privileged operations.
 - Project, worktree, scan-artifact, diff, and preview paths remain inside their authorized canonical root. Symbolic links and file replacement cannot turn a valid token into an out-of-root read.
 - Child processes use argument arrays, bounded output/time, noninteractive credentials, and a minimal environment. Provider secrets are never persisted in source, SQLite, logs, or Renderer-readable state.
@@ -37,16 +37,16 @@ Severity must reflect the local desktop boundary and prerequisites. A repository
 
 ## Out of Scope and Limitations
 
-- Vulnerabilities in OpenAI, DeepSeek, Git, Electron, operating-system, or MCP services with no Aster-specific vulnerable integration path belong upstream.
-- Model prompt injection without a bypass of Aster approval, sandbox, project-root, or credential controls is not by itself a product vulnerability.
-- Code signing, notarization, and Windows signing cannot be fully verified without external certificates and target-platform release infrastructure; configuration errors in Aster's release scripts remain in scope.
-- Denial of service requiring the user to intentionally run an unrestricted command is not reportable unless Aster silently expands that authority or fails a documented resource boundary.
+- Vulnerabilities in OpenAI, DeepSeek, Git, Electron, operating-system, or MCP services with no Norevinq-specific vulnerable integration path belong upstream.
+- Model prompt injection without a bypass of Norevinq approval, sandbox, project-root, or credential controls is not by itself a product vulnerability.
+- Code signing, notarization, and Windows signing cannot be fully verified without external certificates and target-platform release infrastructure; configuration errors in Norevinq's release scripts remain in scope.
+- Denial of service requiring the user to intentionally run an unrestricted command is not reportable unless Norevinq silently expands that authority or fails a documented resource boundary.
 
 ## Reporting
 
 Do not publish suspected vulnerabilities or secrets in public issues. Use the repository Security page and select **Report a vulnerability** to create a private GitHub Security Advisory:
 
-https://github.com/xingchen20lj/aster-code-desktop/security/advisories/new
+https://github.com/xingchen20lj/norevinq-desktop/security/advisories/new
 
 Include the affected version, attacker prerequisites, minimal reproduction, expected security boundary, actual result, impact, and any proposed remediation. Use synthetic data wherever possible. Never include real API keys, authentication databases, unrelated user files, private repository content, or destructive proof-of-concept steps.
 

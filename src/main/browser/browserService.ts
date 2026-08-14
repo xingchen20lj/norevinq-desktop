@@ -16,7 +16,7 @@ export class BrowserService {
   readonly #getWindow: () => BrowserWindow | null
   readonly #openExternal: (url: string) => Promise<void>
   readonly #subscriptions = new Set<BrowserSubscription>()
-  readonly #partition = `aster-preview-${randomUUID()}`
+  readonly #partition = `norevinq-preview-${randomUUID()}`
   #view: WebContentsView | null = null
   #owner: BrowserWindow | null = null
   #sessionConfigured = false

@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AgentService, ASTER_AGENT_DEVELOPER_INSTRUCTIONS } from '../../src/main/agent/agentService.js'
+import { AgentService, NOREVINQ_AGENT_DEVELOPER_INSTRUCTIONS } from '../../src/main/agent/agentService.js'
 import type {
   JsonRpcNotificationHandler,
   JsonRpcRequestContext,
@@ -54,8 +54,8 @@ describe('AgentService', () => {
     expect(runtime.turnStarts).toBe(1)
     expect(runtime.turnCompletions).toBe(1)
     expect(runtime.requests.find(({ method }) => method === 'thread/start')?.params).toMatchObject({
-      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
-      serviceName: 'Aster',
+      developerInstructions: NOREVINQ_AGENT_DEVELOPER_INSTRUCTIONS,
+      serviceName: 'Norevinq',
     })
 
     service.dispose()
@@ -223,7 +223,7 @@ describe('AgentService', () => {
       'thread/list', 'thread/resume', 'thread/goal/get', 'turn/steer', 'turn/interrupt',
     ])
     expect(runtime.requests.find(({ method }) => method === 'thread/resume')?.params).toMatchObject({
-      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
+      developerInstructions: NOREVINQ_AGENT_DEVELOPER_INSTRUCTIONS,
     })
     service.dispose()
     database.close()
@@ -373,7 +373,7 @@ describe('AgentService', () => {
 
   it('opens only a conversation already associated with the deep-linked project', async () => {
     const { database, projectId } = createDatabase()
-    const otherPath = mkdtempSync(join(tmpdir(), 'aster-deep-link-project-'))
+    const otherPath = mkdtempSync(join(tmpdir(), 'norevinq-deep-link-project-'))
     temporaryPaths.push(otherPath)
     const otherProjectId = database.upsertProject(otherPath).id
     database.associateThread(projectId, 'thread-2')
@@ -772,7 +772,7 @@ class FakeRuntime {
 }
 
 function createDatabase(): { database: StateDatabase; projectId: string; root: string } {
-  const root = mkdtempSync(join(tmpdir(), 'aster-agent-test-'))
+  const root = mkdtempSync(join(tmpdir(), 'norevinq-agent-test-'))
   temporaryPaths.push(root)
   const projectPath = mkdtempSync(join(root, 'project-'))
   const database = new StateDatabase(join(root, 'state.sqlite3'))

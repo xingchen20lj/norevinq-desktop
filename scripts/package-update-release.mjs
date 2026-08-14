@@ -1,7 +1,7 @@
 import { build, Platform } from 'electron-builder'
 import { requireSecureUpdateUrl } from './update-release-config.mjs'
 
-const updateUrl = requireSecureUpdateUrl(process.env.ASTER_UPDATE_URL)
+const updateUrl = requireSecureUpdateUrl(process.env.NOREVINQ_UPDATE_URL)
 const platform = process.platform === 'darwin'
   ? Platform.MAC
   : process.platform === 'win32'

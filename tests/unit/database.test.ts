@@ -15,7 +15,7 @@ afterEach(() => {
 
 describe('StateDatabase', () => {
   it('persists and deduplicates recent projects', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-test-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-test-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const otherProjectPath = mkdtempSync(join(root, 'other-project-'))
@@ -66,7 +66,7 @@ describe('StateDatabase', () => {
   })
 
   it('migrates v7 project and thread records to pinned metadata', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-migration-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-migration-'))
     temporaryPaths.push(root)
     const databasePath = join(root, 'state.sqlite3')
     const legacy = new DatabaseSync(databasePath)
@@ -102,7 +102,7 @@ describe('StateDatabase', () => {
   })
 
   it('persists conversation worktree context without erasing it during list refreshes', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-worktree-context-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-worktree-context-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const worktreePath = mkdtempSync(join(root, 'worktree-'))
@@ -135,7 +135,7 @@ describe('StateDatabase', () => {
   })
 
   it('persists durable worktree handoff recovery metadata across restart', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-handoff-recovery-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-handoff-recovery-'))
     temporaryPaths.push(root)
     const databasePath = join(root, 'state.sqlite3')
     const projectPath = mkdtempSync(join(root, 'project-'))
@@ -148,7 +148,7 @@ describe('StateDatabase', () => {
       threadId: 'thread-recovery',
       sourceWorktreeId: null,
       targetWorktreeId: '22222222-2222-7222-8222-222222222222',
-      recoveryRef: 'refs/aster/handoffs/11111111-1111-7111-8111-111111111111',
+      recoveryRef: 'refs/norevinq/handoffs/11111111-1111-7111-8111-111111111111',
       stashOid: 'a'.repeat(40),
       sourceHeadOid: 'b'.repeat(40),
       sourceTreeOid: 'c'.repeat(40),
@@ -188,7 +188,7 @@ describe('StateDatabase', () => {
   })
 
   it('bounds pinned conversation hydration to twenty records per project', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-pins-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-pins-'))
     temporaryPaths.push(root)
     const projectPath = mkdtempSync(join(root, 'project-'))
     const database = new StateDatabase(join(root, 'state.sqlite3'))
@@ -205,7 +205,7 @@ describe('StateDatabase', () => {
   })
 
   it('writes scheduler history atomically in a batch', () => {
-    const root = mkdtempSync(join(tmpdir(), 'aster-db-scheduler-batch-'))
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-db-scheduler-batch-'))
     temporaryPaths.push(root)
     const database = new StateDatabase(join(root, 'state.sqlite3'))
     const base: ScheduledRun = {

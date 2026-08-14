@@ -8,7 +8,7 @@ import { StateDatabase } from '../../src/main/state/database.js'
 test.skip(process.platform === 'win32', 'The deterministic fixture wrappers use POSIX launchers; service coverage is cross-platform.')
 
 test('preflights GitHub, pushes a real branch, creates one verified Draft PR, and remains idempotent', async () => {
-  const profile = mkdtempSync(join(tmpdir(), 'aster-github-pr-e2e-'))
+  const profile = mkdtempSync(join(tmpdir(), 'norevinq-github-pr-e2e-'))
   const projectPath = join(profile, 'project')
   const remotePath = join(profile, 'remote.git')
   const codexHome = join(profile, 'agent-home')
@@ -24,19 +24,19 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
   mkdirSync(binPath)
   execFileSync('git', ['init', '--bare', remotePath])
   runGit(projectPath, ['init', '-b', 'main'])
-  runGit(projectPath, ['config', 'user.name', 'Aster Test'])
-  runGit(projectPath, ['config', 'user.email', 'aster@example.invalid'])
+  runGit(projectPath, ['config', 'user.name', 'Norevinq Test'])
+  runGit(projectPath, ['config', 'user.email', 'norevinq@example.invalid'])
   writeFileSync(join(projectPath, 'README.md'), '# GitHub PR fixture\n')
   runGit(projectPath, ['add', 'README.md'])
   runGit(projectPath, ['commit', '-m', 'test: baseline'])
   runGit(projectPath, ['push', remotePath, 'main'])
   runGit(projectPath, ['checkout', '-b', 'feature/github-pr'])
-  writeFileSync(join(projectPath, 'feature.txt'), 'ASTER_GITHUB_PR_OK\n')
+  writeFileSync(join(projectPath, 'feature.txt'), 'NOREVINQ_GITHUB_PR_OK\n')
   runGit(projectPath, ['add', 'feature.txt'])
   runGit(projectPath, ['commit', '-m', 'feat: GitHub PR proof'])
-  runGit(projectPath, ['remote', 'add', 'origin', 'https://github.com/aster-fixture/project.git'])
+  runGit(projectPath, ['remote', 'add', 'origin', 'https://github.com/norevinq-fixture/project.git'])
 
-  const database = new StateDatabase(join(profile, 'aster-code.sqlite3'))
+  const database = new StateDatabase(join(profile, 'norevinq.sqlite3'))
   const project = database.upsertProject(projectPath)
   database.close()
   writeWrapper(codexWrapper, resolve('tests/helpers/fakeCodexLifecycle.mjs'))
@@ -47,16 +47,16 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
     args: ['.', `--user-data-dir=${profile}`],
     env: {
       ...process.env,
-      ASTER_UNRELATED_SECRET: 'must-not-reach-gh',
+      NOREVINQ_UNRELATED_SECRET: 'must-not-reach-gh',
       CODEX_BINARY: codexWrapper,
-      ASTER_AGENT_HOME: codexHome,
+      NOREVINQ_AGENT_HOME: codexHome,
       GH_CONFIG_DIR: ghConfig,
       PATH: `${binPath}${delimiter}${process.env.PATH ?? ''}`,
     },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Norevinq 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Git 状态' }).click()
     const panel = window.getByLabel('Git 工作区')
     await expect(panel).toBeVisible()
@@ -73,16 +73,16 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
     const createButton = pullRequest.getByRole('button', { name: '推送并创建 Draft PR' })
     await expect(createButton).toBeVisible()
     await createButton.scrollIntoViewIfNeeded()
-    await window.screenshot({ path: 'test-results/aster-github-pr-form-compact.png' })
+    await window.screenshot({ path: 'test-results/norevinq-github-pr-form-compact.png' })
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await createButton.click()
     await expect(pullRequest).toContainText('已创建 PR #42')
     await expect(pullRequest).toContainText('#42 · feat: desktop GitHub PR')
     await expect(pullRequest).toContainText('feature/github-pr → main')
-    await window.screenshot({ path: 'test-results/aster-github-pr.png' })
+    await window.screenshot({ path: 'test-results/norevinq-github-pr.png' })
 
     const repeated = await window.evaluate(async ({ projectId }) => {
-      const bridge = Reflect.get(window, 'aster') as {
+      const bridge = Reflect.get(window, 'norevinq') as {
         createGitHubPullRequest: (input: Record<string, unknown>) => Promise<{ created: boolean; pushed: boolean; pullRequest: { number: number } }>
       }
       return bridge.createGitHubPullRequest({
@@ -103,7 +103,7 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
       title: 'feat: desktop GitHub PR',
       body: '## 验证\n\n- real local Git push\n- bounded fake GitHub API',
       base: 'main',
-      head: 'aster-fixture:feature/github-pr',
+      head: 'norevinq-fixture:feature/github-pr',
       draft: true,
       unrelatedSecretPresent: false,
       deepSeekKeyPresent: false,
@@ -126,7 +126,7 @@ function writeGitWrapper(path: string, remotePath: string): void {
   writeFileSync(path, [
     '#!/bin/sh',
     'if [ "$1" = "push" ]; then',
-    `  exec ${shellQuote(realGit)} -c ${shellQuote(`url.${remotePath}/.insteadOf=https://github.com/aster-fixture/project.git`)} "$@"`,
+    `  exec ${shellQuote(realGit)} -c ${shellQuote(`url.${remotePath}/.insteadOf=https://github.com/norevinq-fixture/project.git`)} "$@"`,
     'fi',
     `exec ${shellQuote(realGit)} "$@"`,
     '',

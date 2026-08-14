@@ -125,7 +125,7 @@ export type SecurityRuntimeStatus = {
   access: 'granted' | 'not_granted' | 'unknown'
   deepseek: {
     configured: boolean
-    integration: 'aster-sdk-extension'
+    integration: 'norevinq-sdk-extension'
     models: SecurityDeepSeekModel[]
   }
 }

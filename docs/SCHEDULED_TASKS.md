@@ -1,6 +1,6 @@
 # 计划任务
 
-Aster Code 的计划任务是本地持久化的 Codex 自动化。调度器运行在 Electron 主进程中，只有电脑开机且应用正在运行时才会准时触发；应用退出期间不会安装后台守护进程。
+Norevinq 的计划任务是本地持久化的 Codex 自动化。调度器运行在 Electron 主进程中，只有电脑开机且应用正在运行时才会准时触发；应用退出期间不会安装后台守护进程。
 
 ## 执行模型
 
@@ -41,5 +41,5 @@ RRULE:FREQ=HOURLY;INTERVAL=4;BYMINUTE=0
 ## 已验证范围
 
 - 单元/集成测试覆盖时区换算、持久化、编辑、暂停/恢复、删除后保留历史、重试、脱敏、错过跳过和 AbortSignal 取消。
-- Electron E2E 从计划任务 UI 创建 Local/只读任务，真实 app-server 返回 `ASTER_SCHEDULED_OK`，并验证完成记录、未读和已读状态。
+- Electron E2E 从计划任务 UI 创建 Local/只读任务，真实 app-server 返回 `NOREVINQ_SCHEDULED_OK`，并验证完成记录、未读和已读状态。
 - worktree 创建与任务 cwd 已分别通过既有真实回归；计划任务专属 worktree 在线回归留在最终跨功能测试中。
