@@ -2,7 +2,7 @@
   "name": "aster-code",
   "version": "0.1.0",
   "private": true,
-  "author": "Aster Code contributors",
+  "author": "xingchen20lj and Aster Code contributors",
   "description": "A local-first desktop coding agent with OpenAI and DeepSeek model providers.",
   "license": "Apache-2.0",
   "repository": {
