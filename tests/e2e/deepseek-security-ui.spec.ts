@@ -67,7 +67,7 @@ test('selects DeepSeek Security and completes an isolated local preflight', asyn
   try {
     const window = await application.firstWindow()
     await window.getByRole('button', { name: '安全', exact: true }).click()
-    const security = window.getByRole('dialog', { name: '安全工作台' })
+    const security = window.getByRole('dialog', { name: 'Aster 安全工作台' })
     await security.getByRole('button', { name: '扫描', exact: true }).click()
     await security.getByLabel('模型提供商').selectOption('deepseek')
     await expect(security.getByLabel('DeepSeek 模型')).toHaveValue('deepseek-v4-pro')

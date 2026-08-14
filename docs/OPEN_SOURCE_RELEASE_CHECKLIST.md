@@ -58,7 +58,7 @@
 ## 不得公开的内容
 
 - API Key、ChatGPT/GitHub token、签名证书和密码；
-- Electron `userData`、Codex home、SQLite、日志或安全扫描未密封产物；
+- Electron `userData`、Aster `agent-home`、SQLite、日志或安全扫描未密封产物；
 - 私人项目源代码、用户目录截图或无关个人信息；
 - 未验证的漏洞细节、攻击代码或第三方私密报告；
 - 使用真实外部服务产生但未经脱敏和授权的测试数据。

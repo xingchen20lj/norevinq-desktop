@@ -344,7 +344,7 @@ export class SecurityService {
     if (!this.#deepSeekCredential()) throw new Error('尚未配置 DeepSeek API Key；请先前往设置保存凭据。')
     if (!request.model || !isDeepSeekSecurityModel(request.model)) throw new Error('请选择有效的 DeepSeek 安全扫描模型。')
     if (request.maxCostUsd !== undefined) {
-      throw new Error('Codex Security SDK 尚无 DeepSeek 官方计价器，不能为该扫描提供可靠的美元硬上限。')
+      throw new Error('Aster 安全引擎尚无 DeepSeek 官方计价器，不能为该扫描提供可靠的美元硬上限。')
     }
   }
 

@@ -8,11 +8,14 @@
 
 ## 当前任务
 
+- 完成面向普通用户的 Aster 产品身份统一、真实模型回答验证，以及本地私有目录从 `codex-home` 到 `agent-home` 的兼容迁移。
 - 完成 Codex Security 直接 DeepSeek Responses provider、隔离凭据环境、实时 token/缓存与人民币费用展示的真实在线验证和发布质量门。
 - 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
 
+- 普通界面、活动作者、运行状态、审批、安全工作台和用户可见错误统一采用 Aster 产品身份；新建、恢复和分叉任务均注入透明的 Aster `developerInstructions`，要求日常回答自称 Aster、被询问架构/许可/模型时如实披露 OpenAI 开源 Codex app-server 与实际提供商。单元测试、Electron 生命周期协议断言通过，DeepSeek V4 Flash 真实在线身份测试于 4.5 秒返回包含 Aster 且不含 Codex 的普通回答。
+- Aster 默认私有运行时目录从 `userData/codex-home` 改为 `userData/agent-home`；首次启动时仅在新目录不存在且旧路径为真实目录时原地迁移，保留登录、任务、MCP 和技能状态。新公开覆盖变量为 `ASTER_AGENT_HOME`/`ASTER_AGENT_BINARY`，旧变量只作为兼容别名；上游子进程所需的 `CODEX_HOME`、项目 `.codex` 和第三方包名继续保留以维持官方兼容性。目录创建、权限、符号链接拒绝、迁移保真及 Electron 回归通过。
 - 将公开 `@openai/codex-security` 升级到 0.1.11，并以 Apache-2.0 可审计 pnpm 补丁增加固定 DeepSeek provider、SDK 实例级环境隔离和只读 token usage 回调；补丁不改变扫描提示、sealed contract、sandbox、finding schema 或产物校验，完整差异随仓库分发。
 - 安全工作台可直接选择 DeepSeek V4 Flash 或 V4 Pro，无需 OpenAI 登录；Pro 在约 12 分钟内完成一文件 standard 扫描，Flash 经根因对照后固定复用 Aster Codex 0.147.0、单并发并于 160.9 秒完成同一类扫描，两者都返回 `completed + sealed` 且 usage 非空。扫描卡实时显示输入、总计、缓存命中/未命中、输出与推理 token，并按官方当前/高峰/非高峰价格逐增量累计美元和人民币估算；真实/打包 UI 预检、汇率降级和跨计价时段单测通过。早期 Flash 失败现已归类为旧运行时/并发收敛组合问题，不再误称官方模型限制。
 - 修复同一任务内的模型切换：Renderer 继续任务时现在显式传递 model/provider；同提供商换模型使用 `turn/start.model`，OpenAI↔DeepSeek 跨提供商切换则在空闲线程上执行 `thread/unsubscribe` → 带覆盖的 `thread/resume`，并核验服务端回显，拒绝静默沿用旧模型。固定官方 Codex 0.147.0 已真实验证同一 thread 在 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro 间切换，不产生模型回答费用。
@@ -229,14 +232,14 @@
 - 2026-08-13 最新 Intel macOS 隔离体验包 `ba33d79` 真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，私有 `codex-home` 为真实 `0700` 目录，DMG CRC 与 ZIP 全文件校验通过；DMG 为 263 MiB，SHA-256 `fb8e35f4199155432ee001d7a36c41e66ed215afeb9c58057dc66e2a73fbaa79`。
 - Codex home 隔离后完整 `verify:ci`：36 个测试文件 172 项、2 项性能基准、覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
 - GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
-- 将 Aster app-server 的 `CODEX_HOME` 固定到独立 Electron `userData/codex-home`（macOS 实际为 `~/Library/Application Support/aster-code/codex-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界。
+- 将 Aster app-server 的上游兼容变量 `CODEX_HOME` 固定到独立 Electron `userData/agent-home`（macOS 实际为 `~/Library/Application Support/aster-code/agent-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界；旧版 `codex-home` 自动迁移。
 - 完成整文件可恢复丢弃：staged/unstaged/untracked/rename 内容与 index 保真，恢复点存入 `refs/aster/discards/<uuid>`、最多 32 个，跨应用重启保持，不占用或删除用户已有 stash；目标出现新修改时失败关闭。
 - 完成 Git 面板丢弃确认、恢复历史与专属离线 Electron E2E；真实仓库跨重启恢复文件，单元测试覆盖用户 stash、rename 和占用目标。
 - 修复内嵌浏览器覆盖任务和输入框：宽屏改为可拖动/键盘缩放的右侧分栏，窄屏自动底部停靠；1200×760 与 800×640 Electron 布局断言和截图通过。
 - 本阶段完整 `verify:ci`：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算全部通过；Git/浏览器两项专属 Electron E2E 通过。
 - PR #5 首轮 macOS 15 全绿；Windows 2025 准确发现 runner 全局 `core.autocrlf` 使恢复后的测试文本按平台转换为 CRLF，并因断言提前失败导致 SQLite 句柄阻塞临时目录清理。测试仓库现固定 `core.autocrlf=false` 验证字节保真，清理增加 Windows 有界重试；产品仍尊重用户仓库配置。
 - 用户在试用 DMG 打开普通非 Git 文件夹时准确发现 `worktree:list` 冒泡 `fatal: not a git repository`；实地只读复核确认目标路径没有 `.git`。
-- 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Codex 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
+- 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Aster 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
 - 完成工作树基线目录与选择器：最多 500 个 HEAD/本地分支/远端分支/标签，annotated tag 解析到 commit；UI 显示类型/ref/短 OID，创建时再次解析并匹配 expected OID，ref 移动失败关闭。
 - SQLite migration v10 持久化所选 `base_ref` 与实际 `base_oid`；真实仓库从非当前 `release/base` 创建 detached worktree，实际 HEAD、旧版本文件和 UI 闭环均经自动测试。
 - 本阶段完整 `verify:ci`：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建与 bundle 预算全部通过；两项专属 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
@@ -284,7 +287,7 @@
 
 ## 当前失败测试
 
-当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、194 项通过及 1 项跳过，覆盖率 81.12/70.04/86.00/88.00，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；真实完整应用 E2E、开发态与打包态 DeepSeek Security UI/预检均通过。生产依赖审计为 0 已知漏洞，目录包内 Codex 0.147.0 检查通过。本分支跨平台 CI 待提交后验证。
+当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、195 项通过及 1 项跳过，覆盖率 81.16/70.11/86.01/88.04，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；真实完整应用 E2E、开发态与打包态 DeepSeek Security UI/预检均通过。生产依赖审计为 0 已知漏洞，目录包内 Codex 0.147.0 检查通过。Windows CI 首次 Electron 下载撞上 30 秒用例超时的问题已通过最小安装脚本白名单修复，待本提交推送后复验跨平台 CI。
 
 ## 已知问题
 

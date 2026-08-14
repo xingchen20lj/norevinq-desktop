@@ -70,10 +70,10 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
   } : null
 
   return <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close() }}>
-    <section className="settings-workbench security-workbench" role="dialog" aria-modal="true" aria-label="安全工作台">
+    <section className="settings-workbench security-workbench" role="dialog" aria-modal="true" aria-label="Aster 安全工作台">
       <header className="settings-workbench-header">
-        <div><p className="eyebrow">CODEX SECURITY</p><h2>安全工作台</h2></div>
-        <button className="icon-button" onClick={close} aria-label="关闭安全工作台"><X size={16} /></button>
+        <div><p className="eyebrow">ASTER SECURITY</p><h2>Aster 安全工作台</h2></div>
+        <button className="icon-button" onClick={close} aria-label="关闭 Aster 安全工作台"><X size={16} /></button>
       </header>
       <nav className="settings-tabs" aria-label="安全类别">
         <button className={tab === 'overview' ? 'selected' : ''} onClick={() => setTab('overview')}><Gauge size={14} />总览</button>
@@ -129,10 +129,10 @@ function RuntimeCard({ snapshot }: { snapshot: SecuritySnapshot | null }): React
   const runtime = snapshot?.runtime
   return <div className="security-runtime">
     <div><strong>SDK</strong><span>{runtime?.sdkVersion ?? '检测中'} · plugin {runtime?.bundledPluginVersion ?? '—'}</span></div>
-    <div><strong>隔离 Codex</strong><span>SDK {runtime?.codexSdkVersion ?? '—'} · executable {runtime?.codexExecutableVersion ?? '—'}</span></div>
+    <div><strong>隔离安全引擎</strong><span>SDK {runtime?.codexSdkVersion ?? '—'} · executable {runtime?.codexExecutableVersion ?? '—'}</span></div>
     <div><strong>Python</strong><span>{runtime?.python.status === 'ready' ? runtime.python.executable : runtime?.python.message ?? '尚未诊断'}</span></div>
     <div><strong>账户 / Trusted Access</strong><span>{runtime?.account.details ?? runtime?.account.status ?? 'unknown'} · {runtime?.access ?? 'unknown'}</span></div>
-    <div><strong>DeepSeek Security</strong><span>{runtime?.deepseek.configured ? `已配置 · ${runtime.deepseek.models.join(' / ')}` : '未配置 API Key'}</span></div>
+    <div><strong>DeepSeek 安全扫描</strong><span>{runtime?.deepseek.configured ? `已配置 · ${runtime.deepseek.models.join(' / ')}` : '未配置 API Key'}</span></div>
   </div>
 }
 
@@ -179,7 +179,7 @@ function Findings({ scans, busy, run, viewResult }: {
   viewResult: (artifact: SecurityArtifact) => void
 }): React.JSX.Element {
   const entries = scans.flatMap((scan) => (scan.result?.findings ?? []).map((finding) => ({ scanId: scan.id, finding })))
-  return <div className="settings-section"><div className="section-heading"><div><h3>漏洞</h3><p>证据、验证和攻击路径来自真实 sealed findings，不由界面补写。</p></div></div>{entries.length === 0 ? <Empty title="没有已验证漏洞" detail="完成扫描后，发现会按严重程度显示在此。" /> : <div className="security-findings">{entries.sort((a, b) => severityRank(a.finding.severity) - severityRank(b.finding.severity)).map(({ scanId, finding }) => <details key={`${scanId}:${finding.occurrenceId}`}><summary><span className={`severity ${finding.severity}`}>{finding.severity}</span><strong>{finding.title}</strong><small>{finding.locations[0] ? `${finding.locations[0].path}:${String(finding.locations[0].startLine)}` : finding.ruleId}</small></summary><p>{finding.summary}</p><dl><dt>置信度</dt><dd>{finding.confidence}</dd><dt>分类</dt><dd>{finding.category} · {finding.cwe.join(', ')}</dd><dt>修复</dt><dd>{finding.remediation}</dd><dt>验证</dt><dd>{finding.validation ? '包含验证证据' : '未提供'}</dd><dt>攻击路径</dt><dd>{finding.attackPath ? '包含攻击路径' : '未提供'}</dd></dl>{finding.evidence.map((evidence) => <pre key={`${evidence.path}:${String(evidence.startLine)}`}>{evidence.code}</pre>)}<div className="finding-actions"><button disabled={busy} onClick={() => void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'validate', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) })}>验证</button><button disabled={busy} onClick={() => { if (window.confirm('修复会让 Codex Security 修改当前仓库文件。是否继续？')) void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'patch', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>修复</button><button disabled={busy} onClick={() => { const reason = window.prompt('请输入标记误报的原因'); if (reason?.trim()) void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'false_positive', reason: reason.trim(), confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>标记误报</button></div></details>)}</div>}</div>
+  return <div className="settings-section"><div className="section-heading"><div><h3>漏洞</h3><p>证据、验证和攻击路径来自真实 sealed findings，不由界面补写。</p></div></div>{entries.length === 0 ? <Empty title="没有已验证漏洞" detail="完成扫描后，发现会按严重程度显示在此。" /> : <div className="security-findings">{entries.sort((a, b) => severityRank(a.finding.severity) - severityRank(b.finding.severity)).map(({ scanId, finding }) => <details key={`${scanId}:${finding.occurrenceId}`}><summary><span className={`severity ${finding.severity}`}>{finding.severity}</span><strong>{finding.title}</strong><small>{finding.locations[0] ? `${finding.locations[0].path}:${String(finding.locations[0].startLine)}` : finding.ruleId}</small></summary><p>{finding.summary}</p><dl><dt>置信度</dt><dd>{finding.confidence}</dd><dt>分类</dt><dd>{finding.category} · {finding.cwe.join(', ')}</dd><dt>修复</dt><dd>{finding.remediation}</dd><dt>验证</dt><dd>{finding.validation ? '包含验证证据' : '未提供'}</dd><dt>攻击路径</dt><dd>{finding.attackPath ? '包含攻击路径' : '未提供'}</dd></dl>{finding.evidence.map((evidence) => <pre key={`${evidence.path}:${String(evidence.startLine)}`}>{evidence.code}</pre>)}<div className="finding-actions"><button disabled={busy} onClick={() => void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'validate', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) })}>验证</button><button disabled={busy} onClick={() => { if (window.confirm('修复会让 Aster 安全工作台修改当前仓库文件。是否继续？')) void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'patch', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>修复</button><button disabled={busy} onClick={() => { const reason = window.prompt('请输入标记误报的原因'); if (reason?.trim()) void run(async () => { const value = await window.aster.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'false_positive', reason: reason.trim(), confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>标记误报</button></div></details>)}</div>}</div>
 }
 
 function Repositories({ scans }: { scans: SecurityScanRecord[] }): React.JSX.Element {
@@ -189,7 +189,7 @@ function Repositories({ scans }: { scans: SecurityScanRecord[] }): React.JSX.Ele
 }
 
 function SecuritySettings({ snapshot, busy, refresh }: { snapshot: SecuritySnapshot | null; busy: boolean; refresh: () => Promise<void> }): React.JSX.Element {
-  return <div className="settings-section"><div className="section-heading"><div><h3>运行时与权限</h3><p>Security runtime 与主 Codex app-server 版本隔离，避免依赖漂移。</p></div><button disabled={busy} onClick={() => void refresh()}><RefreshCw size={13} />重新检测</button></div><RuntimeCard snapshot={snapshot} /><div className="provider-warning"><strong>账户权限边界</strong><span>已登录不代表自动拥有 Codex Security 或 Trusted Access。授权状态只有真实扫描事件能够确认，界面不会静默推断。</span></div><div className="security-policy"><strong>产物安全策略</strong><ul><li>扫描输出位于工作树之外，目录权限为 0700。</li><li>报告读取限制为已完成扫描的固定文件，拒绝符号链接越界。</li><li>预览最多 2 MiB；密钥、令牌和认证头不会写入扫描历史。</li></ul></div></div>
+  return <div className="settings-section"><div className="section-heading"><div><h3>运行时与权限</h3><p>安全扫描引擎与主智能体引擎版本隔离，避免依赖漂移。</p></div><button disabled={busy} onClick={() => void refresh()}><RefreshCw size={13} />重新检测</button></div><RuntimeCard snapshot={snapshot} /><div className="provider-warning"><strong>账户权限边界</strong><span>已登录不代表自动拥有 Security 或 Trusted Access。授权状态只有真实扫描事件能够确认，界面不会静默推断。</span></div><div className="security-policy"><strong>产物安全策略</strong><ul><li>扫描输出位于工作树之外，目录权限为 0700。</li><li>报告读取限制为已完成扫描的固定文件，拒绝符号链接越界。</li><li>预览最多 2 MiB；密钥、令牌和认证头不会写入扫描历史。</li></ul></div></div>
 }
 
 function Empty({ title, detail }: { title: string; detail: string }): React.JSX.Element {

@@ -11,7 +11,7 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
   const profile = mkdtempSync(join(tmpdir(), 'aster-github-pr-e2e-'))
   const projectPath = join(profile, 'project')
   const remotePath = join(profile, 'remote.git')
-  const codexHome = join(profile, 'codex-home')
+  const codexHome = join(profile, 'agent-home')
   const ghConfig = join(profile, 'gh-config')
   const binPath = join(profile, 'bin')
   const codexWrapper = join(binPath, 'codex')
@@ -49,14 +49,14 @@ test('preflights GitHub, pushes a real branch, creates one verified Draft PR, an
       ...process.env,
       ASTER_UNRELATED_SECRET: 'must-not-reach-gh',
       CODEX_BINARY: codexWrapper,
-      ASTER_CODEX_HOME: codexHome,
+      ASTER_AGENT_HOME: codexHome,
       GH_CONFIG_DIR: ghConfig,
       PATH: `${binPath}${delimiter}${process.env.PATH ?? ''}`,
     },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Git 状态' }).click()
     const panel = window.getByLabel('Git 工作区')
     await expect(panel).toBeVisible()

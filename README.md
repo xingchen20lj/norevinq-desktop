@@ -61,7 +61,7 @@ pnpm package:win
 - GitHub Pull Request 功能通过用户已经登录的 `gh` CLI 工作，Aster 不读取或保存 GitHub token。
 - Codex Security 扫描需要 Python 3.10+；OpenAI 模式受账户 Security/Trusted Access 权限约束，DeepSeek V4 Flash 与 V4 Pro 可直接使用 `DEEPSEEK_API_KEY`，无需 OpenAI 登录。两者均已通过 Aster 0.1.0 的真实 `completed + sealed` 扫描；Flash 固定复用 Aster 0.147.0 运行时并串行审计，Pro 使用有限并行。
 
-Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树、凭据和 Codex home，不会覆盖官方 Codex 桌面的用户数据。项目中的 `.codex` 和 `AGENTS.md` 仍遵循 Codex 项目配置规则。
+Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树、凭据和 `agent-home`，不会覆盖官方 Codex 桌面的用户数据。旧版 `codex-home` 会在首次启动新版时原地迁移为 `agent-home`；项目中的 `.codex` 和 `AGENTS.md` 仍遵循上游兼容规则。
 
 ## 更多界面
 

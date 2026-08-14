@@ -28,10 +28,10 @@ test('starts the packaged app with its bundled Codex runtime', async () => {
     expect(runtime.version).toMatch(/^codex(?:-cli)?\s+0\.147\.0$/iu)
     expect(runtime.binaryPath).toContain('app.asar.unpacked')
     expect(runtime.models.length).toBeGreaterThan(0)
-    const codexHome = join(profile, 'codex-home')
-    expect(lstatSync(codexHome).isDirectory()).toBe(true)
-    expect(lstatSync(codexHome).isSymbolicLink()).toBe(false)
-    if (process.platform !== 'win32') expect(lstatSync(codexHome).mode & 0o777).toBe(0o700)
+    const agentHome = join(profile, 'agent-home')
+    expect(lstatSync(agentHome).isDirectory()).toBe(true)
+    expect(lstatSync(agentHome).isSymbolicLink()).toBe(false)
+    if (process.platform !== 'win32') expect(lstatSync(agentHome).mode & 0o777).toBe(0o700)
     const updates = await window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
         getUpdateState: () => Promise<{ phase: string; configured: boolean; disabledReason: string | null }>

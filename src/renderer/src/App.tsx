@@ -518,7 +518,7 @@ export function App(): React.JSX.Element {
   }
 
   async function compactSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Codex 会保留摘要并继续使用同一任务。')) return
+    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Aster 会保留摘要并继续使用同一任务。')) return
     await runThreadAction(() => window.aster.compactConversation({ threadId: selectedThread.id }))
   }
 
@@ -530,7 +530,7 @@ export function App(): React.JSX.Element {
   }
 
   async function deleteSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('永久删除此任务及其 Codex 历史？此操作无法撤销。')) return
+    if (!selectedThread || !window.confirm('永久删除此任务及其 Aster 历史？此操作无法撤销。')) return
     await runThreadAction(() => window.aster.deleteConversation({ threadId: selectedThread.id }))
   }
 
@@ -587,7 +587,7 @@ export function App(): React.JSX.Element {
       setBrowserOpen(false)
     }
     if (runtime?.phase !== 'ready') {
-      setError('Codex app-server 尚未就绪，无法启动终端。')
+      setError('Aster 智能体引擎尚未就绪，无法启动终端。')
       return
     }
     const worktreeId = selectedWorktree?.id ?? null
@@ -624,14 +624,14 @@ export function App(): React.JSX.Element {
 
   const shortcutModifier = bootstrap?.platform === 'darwin' ? '⌘' : 'Ctrl+'
   const commands: CommandAction[] = [
-    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Codex 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
+    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Aster 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
     { id: 'open-project', label: '打开项目', detail: '使用系统目录选择器添加本地项目', run: openProject },
     { id: 'files', label: '文件与产物', detail: '浏览当前项目或工作树中的真实文件', disabled: !selectedProject, run: () => openFiles() },
     { id: 'terminal', label: '打开终端', detail: '打开绑定当前任务上下文的 app-server PTY', shortcut: `${shortcutModifier}\``, disabled: !selectedProject, run: openTerminal },
     { id: 'browser', label: '本地网页预览', detail: '打开受限 loopback WebContentsView', run: () => { setFilesOpen(false); setTerminalOpen(false); setBrowserOpen(true) } },
     { id: 'git', label: 'Git 工作区', detail: '查看状态、差异、暂存和提交', disabled: !selectedProject, run: () => setGitOpen(true) },
     { id: 'scheduler', label: '计划任务', detail: '管理自动化与运行收件箱', run: () => setSchedulerOpen(true) },
-    { id: 'security', label: '安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
+    { id: 'security', label: 'Aster 安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
     { id: 'settings', label: '设置', detail: '提供商、MCP、技能和配置', run: () => setSettingsOpen(true) },
     { id: 'theme-system', label: '外观：跟随系统', detail: '实时跟随操作系统深浅外观', run: () => setThemePreference('system') },
     { id: 'theme-light', label: '外观：浅色', detail: '固定使用浅色主题', run: () => setThemePreference('light') },
@@ -768,8 +768,8 @@ export function App(): React.JSX.Element {
               <GitBranch size={13} />{gitStatus?.branch ?? (gitStatus?.initialized ? 'Detached' : 'Local')}
               {gitStatus && gitStatus.files.length > 0 && <b>{gitStatus.files.length}</b>}
             </button>}
-            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? runtime?.binaryPath ?? undefined}>
-              <span className="runtime-dot" /> Codex {runtimeLabel(runtime)}
+            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? 'Aster 智能体引擎状态'}>
+              <span className="runtime-dot" /> Aster {runtimeLabel(runtime)}
             </span>
           </div>
           <div className="topbar-actions">
@@ -920,7 +920,7 @@ export function App(): React.JSX.Element {
       {goalOpen && <div className="thread-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGoalOpen(false) }}>
         <form className="thread-dialog goal-dialog" role="dialog" aria-label="长期目标" onSubmit={(event) => { event.preventDefault(); void saveGoal() }}>
           <h2>长期目标</h2>
-          <p>目标由 Codex app-server 持久化，可在后续任务中继续跟踪用量与状态。</p>
+          <p>目标由 Aster 智能体引擎持久化，可在后续任务中继续跟踪用量与状态。</p>
           <label><span>目标</span><textarea autoFocus aria-label="目标内容" maxLength={10_000} rows={5} value={goalObjective} onChange={(event) => setGoalObjective(event.target.value)} /></label>
           <label><span>状态</span><select aria-label="目标状态" value={goalStatus} onChange={(event) => setGoalStatus(event.target.value as ThreadGoalStatus)}>
             <option value="active">进行中</option>
@@ -1031,7 +1031,7 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
       {recovery.error && <small>{recovery.error}</small>}
       <button disabled={busy} onClick={() => void retryRecovery(recovery.id)}>安全重试</button>
     </div>)}
-    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Codex 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
+    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Aster 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
       {baseCatalog?.repositoryInitialized && baseCatalog.bases.length === 0 && <div className="worktree-init-note"><strong>Git 仓库还没有提交</strong><span>请先创建首次提交，再从提交基线建立隔离工作树。</span></div>}
       <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
       {baseCatalog?.truncated && <p className="worktree-warning">基线列表已限制为前 500 项。</p>}
@@ -1468,14 +1468,14 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
     <div className="hero-orbit" aria-hidden="true"><div className="hero-core"><Sparkles size={27} /></div></div>
     <p className="eyebrow">LOCAL-FIRST CODING AGENT</p>
     <h1>{selectedProject ? `开始处理 ${selectedProject.name}` : '把复杂开发工作交给智能体'}</h1>
-    <p className="hero-subtitle">{selectedProject?.path ?? '由 Codex app-server 驱动的本地智能编程工作台'}</p>
+    <p className="hero-subtitle">{selectedProject?.path ?? 'Aster 本地优先智能编程工作台'}</p>
     {!selectedProject && <button className="primary-button" onClick={() => void openProject()} disabled={isOpening}>
       <FolderOpen size={17} /> {isOpening ? '正在打开…' : '打开本地项目'}
     </button>}
     <div className="capability-grid">
-      <article><Bot size={20} /><div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
+      <article><Bot size={20} /><div><h2>Aster 任务</h2><p>{runtime?.version ? `${String(runtime.models.length)} 个模型 · 智能体引擎 ${runtimeLabel(runtime)}` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
       <article><GitBranch size={20} /><div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div><span className="status-chip connected">已接入</span></article>
-      <article><ShieldCheck size={20} /><div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
+      <article><ShieldCheck size={20} /><div><h2>Aster 安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
     </div>
   </div>
 }
@@ -1496,7 +1496,7 @@ function ActivityTimeline({ state, goal, openFile }: {
     {!state || state.activities.length === 0
       ? <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
       : state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
-    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
+    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Aster 正在工作</div>}
   </div>
 }
 
@@ -1568,7 +1568,7 @@ function IntegrationRequestPanel({ request, onError }: {
     <div className="integration-request-heading">
       <Wrench size={16} />
       <div>
-        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Codex 请求补充信息'}</strong>
+        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Aster 请求补充信息'}</strong>
         <p>{request.kind === 'mcpElicitation' ? request.message : request.questions[0]?.question}</p>
       </div>
     </div>
@@ -1604,7 +1604,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
     catch (reason) { onError(toErrorMessage(reason)) }
   }
   return <section className="approval-panel" aria-label="待审批操作">
-    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Codex 请求继续执行受保护操作。'}</p>
+    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Aster 请求继续执行受保护操作。'}</p>
       {approval.kind === 'permissions' && <div className="permission-request-list">{approval.permissions.map((permission) => <label key={permission.id}>
         <input type="checkbox" checked={selectedPermissions.has(permission.id)} onChange={(event) => {
           const checked = event.currentTarget.checked
@@ -1627,7 +1627,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
 function activityLabel(activity: AgentActivity): string {
   switch (activity.type) {
     case 'userMessage': return '你的指令'
-    case 'agentMessage': return 'Codex'
+    case 'agentMessage': return 'Aster'
     case 'reasoning': return '推理'
     case 'command': return '命令'
     case 'fileChange': return '文件变更'

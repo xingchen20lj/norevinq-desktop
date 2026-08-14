@@ -209,7 +209,7 @@ function ProviderTab({ providers, account, apiKey, setApiKey, busy, run, onUpdat
           ? '当前提供商不要求 OpenAI 认证'
           : '可使用 ChatGPT 或 OpenAI API Key'
   return <div className="settings-section">
-    <div className="section-heading"><div><h3>OpenAI Codex</h3><p>认证状态和登录由官方 Codex app-server 管理。</p></div><button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.refreshOpenAiAccount()))}><RefreshCw size={13} />刷新</button></div>
+    <div className="section-heading"><div><h3>OpenAI</h3><p>在 Aster 中管理 OpenAI 或 ChatGPT 认证状态。</p></div><button disabled={busy} onClick={() => void run(async () => onAccount(await window.aster.refreshOpenAiAccount()))}><RefreshCw size={13} />刷新</button></div>
     <div className="provider-state">
       <div className="provider-icon"><KeyRound size={17} /></div>
       <div><strong>{accountLabel}</strong><p>{accountDetail}</p></div>
@@ -228,9 +228,9 @@ function ProviderTab({ providers, account, apiKey, setApiKey, busy, run, onUpdat
         })}>使用 API Key</button>
       </div>
     </>}
-    {account?.rateLimits?.primary && <div className="account-rate-limit"><div><strong>{account.rateLimits.limitName ?? account.rateLimits.limitId ?? 'Codex 用量窗口'}</strong><span>{account.rateLimits.primary.usedPercent.toFixed(0)}%</span></div><progress max={100} value={account.rateLimits.primary.usedPercent} /><small>{formatRateLimitReset(account.rateLimits.primary.resetsAt)}</small></div>}
+    {account?.rateLimits?.primary && <div className="account-rate-limit"><div><strong>{account.rateLimits.limitName ?? account.rateLimits.limitId ?? 'OpenAI 用量窗口'}</strong><span>{account.rateLimits.primary.usedPercent.toFixed(0)}%</span></div><progress max={100} value={account.rateLimits.primary.usedPercent} /><small>{formatRateLimitReset(account.rateLimits.primary.resetsAt)}</small></div>}
     <p className="settings-note">ChatGPT 令牌和 API Key 均由 app-server 持久化并刷新；Renderer 不读取凭据。实验性的外部 ChatGPT token 注入未启用。</p>
-    <div className="section-heading"><div><h3>DeepSeek Responses</h3><p>一级模型提供商，通过 Codex Responses wire API 工作。</p></div></div>
+    <div className="section-heading"><div><h3>DeepSeek Responses</h3><p>作为 Aster 的一级模型提供商，通过 Responses API 工作。</p></div></div>
     <div className="provider-state">
       <div className="provider-icon"><KeyRound size={17} /></div>
       <div><strong>{status?.configured ? '已配置' : '未配置'}</strong><p>{status?.credentialSource === 'environment' ? '由进程环境安全提供' : status?.credentialSource === 'os-vault' ? '保存在操作系统加密保险库' : '添加 API Key 以启用'}</p></div>
@@ -286,7 +286,7 @@ function McpTab({ project, threadId, snapshot, busy, run }: {
   if (!project) return <EmptySettings title="尚未打开项目" detail="打开项目后可查看其有效 MCP 配置。" />
   return <div className="settings-section">
     <div className="section-heading"><div><h3>MCP 服务器</h3><p>状态、OAuth、资源和直接工具诊断均由 app-server 提供。</p></div><button disabled={busy} onClick={() => void run(() => window.aster.reloadMcpServers({ projectId: project.id }))}><RefreshCw size={13} />重载</button></div>
-    {snapshot?.loading ? <Loading /> : snapshot?.mcpServers.length === 0 ? <EmptySettings title="未配置 MCP" detail="在 Codex 用户配置中添加 MCP 服务器后重载。" /> : <div className="integration-grid">
+    {snapshot?.loading ? <Loading /> : snapshot?.mcpServers.length === 0 ? <EmptySettings title="未配置 MCP" detail="在 Aster 智能体配置中添加 MCP 服务器后重载。" /> : <div className="integration-grid">
       <aside>{snapshot?.mcpServers.map((item) => <button key={item.name} className={item.name === server?.name ? 'selected' : ''} onClick={() => { setServerName(item.name); setToolName(''); setToolResult(null); setResourceResult(null) }}><Network size={13} /><span><strong>{item.title ?? item.name}</strong><small>{item.tools.length} 工具 · {item.resources.length} 资源</small></span><i className={item.authStatus === 'oAuth' || item.authStatus === 'bearerToken' ? 'connected' : ''} /></button>)}</aside>
       {server && <div className="integration-detail">
         <div className="integration-title"><div><strong>{server.title ?? server.name}</strong><small>{server.version ?? '版本未报告'} · {server.authStatus}</small></div>{server.authStatus === 'notLoggedIn' && <button disabled={busy} onClick={() => void run(async () => {
@@ -332,7 +332,7 @@ function SkillsTab({ project, snapshot, busy, run }: {
   if (!project) return <EmptySettings title="尚未打开项目" detail="打开项目后可发现用户、仓库、系统与管理员技能。" />
   return <div className="settings-section">
     <div className="section-heading"><div><h3>技能</h3><p>app-server 发现的真实技能；文件变化会自动刷新。</p></div><button disabled={busy} onClick={() => void run(() => window.aster.refreshIntegrations())}><RefreshCw size={13} />刷新</button></div>
-    <div className={`trust-banner ${snapshot?.trusted ? 'trusted' : ''}`}><ShieldCheck size={16} /><div><strong>{snapshot?.trusted ? '项目已信任' : '项目未信任'}</strong><p>信任后才可添加进程级外部技能根目录；项目技能仍按 Codex 规则展示。</p></div><button disabled={busy} onClick={() => void run(() => window.aster.setProjectTrust({ projectId: project.id, trusted: !snapshot?.trusted }))}>{snapshot?.trusted ? '撤销信任' : '信任项目'}</button></div>
+    <div className={`trust-banner ${snapshot?.trusted ? 'trusted' : ''}`}><ShieldCheck size={16} /><div><strong>{snapshot?.trusted ? '项目已信任' : '项目未信任'}</strong><p>信任后才可添加进程级外部技能根目录；项目技能仍按兼容规则展示。</p></div><button disabled={busy} onClick={() => void run(() => window.aster.setProjectTrust({ projectId: project.id, trusted: !snapshot?.trusted }))}>{snapshot?.trusted ? '撤销信任' : '信任项目'}</button></div>
     <div className="extra-roots"><div><strong>额外技能目录</strong><small>只在当前 app-server 进程有效，不写入项目。</small></div><button disabled={busy || !snapshot?.trusted} onClick={() => void run(() => window.aster.chooseExtraSkillRoot({ projectId: project.id }))}><Plus size={12} />添加</button></div>
     {snapshot?.extraSkillRoots.map((root) => <div className="root-row" key={root}><code>{root}</code><button disabled={busy} onClick={() => void run(() => window.aster.removeExtraSkillRoot({ projectId: project.id, path: root }))}><Trash2 size={12} /></button></div>)}
     <div className="skill-list">{snapshot?.skills.map((skill) => <article key={skill.path}>
@@ -363,7 +363,7 @@ function ConfigTab({ project, snapshot, busy, run }: {
       <ConfigSelect label="输出详细度" value={null} values={['low', 'medium', 'high']} disabled={busy} onChange={(value) => write('model_verbosity', value)} />
     </div>
     <h4>项目指令</h4>
-    {snapshot?.instructions.length ? snapshot.instructions.map((instruction) => <details className="config-layer" key={instruction.path}><summary><FileText size={12} />{instruction.path}<span>{instruction.bytes} bytes</span></summary><pre>{instruction.preview}</pre></details>) : <p className="integration-empty">项目根目录没有 AGENTS.md 或 AGENTS.override.md；Codex 仍会按其层级规则寻找指令。</p>}
+    {snapshot?.instructions.length ? snapshot.instructions.map((instruction) => <details className="config-layer" key={instruction.path}><summary><FileText size={12} />{instruction.path}<span>{instruction.bytes} bytes</span></summary><pre>{instruction.preview}</pre></details>) : <p className="integration-empty">项目根目录没有 AGENTS.md 或 AGENTS.override.md；Aster 仍会按兼容层级规则寻找指令。</p>}
     <h4>权限配置</h4>
     {snapshot?.permissionProfiles.length ? <div className="skill-list permission-profile-list">{snapshot.permissionProfiles.map((profile) => <article key={profile.id}>
       <div><strong>{profile.id}</strong><span>{profile.allowed ? '允许选择' : '被管理要求禁用'}</span></div>

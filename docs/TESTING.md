@@ -17,7 +17,8 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `pnpm exec playwright test tests/e2e/github-pr.spec.ts`：不访问真实 GitHub；真实 Git 仓库向本地 bare remote 推送 feature 分支，确定性 `gh` 替身验证登录、仓库、Draft PR、正文 stdin、结构化回读、重复创建幂等和无关密钥隔离。
 - `pnpm exec playwright test tests/e2e/git-discard.spec.ts`：不调用模型；真实 Git 仓库验证整文件可恢复丢弃跨应用重启持久化，并恢复原文件内容。
 - `pnpm exec playwright test tests/e2e/ipc-security.spec.ts`：验证主窗口 IPC、恶意 Renderer 拒绝及浏览器宽屏右栏/窄屏底栏布局，包含键盘调整分隔条。
-- `pnpm exec playwright test tests/e2e/non-git-project.spec.ts`：打开真实普通文件夹，验证首页无 `worktree:list` Git fatal，工作树显示 Local-only 引导且 Codex 任务入口仍可用。
+- `pnpm exec playwright test tests/e2e/non-git-project.spec.ts`：打开真实普通文件夹，验证首页无 `worktree:list` Git fatal，工作树显示 Local-only 引导且 Aster 任务入口仍可用。
+- `DEEPSEEK_API_KEY=... pnpm exec playwright test tests/e2e/aster-identity.spec.ts`：用 DeepSeek V4 Flash 发起最小真实任务，验证普通回答使用 Aster 产品身份且不出现 Codex；无 Key 时自动跳过。
 - `pnpm exec playwright test tests/e2e/worktree-recovery.spec.ts`：构造目标已 apply 后崩溃及后续人工修改，重启验证恢复状态可见、安全重试失败关闭、恢复 ref 与人工文件均保留。
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：除任务生命周期外，从非当前 `release/base` 分支选择不可变 OID 创建 detached worktree，并验证实际 HEAD/文件内容。
 - 2026-08-11 一次性显式线上回归：Aster Electron 主进程真实创建并回读私有 Draft PR #1；验证 `~/bin/gh` 发现、真实 push、owner/head/base/URL 和在线幂等。该外部写入测试不进入常规 CI，避免在重复运行中修改用户仓库。

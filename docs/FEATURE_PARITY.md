@@ -11,8 +11,9 @@
 | 桌面基础 | 单实例、深链接、窗口状态恢复 | 部分实现 | 单实例与 SQLite bounds/最大化/全屏安全恢复已测试；`aster-code://project/<uuid>` 与项目关联任务深链接具备严格解析、双重关联校验、冷启动队列、单实例 Electron E2E 和 macOS 包元数据验证；Windows/macOS 外部应用真实唤起待目标系统发布回归 |
 | 桌面基础 | 自动更新 | 部分实现 | electron-updater 6.8.9 状态机、30 秒/6 小时检查、显式下载、退出/重启安装、进度/错误 UI、HTTPS 发布构建和真实 app-update/latest-mac SHA-512 元数据已测试；仓库尚无真实发布域名、macOS/Windows 签名身份，故跨版本安装为外部发布阻塞 |
 | 桌面基础 | 深色/浅色/跟随系统 | 已测试 | system/light/dark 偏好、matchMedia 实时变化、重载恢复和深浅 E2E |
+| 桌面基础 | Aster 产品身份与透明上游归属 | 已测试 | 普通界面、活动作者、新建/恢复/分叉任务统一使用 Aster；协议请求自动注入 Aster 身份指令，单元及 Electron 生命周期断言覆盖；DeepSeek V4 Flash 真实在线普通回答包含 Aster 且不含 Codex；技术文档、许可和诊断仍如实保留 OpenAI Codex app-server/Codex Security 归属 |
 | 导航 | 项目、任务、计划任务、安全、设置导航 | 已测试 | 项目/任务、计划任务（含未读徽标）、五页安全工作台与提供商/MCP/技能/配置/应用五页设置工作台均经 Electron 回归 |
-| 项目 | 打开真实本地目录 | 已测试 | 系统目录对话框、realpath 校验、SQLite 写入；普通非 Git 文件夹可直接运行 Codex，工作树返回 Local-only 空状态而不冒泡 Git fatal，Electron E2E 通过 |
+| 项目 | 打开真实本地目录 | 已测试 | 系统目录对话框、realpath 校验、SQLite 写入；普通非 Git 文件夹可直接运行 Aster 任务，工作树返回 Local-only 空状态而不冒泡 Git fatal，Electron E2E 通过 |
 | 项目 | 最近项目和固定项目 | 已测试 | 最近项目恢复/去重、SQLite 固定、固定优先排序和 Renderer 重载恢复均通过自动测试与 Electron E2E |
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 已测试 | 默认不信任、SQLite 持久化、外部技能根目录信任门；单元与 Electron UI 通过 |
@@ -23,7 +24,7 @@
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |
 | 对话 | 长上下文压缩 | 已测试 | `thread/compact/start`、活动 turn 保护和确认 UI 经协议替身/Electron E2E；真实模型压缩内容待账户恢复后复验 |
 | 对话 | 重启后状态恢复 | 部分实现 | 项目→thread 关联持久化、thread/list/resume 与已完成历史 hydration 自动测试通过；`turn/start` 遇到新 app-server 尚未加载历史 thread 时会自动 resume 并安全重试一次；真实进程在线 E2E 因账户使用量耗尽待复验 |
-| 智能体 | Codex app-server stdio 生命周期 | 已测试 | 开发与打包 Electron 均真实自动启动；发布包使用官方 `@openai/codex` 0.147.0，而非 ChatGPT 私有安装；私有 `userData/codex-home` 隔离官方客户端登录、thread 与用户配置 |
+| 智能体 | Codex app-server stdio 生命周期 | 已测试 | 开发与打包 Electron 均真实自动启动；发布包使用官方 `@openai/codex` 0.147.0，而非 ChatGPT 私有安装；私有 `userData/agent-home` 隔离官方客户端登录、thread 与用户配置，旧 `codex-home` 自动迁移 |
 | 智能体 | 协议握手和版本匹配类型 | 已测试 | 真实握手；929 个生成文件和哈希 manifest |
 | 智能体 | app-server 崩溃检测与恢复 | 已测试 | 真实子进程 JSONL 替身注入 exit 23：空闲连接恢复 ready，活动 turn 失败关闭且不重启/重放 |
 | 智能体 | 流式文本、推理和活动时间线 | 已测试 | 真实在线 Codex 文本流 E2E；reducer 27 项测试覆盖乱序 delta 与 1 MiB 截断 |

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "author": "Aster Code contributors",
-  "description": "A local-first desktop coding agent client powered by Codex app-server.",
+  "description": "A local-first desktop coding agent with OpenAI and DeepSeek model providers.",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",

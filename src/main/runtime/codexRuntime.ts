@@ -132,7 +132,7 @@ export class CodexRuntimeSupervisor {
       this.#restartTimer = null
     }
     const child = this.#child
-    this.#peer?.close(new JsonlRpcClosedError('Codex runtime was stopped'))
+    this.#peer?.close(new JsonlRpcClosedError('Aster agent runtime was stopped'))
     this.#peer = null
     this.#child = null
     if (child?.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
@@ -287,7 +287,7 @@ export class CodexRuntimeSupervisor {
     } catch (error: unknown) {
       const message = toErrorMessage(error)
       await this.#log('error', 'Codex app-server initialization failed', { error: message })
-      peer.close(new JsonlRpcClosedError('Codex initialization failed'))
+      peer.close(new JsonlRpcClosedError('Aster agent initialization failed'))
       if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM')
       if (this.#child === child) this.#child = null
       if (this.#peer === peer) this.#peer = null
@@ -302,7 +302,7 @@ export class CodexRuntimeSupervisor {
 
   #handleExit(generation: number, code: number | null, signal: NodeJS.Signals | null): void {
     if (generation !== this.getSnapshot().generation) return
-    this.#peer?.close(new JsonlRpcClosedError('Codex app-server exited'))
+    this.#peer?.close(new JsonlRpcClosedError('Aster agent runtime exited'))
     this.#peer = null
     this.#child = null
     const exitPatch = { lastExitCode: code, lastSignal: signal }
@@ -315,7 +315,7 @@ export class CodexRuntimeSupervisor {
       this.#state.update({
         ...exitPatch,
         phase: 'failed',
-        error: 'Codex app-server exited during an active turn. Automatic replay was disabled to avoid duplicate side effects.',
+        error: 'Aster 智能体引擎在任务运行期间退出；为避免重复执行副作用，未自动重放任务。',
       })
       return
     }
@@ -329,7 +329,7 @@ export class CodexRuntimeSupervisor {
       this.#state.update({
         ...exitPatch,
         phase: 'failed',
-        error: `Codex app-server exited and exceeded ${String(this.#maxAutomaticRestarts)} automatic restart attempts.`,
+        error: `Aster 智能体引擎退出，并已超过 ${String(this.#maxAutomaticRestarts)} 次自动重启上限。`,
       })
       return
     }
@@ -339,7 +339,7 @@ export class CodexRuntimeSupervisor {
       ...exitPatch,
       phase: 'restarting',
       restartAttempt: nextAttempt,
-      error: `Codex app-server exited unexpectedly; retrying in ${String(delay)} ms.`,
+      error: `Aster 智能体引擎意外退出；将在 ${String(delay)} 毫秒后重试。`,
     })
     this.#restartTimer = setTimeout(() => {
       this.#restartTimer = null
@@ -348,7 +348,7 @@ export class CodexRuntimeSupervisor {
   }
 
   #requireReadyPeer(): JsonlRpcPeer {
-    if (this.getSnapshot().phase !== 'ready' || !this.#peer) throw new Error('Codex runtime is not ready.')
+    if (this.getSnapshot().phase !== 'ready' || !this.#peer) throw new Error('Aster agent runtime is not ready.')
     return this.#peer
   }
 

@@ -65,6 +65,17 @@ type AgentServiceOptions = {
 
 const MAX_PERMISSION_OPTIONS = 64
 const MAX_PERMISSION_TEXT = 4_096
+export const ASTER_AGENT_DEVELOPER_INSTRUCTIONS = [
+  'You are the coding agent inside the Aster Code desktop application.',
+  'In ordinary user-facing conversation, refer to yourself as Aster and do not introduce yourself as Codex.',
+  'Do not misrepresent the underlying model, provider, or implementation.',
+  'If the user asks about architecture, licensing, providers, or diagnostics, explain truthfully that Aster uses OpenAI\'s open-source Codex app-server and identify the actual model/provider when known.',
+  'Keep official technical names, commands, file formats, and protocol identifiers unchanged when accuracy requires them.',
+].join(' ')
+
+const ASTER_THREAD_IDENTITY: Record<string, JsonValue> = {
+  developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
+}
 
 export class AgentService {
   readonly #runtime: RuntimePort
@@ -173,7 +184,10 @@ export class AgentService {
   async selectThread(threadId: string): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(threadId)
     await this.#runtime.start()
-    const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
+    const result = asRecord(await this.#runtime.request('thread/resume', {
+      threadId,
+      ...ASTER_THREAD_IDENTITY,
+    }))
     const thread = asRecord(result.thread)
     this.#hydrateThread(thread)
     const projectId = this.#snapshot.projectId
@@ -189,10 +203,13 @@ export class AgentService {
       throw new Error('Conversation is not associated with the requested project.')
     }
     await this.#runtime.start()
-    const result = asRecord(await this.#runtime.request('thread/resume', { threadId }))
+    const result = asRecord(await this.#runtime.request('thread/resume', {
+      threadId,
+      ...ASTER_THREAD_IDENTITY,
+    }))
     const thread = asRecord(result.thread)
     if (requireString(thread.id, 'thread.id') !== threadId) {
-      throw new Error('Codex returned another conversation for the deep link.')
+      throw new Error('Aster 智能体引擎为该链接返回了另一个任务。')
     }
     this.#hydrateThread(thread)
     this.#update({
@@ -249,6 +266,7 @@ export class AgentService {
     await this.#runtime.start()
     const result = asRecord(await this.#runtime.request('thread/fork', {
       threadId: input.threadId,
+      ...ASTER_THREAD_IDENTITY,
       ...(input.lastTurnId ? { lastTurnId: input.lastTurnId } : {}),
     }))
     const thread = asRecord(result.thread)
@@ -301,7 +319,7 @@ export class AgentService {
       tokenBudget,
     }))
     const goal = toThreadGoal(asRecord(result.goal))
-    if (goal.threadId !== input.threadId) throw new Error('Codex returned a goal for another conversation.')
+    if (goal.threadId !== input.threadId) throw new Error('Aster 智能体引擎返回了其他任务的目标。')
     this.#update({ goals: { ...this.#snapshot.goals, [input.threadId]: goal }, error: null })
     return this.#snapshot
   }
@@ -382,7 +400,9 @@ export class AgentService {
     const params: Record<string, JsonValue> = {
       approvalPolicy: input.approvalPolicy ?? 'on-request',
       cwd: workingPath,
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
       sandbox: input.sandbox ?? 'workspace-write',
+      serviceName: 'Aster',
     }
     if (input.model) params.model = input.model
     if (input.modelProvider) params.modelProvider = input.modelProvider
@@ -413,7 +433,10 @@ export class AgentService {
     const text = requirePrompt(input.text)
     await this.#runtime.start()
     if (existingThreadId) {
-      const resumed = asRecord(await this.#runtime.request('thread/resume', { threadId: existingThreadId }))
+      const resumed = asRecord(await this.#runtime.request('thread/resume', {
+        threadId: existingThreadId,
+        ...ASTER_THREAD_IDENTITY,
+      }))
       this.#hydrateThread(asRecord(resumed.thread))
       const turnId = await this.#startTurn({
         threadId: existingThreadId,
@@ -430,7 +453,9 @@ export class AgentService {
     const params: Record<string, JsonValue> = {
       approvalPolicy: input.approvalPolicy ?? 'never',
       cwd: workingPath,
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
       sandbox: input.sandbox ?? 'read-only',
+      serviceName: 'Aster',
     }
     if (input.model) params.model = input.model
     if (input.modelProvider) params.modelProvider = input.modelProvider
@@ -543,17 +568,21 @@ export class AgentService {
     overrides: { model?: string; modelProvider?: string } = {},
   ): Promise<void> {
     try {
-      const result = asRecord(await this.#runtime.request('thread/resume', { threadId, ...overrides }))
+      const result = asRecord(await this.#runtime.request('thread/resume', {
+        threadId,
+        ...ASTER_THREAD_IDENTITY,
+        ...overrides,
+      }))
       const thread = asRecord(result.thread)
       if (requireString(thread.id, 'thread.id') !== threadId) {
-        throw new Error('Codex resumed a different conversation.')
+        throw new Error('Aster 智能体引擎恢复了另一个任务。')
       }
       if (overrides.model && requireString(result.model, 'thread.resume.model') !== overrides.model) {
-        throw new Error(`Codex did not apply the selected model "${overrides.model}".`)
+        throw new Error(`Aster 智能体引擎未应用所选模型“${overrides.model}”。`)
       }
       if (overrides.modelProvider
         && requireString(result.modelProvider, 'thread.resume.modelProvider') !== overrides.modelProvider) {
-        throw new Error(`Codex did not apply the selected provider "${overrides.modelProvider}".`)
+        throw new Error(`Aster 智能体引擎未应用所选提供商“${overrides.modelProvider}”。`)
       }
       this.#hydrateThread(thread)
     } catch (error) {
@@ -664,7 +693,7 @@ export class AgentService {
       return
     }
     const goal = toThreadGoal(asRecord(rawGoal))
-    if (goal.threadId !== threadId) throw new Error('Codex returned a goal for another conversation.')
+    if (goal.threadId !== threadId) throw new Error('Aster 智能体引擎返回了其他任务的目标。')
     this.#update({ goals: { ...this.#snapshot.goals, [threadId]: goal } })
   }
 
@@ -920,7 +949,7 @@ function toThreadStatus(value: unknown): ConversationThreadStatus {
 
 function toThreadGoal(value: Record<string, unknown>): ThreadGoal {
   const status = requireString(value.status, 'goal.status')
-  if (!isThreadGoalStatus(status)) throw new Error('Codex returned an invalid goal.status.')
+  if (!isThreadGoalStatus(status)) throw new Error('Aster 智能体引擎返回了无效的 goal.status。')
   const tokenBudget = value.tokenBudget === null ? null : requireFiniteNumber(value.tokenBudget, 'goal.tokenBudget')
   return {
     threadId: requireString(value.threadId, 'goal.threadId'),
@@ -941,7 +970,7 @@ function isThreadGoalStatus(value: string): value is ThreadGoalStatus {
 
 function requireFiniteNumber(value: unknown, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
-    throw new Error(`Codex returned an invalid ${label}.`)
+    throw new Error(`Aster 智能体引擎返回了无效的 ${label}。`)
   }
   return value
 }
@@ -978,7 +1007,7 @@ function turnKey(threadId: string, turnId: string): string {
 }
 
 function asRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Codex returned an invalid object.')
+  if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('Aster 智能体引擎返回了无效对象。')
   return value as Record<string, unknown>
 }
 
@@ -992,7 +1021,7 @@ function asArray(value: unknown): unknown[] {
 }
 
 function requireString(value: unknown, label: string): string {
-  if (typeof value !== 'string' || !value) throw new Error(`Codex returned an invalid ${label}.`)
+  if (typeof value !== 'string' || !value) throw new Error(`Aster 智能体引擎返回了无效的 ${label}。`)
   return value
 }
 

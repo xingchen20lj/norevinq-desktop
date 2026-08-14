@@ -38,14 +38,14 @@ test('starts with a sandboxed renderer and real project action', async () => {
     args: ['.', `--user-data-dir=${profile}`],
     env: {
       ...process.env,
-      ASTER_CODEX_HOME: process.env.ASTER_TEST_CODEX_HOME ?? join(homedir(), '.codex'),
+      ASTER_AGENT_HOME: process.env.ASTER_TEST_AGENT_HOME ?? process.env.ASTER_TEST_CODEX_HOME ?? join(homedir(), '.codex'),
     },
   })
   try {
     const window = await application.firstWindow()
     await expect(window).toHaveTitle('Aster Code')
     await expect(window.getByRole('heading', { name: /开始处理 project-/ })).toBeVisible()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
 
     const runtime = await window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
@@ -114,7 +114,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await window.getByRole('button', { name: '关闭设置' }).click()
 
     await window.getByRole('button', { name: '安全', exact: true }).click()
-    const security = window.getByRole('dialog', { name: '安全工作台' })
+    const security = window.getByRole('dialog', { name: 'Aster 安全工作台' })
     await expect(security).toBeVisible()
     await expect.poll(async () => window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
@@ -139,7 +139,7 @@ test('starts with a sandboxed renderer and real project action', async () => {
     await expect(security).toContainText('产物目录已隔离')
     if (deepSeekConfigured) await expect(security).toContainText('deepseek · deepseek-v4-pro')
     await window.screenshot({ path: 'test-results/aster-security.png' })
-    await window.getByRole('button', { name: '关闭安全工作台' }).click()
+    await window.getByRole('button', { name: '关闭 Aster 安全工作台' }).click()
 
     await window.getByRole('button', { name: '计划任务', exact: true }).click()
     const scheduler = window.getByRole('dialog', { name: '计划任务工作台' })

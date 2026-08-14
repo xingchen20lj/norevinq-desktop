@@ -30,7 +30,7 @@ describe('Codex binary discovery', () => {
   it('orders explicit, environment, bundled runtime, PATH, then known macOS bundle candidates', () => {
     const candidates = getCodexBinaryCandidates({
       explicitBinary: '/configured/codex',
-      env: { CODEX_BINARY: '/environment/codex', PATH: '/first:/second' },
+      env: { ASTER_AGENT_BINARY: '/environment/aster-agent', CODEX_BINARY: '/legacy/codex', PATH: '/first:/second' },
       platform: 'darwin',
       arch: 'x64',
       resourcesPath: '/Aster Code.app/Contents/Resources',
@@ -39,7 +39,7 @@ describe('Codex binary discovery', () => {
 
     expect(candidates).toEqual([
       { path: '/configured/codex', source: 'explicit' },
-      { path: '/environment/codex', source: 'environment' },
+      { path: '/environment/aster-agent', source: 'environment' },
       { path: '/Aster Code.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-darwin-x64/vendor/x86_64-apple-darwin/bin/codex', source: 'bundled' },
       { path: '/first/codex', source: 'path' },
       { path: '/second/codex', source: 'path' },
@@ -95,6 +95,6 @@ describe('Codex binary discovery', () => {
     await expect(discoverCodexBinary({
       env: { PATH: '' },
       platform: 'linux',
-    })).rejects.toThrow('CODEX_BINARY')
+    })).rejects.toThrow('ASTER_AGENT_BINARY')
   })
 })

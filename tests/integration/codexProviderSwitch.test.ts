@@ -12,7 +12,7 @@ const providerTest = deepSeekKey ? test : test.skip
 
 providerTest('official Codex keeps one thread while switching between DeepSeek and OpenAI providers', async () => {
   const root = await mkdtemp(join(tmpdir(), 'aster-provider-switch-'))
-  const codexHome = join(root, 'codex-home')
+  const codexHome = join(root, 'agent-home')
   const projectPath = join(root, 'project')
   await Promise.all([mkdir(codexHome), mkdir(projectPath)])
   const child = spawn(bundledCodexEntrypoint(), [

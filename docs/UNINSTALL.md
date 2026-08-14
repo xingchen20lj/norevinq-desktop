@@ -12,7 +12,7 @@ macOS 正式包的 Bundle ID 是 `dev.astercode.desktop`，当前版本使用以
 | --- | --- |
 | 应用 | `/Applications/Aster Code.app` |
 | 全部主要用户数据 | `~/Library/Application Support/aster-code` |
-| Aster 专用 Codex home | `~/Library/Application Support/aster-code/codex-home` |
+| Aster 专用智能体目录 | `~/Library/Application Support/aster-code/agent-home` |
 | Security SDK 状态 | `~/Library/Application Support/aster-code/security/sdk-state` |
 | Security 扫描产物 | `~/Library/Application Support/aster-code/security/scans` |
 | SQLite、凭据密文、日志、缓存 | 均在 `~/Library/Application Support/aster-code` 内 |
@@ -118,20 +118,20 @@ security delete-generic-password \
 
 推出 Finder 中仍挂载的 `Aster Code` 磁盘映像，并删除不再需要的 DMG/ZIP。源码构建产生的仓库 `release/`、`node_modules/` 和包管理器全局缓存不属于已安装应用，需要时在源码仓库中另行清理。
 
-如果你曾自行在 shell 配置中写入 `DEEPSEEK_API_KEY`、`ASTER_CODEX_HOME`、`CODEX_BINARY` 或 `ASTER_UPDATE_URL`，卸载程序不会擅自修改这些用户配置。先定位配置行：
+如果你曾自行在 shell 配置中写入 `DEEPSEEK_API_KEY`、`ASTER_AGENT_HOME`、`ASTER_AGENT_BINARY` 或 `ASTER_UPDATE_URL`，卸载程序不会擅自修改这些用户配置。旧版兼容变量 `ASTER_CODEX_HOME`、`CODEX_BINARY` 也应一并检查。先定位配置行：
 
 ```bash
-rg -n 'DEEPSEEK_API_KEY|ASTER_CODEX_HOME|CODEX_BINARY|ASTER_UPDATE_URL' \
+rg -n 'DEEPSEEK_API_KEY|ASTER_AGENT_HOME|ASTER_AGENT_BINARY|ASTER_CODEX_HOME|CODEX_BINARY|ASTER_UPDATE_URL' \
   "$HOME/.zshrc" "$HOME/.zprofile" "$HOME/.bash_profile" "$HOME/.bashrc" 2>/dev/null
 ```
 
 只在确认不再供其他程序使用后，手动删除对应的 `export` 行，并在当前终端执行：
 
 ```bash
-unset DEEPSEEK_API_KEY ASTER_CODEX_HOME CODEX_BINARY ASTER_UPDATE_URL
+unset DEEPSEEK_API_KEY ASTER_AGENT_HOME ASTER_AGENT_BINARY ASTER_CODEX_HOME CODEX_BINARY ASTER_UPDATE_URL
 ```
 
-如果设置过 `ASTER_CODEX_HOME` 指向默认目录之外，还需在确认路径和数据不再需要后，单独删除那个自定义目录。
+如果设置过 `ASTER_AGENT_HOME`（或旧版 `ASTER_CODEX_HOME`）指向默认目录之外，还需在确认路径和数据不再需要后，单独删除那个自定义目录。
 
 ## 卸载结果验证
 

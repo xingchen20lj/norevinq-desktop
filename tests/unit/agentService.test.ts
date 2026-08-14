@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { AgentService } from '../../src/main/agent/agentService.js'
+import { AgentService, ASTER_AGENT_DEVELOPER_INSTRUCTIONS } from '../../src/main/agent/agentService.js'
 import type {
   JsonRpcNotificationHandler,
   JsonRpcRequestContext,
@@ -53,6 +53,10 @@ describe('AgentService', () => {
     expect(database.listProjectThreadIds(projectId)).toEqual(['thread-1'])
     expect(runtime.turnStarts).toBe(1)
     expect(runtime.turnCompletions).toBe(1)
+    expect(runtime.requests.find(({ method }) => method === 'thread/start')?.params).toMatchObject({
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
+      serviceName: 'Aster',
+    })
 
     service.dispose()
     database.close()
@@ -218,6 +222,9 @@ describe('AgentService', () => {
     expect(runtime.requests.map(({ method }) => method)).toEqual([
       'thread/list', 'thread/resume', 'thread/goal/get', 'turn/steer', 'turn/interrupt',
     ])
+    expect(runtime.requests.find(({ method }) => method === 'thread/resume')?.params).toMatchObject({
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
+    })
     service.dispose()
     database.close()
   })
@@ -269,6 +276,7 @@ describe('AgentService', () => {
     ])
     expect(runtime.requests[1]?.params).toEqual({ threadId: 'thread-1' })
     expect(runtime.requests[2]?.params).toEqual({
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
       threadId: 'thread-1', model: 'deepseek-v4-flash', modelProvider: 'deepseek',
     })
     expect(runtime.requests[3]?.params).toMatchObject({
@@ -276,6 +284,7 @@ describe('AgentService', () => {
     })
     expect(runtime.requests[4]?.params).toEqual({ threadId: 'thread-1' })
     expect(runtime.requests[5]?.params).toEqual({
+      developerInstructions: ASTER_AGENT_DEVELOPER_INSTRUCTIONS,
       threadId: 'thread-1', model: 'gpt-5.6-sol', modelProvider: 'openai',
     })
     expect(runtime.requests[6]?.params).toMatchObject({
