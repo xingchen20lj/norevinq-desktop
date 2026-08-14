@@ -4,8 +4,9 @@
 
 ## 2026-08-14 开源发布复核
 
-- 当前桌面会话没有暴露标准 Codex Security prompt-only scan 的启动工具，能力预检也无法确认所需并行运行时，因此未创建或伪称新的 sealed 扫描。
-- 使用仓库既有安全策略和攻击面基线完成父流程复核；重点检查 Electron sandbox/context isolation、顶层主窗口 IPC 授权、文件 token 身份绑定、loopback 浏览器策略、参数数组子进程、更新与发布工作流边界，未发现新的可报告问题。
+- 首轮桌面扫描入口不可用，因此没有把该轮人工复核伪称为 sealed 扫描。随后使用 Codex Security plugin `0.1.19` 的标准单次流程完成 prompt-only 扫描，并由官方 contract finalizer 成功密封；覆盖标记为 `partial`，没有把未逐文件审阅的官方生成协议和编译型第三方二进制算作完整覆盖。
+- 后续扫描确认当前预览版仍有 3 项中等和 5 项低风险工程问题待修复，因此无签名 DMG 只适合可信项目的受控内部体验，不满足公开安全发行标准。可利用细节按仓库安全策略保留在私有扫描报告中，修复并验证前不写入公开文档。
+- 没有发现当前 npm 依赖、官方 Codex 运行时或仓库代码已遭恶意替换的证据，也没有发现本机 ChatGPT 私有二进制被复制进安装包；这不构成对第三方编译二进制的可复现构建证明。
 - `pnpm audit:dependencies` 返回 0 个已知生产依赖漏洞；93 个生产组件声明与 lockfile 一致。
 - 当前树及 Git 历史凭据形状检查只命中测试占位符；未发现私钥、AWS access key 或测试目录外的 OpenAI/DeepSeek/GitHub token 形状值。
 - 新增 `check:open-source`，持续拒绝公共文本中的个人绝对路径、协议清单本机路径/时间戳、测试目录外凭据形状值，以及安装包缺少 LICENSE/NOTICE/第三方清单。
@@ -17,6 +18,7 @@
 - 运行定向单元/集成测试和一个不调用模型的 Electron 对抗测试。
 - 使用 Codex Security plugin 0.1.18 对 Stage 20 working-tree diff 完成七个安全相关文件的 discovery、候选验证和攻击路径校准；两个 release workflow 问题 survives validation，修复见下文。
 - 扫描的 unsealed `scan-manifest.json`、`findings.json`、`coverage.json` 和全部逐文件收据已生成，但 finalizer 拒绝 macOS `/var` 符号链接形式的扫描目录（要求 canonical non-symlink directory）。按扫描流程的单次 finalization 规则未重试，因此本文件不把该次扫描称为 sealed。在线 SDK sealed 扫描仍受账户使用量/费用限制。
+- 2026-08-14 的后续标准扫描使用规范化 `/private/tmp` 目录成功密封；报告留在私有扫描目录，不提交到公开仓库，本文只记录不可直接利用的汇总结论。
 
 ## 已验证并修复
 

@@ -72,6 +72,7 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 ## 文档
 
 - [新手构建指南](docs/BUILDING.md)
+- [macOS 完全卸载说明](docs/UNINSTALL.md)
 - [架构说明](docs/ARCHITECTURE.md)
 - [测试策略](docs/TESTING.md)
 - [安全策略](SECURITY.md)

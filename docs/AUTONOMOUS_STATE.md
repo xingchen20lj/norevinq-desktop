@@ -13,6 +13,9 @@
 
 ## 已完成任务
 
+- 新增 macOS 完全卸载说明，覆盖独立 userData、Aster Codex home、Security 扫描产物、托管工作树元数据、偏好、缓存、深链接、TCC 和 `safeStorage` 钥匙串项目，并明确系统日志/备份不属于应用可保证清除的边界。
+- 使用 Codex Security plugin 0.1.19 完成并密封标准单次部分覆盖扫描；确认默认 Aster Codex/Security 路径不与官方 `~/.codex` 冲突，同时将当前无签名 DMG 限定为可信项目内部体验包。扫描发现 3 项中等和 5 项低风险待修复问题，利用细节不写入未来公开仓库。
+
 - 初始化空 Git 仓库，默认分支为 `main`。
 - 获取 2026-08-10 当前 OpenAI Codex 官方手册。
 - 确认 Codex app-server 以省略 `jsonrpc` 字段的 JSON-RPC 2.0 工作，默认 stdio/JSONL，并要求 `initialize` → `initialized` 握手。
