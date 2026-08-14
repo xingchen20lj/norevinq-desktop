@@ -35,6 +35,8 @@ export default async function afterPack(context) {
     await rm(path, { recursive: true })
   }
 
+  await pruneCanvasPackages(resourcesRoot, context.electronPlatformName, arch)
+
   const securityPluginSource = await realpath(join(
     process.cwd(),
     'node_modules',
@@ -55,4 +57,30 @@ export default async function afterPack(context) {
     preserveTimestamps: true,
     recursive: true,
   })
+}
+
+async function pruneCanvasPackages(resourcesRoot, platform, arch) {
+  const napiRoot = join(resourcesRoot, 'app.asar.unpacked', 'node_modules', '@napi-rs')
+  const expectedPackage = canvasPackageName(platform, arch)
+  const entries = await readdir(napiRoot, { withFileTypes: true })
+  const canvasPackages = entries.filter(({ name }) => name.startsWith('canvas-'))
+  if (!canvasPackages.some(({ name }) => name === expectedPackage)) {
+    throw new Error(`Packaged Canvas runtime is missing ${expectedPackage}.`)
+  }
+
+  for (const entry of canvasPackages) {
+    if (entry.name === expectedPackage) continue
+    const path = join(napiRoot, entry.name)
+    const metadata = await lstat(path)
+    if (!metadata.isDirectory() || metadata.isSymbolicLink()) {
+      throw new Error(`Refusing to prune an unexpected packaged Canvas path: ${path}`)
+    }
+    await rm(path, { recursive: true })
+  }
+}
+
+function canvasPackageName(platform, arch) {
+  if (platform === 'darwin' && (arch === 'x64' || arch === 'arm64')) return `canvas-darwin-${arch}`
+  if (platform === 'win32' && (arch === 'x64' || arch === 'arm64')) return `canvas-win32-${arch}-msvc`
+  throw new Error(`Unsupported Canvas package target: ${platform}-${arch}`)
 }

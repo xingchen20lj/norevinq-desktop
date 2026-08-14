@@ -103,6 +103,6 @@
 | 性能 | 长活动、计划历史和有界缓存 | 已测试 | 5,000 活动/2,000 delta 与 3,000 SQLite 运行基准通过；离屏活动跳过布局，终端/日志/diff 均保持硬预算 |
 | 性能 | 冷启动和进程内存 | 已测试 | Intel macOS 全新 profile 实测首屏 2.15 s、DOMContentLoaded 345 ms、4 进程总工作集 307.1 MiB |
 | 测试 | 单元、集成、E2E、桌面冒烟 | 部分实现 | 最新完整门禁 38 个通过文件、198 项通过、1 项按凭据跳过；官方 0.147.0 account/thread/goal/permission-profile 与 provider-bound thread 集成、DeepSeek→OpenAI→DeepSeek 模型下拉框真实在线 E2E、离线 Electron 生命周期/Handoff/固定/深链接/更新/崩溃诊断/权限审批/账户、配置渠道和打包态 Security 预检通过；本分支远端 CI、Apple Silicon 真机与签名包回归待验证 |
-| 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；目标架构钩子确保 arm64 包只携带 arm64 官方 Codex，Electron/Codex Mach-O 已验证；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Apple Silicon 真机、Developer ID 与公证凭据外部阻塞 |
+| 发布 | macOS 打包/签名/公证流程 | 部分实现 | 独立图标、hardened runtime、entitlements、DMG/ZIP、CRC/解压/SHA-256 与挂载启动已测试；目标架构钩子确保包内只保留对应架构的官方 Codex 与 Canvas 原生 runtime，Electron/Codex Mach-O 和依赖枚举已验证；每次打包先安全清理输出，普通包显式禁止 Git remote 更新源推断；main-only immutable SHA + protected environment + pinned Actions 已加固；Apple Silicon 真机、Developer ID 与公证凭据外部阻塞 |
 | 发布 | Windows 打包/签名流程 | 部分实现 | x64/arm64 Codex optional 包、交互式 per-user NSIS、签名 secrets 守门、Authenticode 验证和 Windows 2025 workflow 已实现；真机、证书与 SmartScreen 待外部验证 |
 | 发布 | 开源许可证、构建指南与社区治理 | 已测试 | Apache-2.0、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南、公开发布检查表和隐私安全截图已加入；冻结安装、181 项测试、开源守门、生产构建、目录包和 packaged E2E 通过，法律资源已在真实 `.app` 中回读 |

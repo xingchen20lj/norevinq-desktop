@@ -34,6 +34,7 @@ if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
 }
 console.log(`Packaged Codex: ${version} (${binary})`)
 await verifySecurityPlugin(unpackedRoot)
+await verifyCanvasRuntime(unpackedRoot, binary)
 await verifyProtocolRegistration()
 console.log('Packaged deep-link protocol: norevinq')
 await verifyUpdateConfiguration(resourcesRoot)
@@ -88,6 +89,22 @@ async function verifySecurityPlugin(directory) {
     throw new Error(`Packaged Codex Security manifest has invalid identity: ${manifestPath}`)
   }
   console.log(`Packaged Codex Security plugin: ${manifest.version} (${pluginRoot})`)
+}
+
+async function verifyCanvasRuntime(directory, codexBinary) {
+  const napiRoot = join(directory, 'node_modules', '@napi-rs')
+  const packages = (await readdir(napiRoot, { withFileTypes: true }))
+    .filter(({ name }) => name.startsWith('canvas-'))
+  const targetArch = process.platform === 'darwin' && codexBinary.includes('aarch64-apple-darwin')
+    ? 'arm64'
+    : process.arch
+  const expected = process.platform === 'darwin'
+    ? `canvas-darwin-${targetArch}`
+    : `canvas-win32-${targetArch}-msvc`
+  if (packages.length !== 1 || packages[0]?.name !== expected || !packages[0].isDirectory()) {
+    throw new Error(`Expected only packaged Canvas runtime ${expected}, found: ${packages.map(({ name }) => name).join(', ')}`)
+  }
+  console.log(`Packaged Canvas runtime: ${expected}`)
 }
 
 async function verifyProtocolRegistration() {
