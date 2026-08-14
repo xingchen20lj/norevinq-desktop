@@ -34,7 +34,7 @@ import { UpdateService } from './update/updateService.js'
 import { createElectronUpdateDriver } from './update/electronUpdateDriver.js'
 import { DiagnosticsService } from './diagnostics/diagnosticsService.js'
 import { AccountService } from './account/accountService.js'
-import { prepareAsterCodexHome } from './runtime/codexHome.js'
+import { prepareAsterAgentHome } from './runtime/codexHome.js'
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'aster-file',
@@ -200,10 +200,16 @@ if (!gotLock) {
 
   void app.whenReady().then(async () => {
     const userData = app.getPath('userData')
-    const codexHome = prepareAsterCodexHome(userData, process.env.ASTER_CODEX_HOME)
-    process.env.CODEX_HOME = codexHome
+    const agentHome = prepareAsterAgentHome(
+      userData,
+      process.env.ASTER_AGENT_HOME ?? process.env.ASTER_CODEX_HOME,
+    )
+    process.env.CODEX_HOME = agentHome
     database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
-    const createdFileService = new FileService(database, { openPath: (path) => shell.openPath(path) })
+    const createdFileService = new FileService(database, {
+      openPath: (path) => shell.openPath(path),
+      trustedArtifactRoots: [join(agentHome, 'generated_images')],
+    })
     fileService = createdFileService
     protocol.handle('aster-file', (request) => serveFilePreview(request, createdFileService))
     const credentialStore = new CredentialStore(join(userData, 'credentials.json'), {
@@ -212,7 +218,7 @@ if (!gotLock) {
       decryptString: (value) => safeStorage.decryptString(value),
     })
     runtimeLogger = createLogger({
-      component: 'codex-runtime',
+      component: 'aster-agent-runtime',
       filePath: join(userData, 'logs', 'runtime.jsonl'),
       rotation: new SizeLimitedRotation(),
     })
@@ -231,7 +237,7 @@ if (!gotLock) {
     const deepSeekKey = environmentDeepSeekKey ?? vaultDeepSeekKey
     runtime = new CodexRuntimeSupervisor({
       logger: runtimeLogger,
-      fixedChildEnvironment: { CODEX_HOME: codexHome },
+      fixedChildEnvironment: { CODEX_HOME: agentHome },
       ...(deepSeekKey ? {
         childEnvironment: { [DEEPSEEK_ENV_KEY]: deepSeekKey },
         configOverrides: DEEPSEEK_CODEX_CONFIG_OVERRIDES,
@@ -254,7 +260,20 @@ if (!gotLock) {
     })
     agentService = createdAgentService
     integrationService = new IntegrationService(runtime, database)
-    securityService = new SecurityService(database, join(userData, 'security'))
+    securityService = new SecurityService(database, join(userData, 'security'), {
+      ...(app.isPackaged ? {
+        pluginPath: join(
+          process.resourcesPath,
+          'app.asar.unpacked',
+          'node_modules',
+          '@openai',
+          'codex-security',
+          '_bundled_plugin',
+        ),
+      } : {}),
+      deepSeekCredential: () => environmentDeepSeekKey ?? readStoredDeepSeekKey(credentialStore),
+      codexBinary: () => runtime?.getSnapshot().binaryPath ?? null,
+    })
     schedulerService = new SchedulerService(database, (task, projectId, signal) =>
       executeScheduledTask(createdAgentService, createdWorktreeService, task, projectId, signal))
     browserService = new BrowserService(() => mainWindow, (url) => shell.openExternal(url))

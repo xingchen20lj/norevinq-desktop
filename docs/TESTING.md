@@ -11,26 +11,30 @@ Aster Code 使用分层验证，避免以静态界面或模拟数据替代真实
 - `pnpm test:e2e`：构建后运行真实 Electron 桌面回归；需要可用的 Codex app-server 和相应账户凭据。
 - `pnpm test:e2e:offline`：不调用模型，验证 Electron 启动、主窗口 IPC 和非主 Renderer 拒绝；用于 macOS/Windows CI。
 - `pnpm test:e2e:performance`：用全新 profile 测量真实 Electron 冷启动、DOMContentLoaded 和总工作集。
-- `pnpm test:e2e:packaged`：直接启动打包后的 `.app`/`.exe`，验证包内 Codex 版本、路径、模型、ready 状态及更新渠道启用/禁用诊断。
+- `pnpm test:e2e:packaged`：直接启动打包后的 `.app`/`.exe`，验证包内 Codex 版本、路径、模型、ready 状态及更新渠道启用/禁用诊断；同时以真实 Git 夹具调用 DeepSeek Security 本地预检，证明 SDK bundled plugin 位于可 `realpath` 的 `app.asar.unpacked` 目录。
 - `ASTER_UPDATE_URL='https://updates.invalid/aster-code/' pnpm package:update`：仅用于本地生成元数据测试，验证 app-update/latest/blockmap/SHA-512；`.invalid` 构建不可发布。
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：不调用模型，以确定性 app-server 进程验证任务搜索、分页、重命名、分叉、压缩、归档、恢复、永久删除、单实例任务深链接及网络/路径权限子集审批的完整桌面流程。
 - `pnpm exec playwright test tests/e2e/github-pr.spec.ts`：不访问真实 GitHub；真实 Git 仓库向本地 bare remote 推送 feature 分支，确定性 `gh` 替身验证登录、仓库、Draft PR、正文 stdin、结构化回读、重复创建幂等和无关密钥隔离。
 - `pnpm exec playwright test tests/e2e/git-discard.spec.ts`：不调用模型；真实 Git 仓库验证整文件可恢复丢弃跨应用重启持久化，并恢复原文件内容。
 - `pnpm exec playwright test tests/e2e/ipc-security.spec.ts`：验证主窗口 IPC、恶意 Renderer 拒绝及浏览器宽屏右栏/窄屏底栏布局，包含键盘调整分隔条。
-- `pnpm exec playwright test tests/e2e/non-git-project.spec.ts`：打开真实普通文件夹，验证首页无 `worktree:list` Git fatal，工作树显示 Local-only 引导且 Codex 任务入口仍可用。
+- `pnpm exec playwright test tests/e2e/non-git-project.spec.ts`：打开真实普通文件夹，验证首页无 `worktree:list` Git fatal，工作树显示 Local-only 引导且 Aster 任务入口仍可用。
+- `DEEPSEEK_API_KEY=... pnpm exec playwright test tests/e2e/aster-identity.spec.ts`：用 DeepSeek V4 Flash 发起最小真实任务，验证普通回答使用 Aster 产品身份且不出现 Codex；无 Key 时自动跳过。
 - `pnpm exec playwright test tests/e2e/worktree-recovery.spec.ts`：构造目标已 apply 后崩溃及后续人工修改，重启验证恢复状态可见、安全重试失败关闭、恢复 ref 与人工文件均保留。
 - `pnpm exec playwright test tests/e2e/conversation-lifecycle.spec.ts`：除任务生命周期外，从非当前 `release/base` 分支选择不可变 OID 创建 detached worktree，并验证实际 HEAD/文件内容。
 - 2026-08-11 一次性显式线上回归：Aster Electron 主进程真实创建并回读私有 Draft PR #1；验证 `~/bin/gh` 发现、真实 push、owner/head/base/URL 和在线幂等。该外部写入测试不进入常规 CI，避免在重复运行中修改用户仓库。
 - `ASTER_TEST_LIVE_AUTH=1 pnpm exec vitest run tests/integration/codexThreadLifecycle.test.ts`：在隔离 `CODEX_HOME` 中额外向官方认证服务发起设备码登录并立即取消；不调用模型、不完成用户授权，常规 CI 不依赖该网络检查。
+- `pnpm exec vitest run tests/integration/codexProviderSwitch.test.ts`：存在本机 OpenAI 登录与 `DEEPSEEK_API_KEY` 时，真实创建 OpenAI/DeepSeek provider-bound thread 并完成双向模型回答；缺少任一凭据时跳过，不能用协议回显代替在线成功。
+- `pnpm build && pnpm exec playwright test tests/e2e/provider-switch.spec.ts`：隔离复制现有登录，真实从模型下拉框执行 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro，验证历史上下文迁移且无错误活动卡。直接运行 Playwright 前必须 build，避免 Electron 启动旧 `out/main`。
 - `pnpm check:bundle`：从生产 HTML 校验首屏 JS/CSS 与 Renderer 总资产预算。
 - `pnpm check:workflows`：拒绝非完整提交 SHA 的远程 Action，并验证发布 workflow 的 main/ref/environment/签名守门。
+- `pnpm check:open-source`：检查许可证、社区文件、仓库元数据、稳定 Codex schema 来源、安装包法律资源，并拒绝公开文本中的个人绝对路径或测试目录外的凭据形状值。
 - `pnpm audit:dependencies`：查询当前漏洞数据库并拒绝生产依赖的高严重度问题。
 - `pnpm audit:licenses`：列出生产依赖许可证，发布前用于生成 third-party notices。
 - `pnpm notices:generate` / `pnpm notices:check`：从锁定的生产依赖图生成或校验根目录 `THIRD_PARTY_NOTICES.md`。
 
 覆盖率是回归缺口信号，不等同于功能完成。全局最低门槛为 statements 78%、branches 65%、functions 80%、lines 85%；关键安全边界仍要求针对性断言和真实运行证据。
 
-2026-08-11 GitHub PR 线上修复后基线：34 个测试文件、159 项；statements 80.62%、branches 69.16%、functions 85.40%、lines 87.45%。
+2026-08-14 开源准备分支基线：36 个测试文件、181 项；statements 80.92%、branches 69.48%、functions 85.99%、lines 87.79%。
 
 ## 自动化层级
 

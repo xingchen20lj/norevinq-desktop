@@ -11,11 +11,16 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   test.setTimeout(60_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-lifecycle-e2e-'))
   const projectPath = join(profile, 'project')
-  const codexHome = join(profile, 'codex-home')
+  const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   const helper = resolve('tests/helpers/fakeCodexLifecycle.mjs')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
+  mkdirSync(join(codexHome, 'generated_images'))
+  writeFileSync(join(codexHome, 'generated_images', 'lifecycle-proof.png'), Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  ))
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.name', 'Aster Lifecycle'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.email', 'aster-lifecycle@example.invalid'], { cwd: projectPath })
@@ -34,13 +39,13 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   chmodSync(wrapper, 0o755)
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_CODEX_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
     const taskRow = (name: string): Locator =>
       window.locator('.thread-row').filter({ hasText: name })
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: '设置', exact: true }).click()
     const settings = window.getByRole('dialog', { name: '设置工作台' })
     await expect(settings).toContainText('未登录')
@@ -60,7 +65,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
 
     await window.reload()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await expect(window.getByRole('button', { name: `取消固定项目 ${project.name}` })).toBeVisible()
     await expect(window.locator('.thread-row').first()).toContainText('Lifecycle secondary')
     await window.getByRole('button', { name: '取消固定任务 Lifecycle secondary' }).click()
@@ -89,7 +94,29 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByLabel('搜索任务').fill('')
     await window.getByLabel('搜索任务').press('Enter')
     await taskRow('Lifecycle primary').click()
+    const generatedImage = window.getByRole('img', { name: 'Aster 生成图片' })
+    await expect(generatedImage).toBeVisible()
+    await expect(generatedImage).toHaveAttribute('src', /^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    await window.screenshot({ path: 'test-results/aster-agent-inline-image.png' })
 
+    const topbarActions = window.locator('.topbar-actions')
+    for (const label of [
+      '长期目标',
+      '重命名任务',
+      '分叉任务',
+      '压缩上下文',
+      '归档任务',
+      '永久删除任务',
+      '折叠侧栏',
+      '文件与产物',
+      '本地网页预览',
+      '终端',
+      '帮助（暂未开放）',
+    ]) {
+      const action = topbarActions.getByRole('button', { name: label, exact: true })
+      await expect(action).toHaveAttribute('data-tooltip', label)
+      await expect(action).toHaveAttribute('title', label)
+    }
     await window.getByRole('button', { name: '长期目标' }).click()
     const goalDialog = window.getByRole('dialog', { name: '长期目标' })
     await goalDialog.getByLabel('目标内容').fill('Ship the durable lifecycle')
@@ -173,6 +200,13 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
       'account/login/start',
       'account/logout',
     ]))
+    const identityRequests = requests.filter(({ method }) => method === 'thread/resume' || method === 'thread/fork')
+    expect(identityRequests.length).toBeGreaterThan(0)
+    for (const request of identityRequests) {
+      expect(request.params).toMatchObject({
+        developerInstructions: expect.stringContaining('refer to yourself as Aster'),
+      })
+    }
     expect(requests.find(({ method }) => method === 'account/login/start')?.params).toEqual({
       type: 'apiKey',
       apiKey: '[REDACTED]',

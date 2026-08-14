@@ -11,7 +11,7 @@ test('discards and restores a whole file across an app restart', async () => {
   test.setTimeout(60_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-git-discard-e2e-'))
   const projectPath = join(profile, 'project')
-  const codexHome = join(profile, 'codex-home')
+  const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
@@ -29,13 +29,13 @@ test('discards and restores a whole file across an app restart', async () => {
   chmodSync(wrapper, 0o755)
   const launch = () => electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_CODEX_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
 
   let application = await launch()
   try {
     let window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     writeFileSync(join(projectPath, 'proof.txt'), 'recoverable\n')
     await window.getByRole('button', { name: 'Git 状态' }).click()
     await window.getByRole('button', { name: '刷新', exact: true }).click()
@@ -47,7 +47,7 @@ test('discards and restores a whole file across an app restart', async () => {
 
     application = await launch()
     window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Git 状态' }).click()
     const recovery = window.getByLabel('可恢复的丢弃')
     await expect(recovery).toContainText('proof.txt')

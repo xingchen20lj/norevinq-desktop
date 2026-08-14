@@ -15,7 +15,7 @@ flowchart LR
   Main --> Git["Git / GitHub CLI 服务"]
   Main --> DB["SQLite 状态库"]
   Main --> Keys["系统凭据保险库"]
-  Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.8"]
+  Main --> Security["隔离 SDK runtime<br/>Codex Security 0.1.11"]
   Main --> Scheduler["SQLite / RRULE<br/>计划任务队列"]
   Main --> Files["路径沙箱 / 流式协议<br/>文件与产物预览"]
   Main --> Browser["隔离 WebContentsView<br/>loopback 网页预览"]
@@ -28,7 +28,7 @@ flowchart LR
 - `src/preload`：白名单 API；不暴露 `ipcRenderer`、文件系统或进程对象。
 - `src/renderer`：React UI 与展示状态。
 - `src/shared`：IPC schema、领域事件、模型能力和公共类型。
-- `src/main/runtime`：私有 Codex home、app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
+- `src/main/runtime`：私有 Aster `agent-home`、app-server 启动、握手、请求关联、事件正规化、恢复、脱敏日志。
 - `src/main/agent`：thread/turn 服务、server request 审批、活动 reducer、状态订阅与历史恢复。
 - `src/main/providers`：provider 生命周期、能力目录和仅进程级 Codex 配置；不写用户全局 Codex 配置。
 - `src/main/account`：稳定 app-server 账户读取、API Key/ChatGPT 托管登录、官方域外链、用量和登录重启状态机；不持有可读 token 库。
@@ -39,7 +39,7 @@ flowchart LR
 - `src/main/worktree`：仓库外托管 worktree、数据库恢复、ownership 校验、锁定/删除和受限 include 复制。
 - `src/main/git`：仓库状态、worktree、diff、stage/revert/commit/push。
 - `src/main/terminal`：PTY 生命周期和有界输出。
-- `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.8/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
+- `src/main/security/securityService.ts`：独立于主 app-server 的 SDK 0.1.11/内置 Codex 0.144.6 扫描运行时、AbortSignal、进度、SQLite 历史和有界 artifact/CLI 操作。SDK 自身以异步子进程执行模型工作；主进程只接收回调，不在 renderer 加载 SDK。
 - `src/main/scheduler`：IANA 时区/RFC 5545 RRULE、SQLite 持久化队列、错过运行、重试、取消和真实 app-server/worktree 执行。
 - `src/main/files`：项目/worktree 根绑定、逐段 symlink 拒绝、有界文本读取、不透明媒体 token、Range 流和外部打开策略。
 - `src/main/browser`：独立临时 session、loopback URL/子资源策略、原生 WebContentsView 生命周期、权限拒绝、控制台与导航状态。
@@ -67,10 +67,12 @@ flowchart LR
 19. 浏览器工作台在宽屏占用独立右侧栏、在窄屏占用独立底部栏；不能覆盖任务时间线或 composer。分隔条同时支持指针和键盘调整，Renderer 的占位尺寸是原生 WebContentsView bounds 的唯一来源。
 20. 窗口状态只由主进程写入内部 SQLite；恢复前必须验证数值、最小尺寸和当前显示器交集，损坏状态回退默认值。
 21. GitHub PR 只在用户二次确认后写入；正文经 stdin，`gh` 使用最小环境，head/base 从登记远端重建，结果必须通过结构化回读和同源 URL 校验。
-22. Aster app-server 固定使用 Electron `userData/codex-home`；不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为仓库指令读取，不属于桌面私有状态。
+22. Aster app-server 固定使用 Electron `userData/agent-home`；旧版 `codex-home` 会安全迁移，不会继承用户或官方应用的 `CODEX_HOME`，提供商热重载也不能覆盖。项目内 `.codex`/`AGENTS.md` 仍作为上游兼容仓库指令读取，不属于桌面私有状态。
+23. 普通界面、活动作者和任务回答采用 Aster 产品身份；`thread/start`、`thread/resume` 与 `thread/fork` 注入一致的透明身份指令。技术文档、许可、诊断和协议层继续保留 OpenAI Codex/Codex Security 的真实名称与归属。
 23. 整文件丢弃先用 Git stash 事务捕获 index/worktree/untracked 状态，再移动到 `refs/aster/discards/<uuid>` 并删除临时 stash 项；恢复成功后才删除 ref，失败时保留恢复点且绝不自动清理可能包含外部并发编辑的冲突文件。
 24. 普通项目目录不要求预先存在 Git；Git/工作树能力必须返回显式未初始化状态。工作树基线只能来自主进程枚举的 HEAD/heads/remotes/tags，创建前再次解析并匹配 UI 所见 OID，再以不可变 OID调用 Git，防止 ref 移动造成错误基线。
 25. 工作树 Handoff 是跨任务关联与 Git 修改的持久化事务：修改快照固定为 Aster 自有 Git ref，并保存源/目标 HEAD、工作树 tree 和 index tree；只有任务关联提交后才删除 ref。启动恢复只能在内容身份完全匹配时自动清理，检测到人工修改必须失败关闭并保留恢复点。
+26. macOS Deep Security 的 discovery worker 不叠加第二层 Seatbelt：官方协调器必须先提供可验证的 managed 父沙箱元数据，Aster 的私有 wrapper 还要求 scan ID 与精确 worker 命令形状，才把子进程 `read-only` 改为 `danger-full-access`。这个值只描述子进程不再创建新 Seatbelt；继承的外层 `codex_security_scan` 文件和网络限制仍是实际权限上限。其他命令、模式和平台原样转发。详见 ADR 0002。
 
 ## 上游与公开资料
 

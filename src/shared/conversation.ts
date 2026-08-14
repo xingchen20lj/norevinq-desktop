@@ -85,6 +85,8 @@ export type StartConversationInput = {
 export type StartTurnInput = {
   threadId: string
   text: string
+  model?: string
+  modelProvider?: string
   reasoningEffort?: string
 }
 

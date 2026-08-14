@@ -1,6 +1,15 @@
 # 安全审计与加固记录
 
-审计日期：2026-08-11，生产依赖复审于 2026-08-13。范围为当前仓库生产源码、Electron 配置、IPC、文件/浏览器边界、子进程、凭据、生产依赖和发布流水线。
+审计日期：2026-08-11，生产依赖复审于 2026-08-13，开源发布复核于 2026-08-14。范围为当前仓库生产源码、Electron 配置、IPC、文件/浏览器边界、子进程、凭据、生产依赖和发布流水线。
+
+## 2026-08-14 开源发布复核
+
+- 首轮桌面扫描入口不可用，因此没有把该轮人工复核伪称为 sealed 扫描。随后使用 Codex Security plugin `0.1.19` 的标准单次流程完成 prompt-only 扫描，并由官方 contract finalizer 成功密封；覆盖标记为 `partial`，没有把未逐文件审阅的官方生成协议和编译型第三方二进制算作完整覆盖。
+- 后续扫描确认当前预览版仍有 3 项中等和 5 项低风险工程问题待修复，因此无签名 DMG 只适合可信项目的受控内部体验，不满足公开安全发行标准。可利用细节按仓库安全策略保留在私有扫描报告中，修复并验证前不写入公开文档。
+- 没有发现当前 npm 依赖、官方 Codex 运行时或仓库代码已遭恶意替换的证据，也没有发现本机 ChatGPT 私有二进制被复制进安装包；这不构成对第三方编译二进制的可复现构建证明。
+- `pnpm audit:dependencies` 返回 0 个已知生产依赖漏洞；93 个生产组件声明与 lockfile 一致。
+- 当前树及 Git 历史凭据形状检查只命中测试占位符；未发现私钥、AWS access key 或测试目录外的 OpenAI/DeepSeek/GitHub token 形状值。
+- 新增 `check:open-source`，持续拒绝公共文本中的个人绝对路径、协议清单本机路径/时间戳、测试目录外凭据形状值，以及安装包缺少 LICENSE/NOTICE/第三方清单。
 
 ## 方法与限制
 
@@ -9,6 +18,7 @@
 - 运行定向单元/集成测试和一个不调用模型的 Electron 对抗测试。
 - 使用 Codex Security plugin 0.1.18 对 Stage 20 working-tree diff 完成七个安全相关文件的 discovery、候选验证和攻击路径校准；两个 release workflow 问题 survives validation，修复见下文。
 - 扫描的 unsealed `scan-manifest.json`、`findings.json`、`coverage.json` 和全部逐文件收据已生成，但 finalizer 拒绝 macOS `/var` 符号链接形式的扫描目录（要求 canonical non-symlink directory）。按扫描流程的单次 finalization 规则未重试，因此本文件不把该次扫描称为 sealed。在线 SDK sealed 扫描仍受账户使用量/费用限制。
+- 2026-08-14 的后续标准扫描使用规范化 `/private/tmp` 目录成功密封；报告留在私有扫描目录，不提交到公开仓库，本文只记录不可直接利用的汇总结论。
 
 ## 已验证并修复
 
@@ -26,11 +36,11 @@
 
 ### 高：Codex Security 的 PDF.js 传递依赖漏洞
 
-`@openai/codex-security@0.1.8` 固定 `pdfjs-dist@5.6.205`，命中 GHSA-hq66-cqwq-w95j（恶意 PDF 任意 JavaScript 执行）。工作区使用 pnpm override 固定到已修复的 `6.2.108`；Node 24 满足其引擎要求。复扫结果为 `No known vulnerabilities found`，SDK 服务测试、构建与本地预检路径继续通过。
+Codex Security 依赖树曾固定 `pdfjs-dist@5.6.205`，命中 GHSA-hq66-cqwq-w95j（恶意 PDF 任意 JavaScript 执行）。工作区使用 pnpm override 固定到已修复的 `6.2.108`；Node 24 满足其引擎要求。当前 SDK 0.1.11 继续由生产依赖审计、SDK 服务测试、构建与本地预检守门。
 
 ### 高：Codex Security 的 extract-zip 传递依赖漏洞
 
-2026-08-13 npm 审计新增 GHSA-jmr9-qjv8-65gv：`@openai/codex-security@0.1.8` 固定的 `extract-zip@2.0.1` 对符号链接目标缺少完整验证，恶意 ZIP 可在解压根外写入。公告把修复版标为 `2.0.2`，但 npm registry 当时尚未发布该版本；项目没有降低审计阈值，而是用 pnpm alias 精确替换为 Electron 官方、带 npm provenance 的兼容实现 `@electron-internal/extract-zip@1.0.5`。生产审计恢复为 `No known vulnerabilities found`，Codex Security 0.1.8 真实 preflight、169 项回归与 macOS/Windows CI 作为兼容性守门。
+2026-08-13 npm 审计新增 GHSA-jmr9-qjv8-65gv：当时 Codex Security 依赖树固定的 `extract-zip@2.0.1` 对符号链接目标缺少完整验证，恶意 ZIP 可在解压根外写入。公告把修复版标为 `2.0.2`，但 npm registry 当时尚未发布该版本；项目没有降低审计阈值，而是用 pnpm alias 精确替换为 Electron 官方、带 npm provenance 的兼容实现 `@electron-internal/extract-zip@1.0.5`。该替换在 SDK 0.1.11 下继续保留，并由生产审计、真实 preflight、回归与 macOS/Windows CI 守门。
 
 ### 中：IPC handler 未统一验证调用 WebContents
 

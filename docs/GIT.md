@@ -8,7 +8,7 @@
 - remote/branch 使用保守 ref 字符集并拒绝 option-like 值。
 - 子进程设置 `GIT_TERMINAL_PROMPT=0`，不会在后台挂起等待凭据输入。
 - 普通命令 30 秒、commit/push 120 秒，stdout/stderr 最大 8 MiB；返回 UI 的错误最多 4,000 字符。
-- 当前没有实现 discard/revert，因此不会以“撤销”名义不可恢复地删除用户未提交内容。
+- 整文件 discard 使用专用可恢复 Git ref，逐 hunk revert 需要显式确认；两者都在执行前验证快照、路径与目标状态。
 - GitHub CLI 仅由主进程启动；只继承系统、代理/证书、SSH agent 和 GitHub 专属认证变量，错误统一脱敏，输出限制为 1 MiB。
 - Electron GUI 不假定继承登录 shell PATH；按显式 `GH_BINARY`、绝对 PATH、`~/bin`、`~/.local/bin`、Homebrew 与 Windows GitHub CLI 标准位置发现可执行文件，发布包不硬编码本机路径。
 - PR body 通过 stdin 提交，head/base 从登记远端重建；URL 和 JSON 结果必须匹配认证主机与目标仓库。
@@ -31,7 +31,7 @@
 - 创建本地 bare remote，真实 push `main` 并断言 `origin/main`、remote fetch/push URL。
 - Electron E2E 中 OpenAI/DeepSeek 智能体真实创建文件；Git 面板刷新后逐文件暂存并真实 commit，最终工作区干净。
 - GitHub PR Electron E2E 对真实临时仓库执行 feature 分支 push 到本地 bare remote；确定性 `gh` 替身验证正文 stdin、Draft #42、结构化回读、重复调用不创建第二个 PR，以及无关密钥不进入子进程。
-- Aster 桌面真实发现 `~/bin/gh`，向私有 `xingchen20lj/aster-code-desktop` 推送 `codex/github-pr-validation` 并创建 Draft PR #1；修正 list/create 的 head 参数差异后，在线结构化回读和重复创建幂等均通过。
+- Aster 桌面真实发现用户级 `gh`，向受控测试远端推送 feature 分支并创建 Draft PR；修正 list/create 的 head 参数差异后，在线结构化回读和重复创建幂等均通过。
 
 ## GitHub CLI 公开协议基线
 

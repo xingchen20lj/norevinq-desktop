@@ -66,7 +66,9 @@ import type { UpdateSnapshot } from '../../shared/update'
 import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
 import type { AccountSnapshot } from '../../shared/account'
 import type { CommandAction } from './CommandPalette'
+import { parseAgentMessage } from '../../shared/agentMessage'
 
+const AgentImage = lazy(() => import('./AgentImage').then(({ AgentImage: component }) => ({ default: component })))
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
 const CommandPalette = lazy(() => import('./CommandPalette').then(({ CommandPalette: component }) => ({ default: component })))
 const FileWorkbench = lazy(() => import('./FileWorkbench').then(({ FileWorkbench: component }) => ({ default: component })))
@@ -518,7 +520,7 @@ export function App(): React.JSX.Element {
   }
 
   async function compactSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Codex 会保留摘要并继续使用同一任务。')) return
+    if (!selectedThread || !window.confirm('压缩此任务的长上下文？Aster 会保留摘要并继续使用同一任务。')) return
     await runThreadAction(() => window.aster.compactConversation({ threadId: selectedThread.id }))
   }
 
@@ -530,7 +532,7 @@ export function App(): React.JSX.Element {
   }
 
   async function deleteSelectedThread(): Promise<void> {
-    if (!selectedThread || !window.confirm('永久删除此任务及其 Codex 历史？此操作无法撤销。')) return
+    if (!selectedThread || !window.confirm('永久删除此任务及其 Aster 历史？此操作无法撤销。')) return
     await runThreadAction(() => window.aster.deleteConversation({ threadId: selectedThread.id }))
   }
 
@@ -558,6 +560,7 @@ export function App(): React.JSX.Element {
         snapshot = await window.aster.startTurn({
           threadId: selectedThread.id,
           text,
+          ...(model ? { model, modelProvider: providerForModel(model) } : {}),
           ...(effort ? { reasoningEffort: effort } : {}),
         })
       }
@@ -586,7 +589,7 @@ export function App(): React.JSX.Element {
       setBrowserOpen(false)
     }
     if (runtime?.phase !== 'ready') {
-      setError('Codex app-server 尚未就绪，无法启动终端。')
+      setError('Aster 智能体引擎尚未就绪，无法启动终端。')
       return
     }
     const worktreeId = selectedWorktree?.id ?? null
@@ -623,14 +626,14 @@ export function App(): React.JSX.Element {
 
   const shortcutModifier = bootstrap?.platform === 'darwin' ? '⌘' : 'Ctrl+'
   const commands: CommandAction[] = [
-    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Codex 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
+    { id: 'new-task', label: '新建任务', detail: '在当前项目开始新的 Aster 任务', shortcut: `${shortcutModifier}N`, disabled: !selectedProject, run: () => setNewTask(true) },
     { id: 'open-project', label: '打开项目', detail: '使用系统目录选择器添加本地项目', run: openProject },
     { id: 'files', label: '文件与产物', detail: '浏览当前项目或工作树中的真实文件', disabled: !selectedProject, run: () => openFiles() },
     { id: 'terminal', label: '打开终端', detail: '打开绑定当前任务上下文的 app-server PTY', shortcut: `${shortcutModifier}\``, disabled: !selectedProject, run: openTerminal },
     { id: 'browser', label: '本地网页预览', detail: '打开受限 loopback WebContentsView', run: () => { setFilesOpen(false); setTerminalOpen(false); setBrowserOpen(true) } },
     { id: 'git', label: 'Git 工作区', detail: '查看状态、差异、暂存和提交', disabled: !selectedProject, run: () => setGitOpen(true) },
     { id: 'scheduler', label: '计划任务', detail: '管理自动化与运行收件箱', run: () => setSchedulerOpen(true) },
-    { id: 'security', label: '安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
+    { id: 'security', label: 'Aster 安全工作台', detail: '扫描、漏洞、报告和设置', run: () => setSecurityOpen(true) },
     { id: 'settings', label: '设置', detail: '提供商、MCP、技能和配置', run: () => setSettingsOpen(true) },
     { id: 'theme-system', label: '外观：跟随系统', detail: '实时跟随操作系统深浅外观', run: () => setThemePreference('system') },
     { id: 'theme-light', label: '外观：浅色', detail: '固定使用浅色主题', run: () => setThemePreference('light') },
@@ -651,6 +654,7 @@ export function App(): React.JSX.Element {
         : await window.aster.startTurn({
           threadId: selectedThread.id,
           text,
+          ...(model ? { model, modelProvider: providerForModel(model) } : {}),
           ...(effort ? { reasoningEffort: effort } : {}),
         })
       setConversations(snapshot)
@@ -766,30 +770,36 @@ export function App(): React.JSX.Element {
               <GitBranch size={13} />{gitStatus?.branch ?? (gitStatus?.initialized ? 'Detached' : 'Local')}
               {gitStatus && gitStatus.files.length > 0 && <b>{gitStatus.files.length}</b>}
             </button>}
-            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? runtime?.binaryPath ?? undefined}>
-              <span className="runtime-dot" /> Codex {runtimeLabel(runtime)}
+            <span className={`runtime-pill ${runtime?.phase ?? 'starting'}`} title={runtime?.error ?? 'Aster 智能体引擎状态'}>
+              <span className="runtime-dot" /> Aster {runtimeLabel(runtime)}
             </span>
           </div>
           <div className="topbar-actions">
             {selectedThread && !newTask && <>
-              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
-              <button className="icon-button" aria-label="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
-              <button className="icon-button" aria-label="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
-              <button className="icon-button" aria-label="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
-              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
-              <button className="icon-button danger-action" aria-label="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
+              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" data-tooltip="长期目标" title="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
+              <button className="icon-button" aria-label="重命名任务" data-tooltip="重命名任务" title="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
+              <button className="icon-button" aria-label="分叉任务" data-tooltip="分叉任务" title="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
+              <button className="icon-button" aria-label="压缩上下文" data-tooltip="压缩上下文" title="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
+              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} data-tooltip={conversations?.listArchived ? '恢复任务' : '归档任务'} title={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
+              <button className="icon-button danger-action" aria-label="永久删除任务" data-tooltip="永久删除任务" title="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
             </>}
-            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
-            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
-            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
-            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
-            <button className="icon-button" aria-label="帮助"><CircleHelp size={17} /></button>
+            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} data-tooltip={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} title={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" data-tooltip="文件与产物" title="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
+            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" data-tooltip="本地网页预览" title="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
+            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" data-tooltip="终端" title="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
+            <button className="icon-button" aria-label="帮助（暂未开放）" data-tooltip="帮助（暂未开放）" title="帮助（暂未开放）"><CircleHelp size={17} /></button>
           </div>
         </header>
 
         <section className={`workspace ${selectedThread && !newTask ? 'conversation-workspace' : ''}`}>
           {selectedThread && !newTask ? (
-            <ActivityTimeline state={activityState} goal={selectedGoal} openFile={(path) => openFiles(path)} />
+            <ActivityTimeline
+              state={activityState}
+              goal={selectedGoal}
+              projectId={selectedProject?.id ?? null}
+              worktreeId={selectedWorktree?.id ?? null}
+              openFile={(path) => openFiles(path)}
+            />
           ) : (
             <Welcome selectedProject={selectedProject} runtime={runtime} isOpening={isOpening} openProject={openProject} />
           )}
@@ -814,14 +824,14 @@ export function App(): React.JSX.Element {
             />
             <div className="composer-footer">
               <div className="composer-options">
-                <select aria-label="模型" value={model} onChange={(event) => {
+                <select aria-label="模型" value={model} disabled={activeTurn || isSubmitting} onChange={(event) => {
                   const nextModel = runtime?.models.find(({ id }) => id === event.target.value)
                   setModel(event.target.value)
                   setEffort(nextModel?.defaultReasoningEffort ?? nextModel?.supportedReasoningEfforts[0] ?? '')
                 }}>
                   {runtime?.models.map((item) => <option value={item.id} key={item.id} disabled={item.hidden}>{item.displayName}</option>)}
                 </select>
-                <select aria-label="推理强度" value={effort} onChange={(event) => setEffort(event.target.value)}>
+                <select aria-label="推理强度" value={effort} disabled={activeTurn || isSubmitting} onChange={(event) => setEffort(event.target.value)}>
                   {(selectedModel?.supportedReasoningEfforts ?? []).map((item) => <option value={item} key={item}>{item}</option>)}
                 </select>
                 <button type="button" onClick={() => setWorktreeOpen(true)}><GitBranch size={13} />{selectedWorktree ? 'Worktree' : 'Local'}</button>
@@ -918,7 +928,7 @@ export function App(): React.JSX.Element {
       {goalOpen && <div className="thread-dialog-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setGoalOpen(false) }}>
         <form className="thread-dialog goal-dialog" role="dialog" aria-label="长期目标" onSubmit={(event) => { event.preventDefault(); void saveGoal() }}>
           <h2>长期目标</h2>
-          <p>目标由 Codex app-server 持久化，可在后续任务中继续跟踪用量与状态。</p>
+          <p>目标由 Aster 智能体引擎持久化，可在后续任务中继续跟踪用量与状态。</p>
           <label><span>目标</span><textarea autoFocus aria-label="目标内容" maxLength={10_000} rows={5} value={goalObjective} onChange={(event) => setGoalObjective(event.target.value)} /></label>
           <label><span>状态</span><select aria-label="目标状态" value={goalStatus} onChange={(event) => setGoalStatus(event.target.value as ThreadGoalStatus)}>
             <option value="active">进行中</option>
@@ -1029,11 +1039,11 @@ function WorktreePanel({ project, items, selected, close, update, select, onErro
       {recovery.error && <small>{recovery.error}</small>}
       <button disabled={busy} onClick={() => void retryRecovery(recovery.id)}>安全重试</button>
     </div>)}
-    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Codex 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
+    {baseCatalog?.repositoryInitialized === false ? <div className="worktree-init-note"><strong>此文件夹还不是 Git 仓库</strong><span>普通 Aster 任务仍可使用；如需隔离工作树，请先在 Git 面板初始化仓库并创建首次提交。</span></div> : <>
       {baseCatalog?.repositoryInitialized && baseCatalog.bases.length === 0 && <div className="worktree-init-note"><strong>Git 仓库还没有提交</strong><span>请先创建首次提交，再从提交基线建立隔离工作树。</span></div>}
       <div className="worktree-base-picker"><label><span>创建基线</span><select aria-label="工作树基线" disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} value={baseRef} onChange={(event) => setBaseRef(event.target.value)}>{baseCatalog?.bases.map((base) => <option key={base.ref} value={base.ref}>{baseKindLabel(base.kind)} · {base.label} · {base.oid.slice(0, 7)}</option>)}</select></label><button disabled={busy} onClick={() => { setBaseCatalog(null); void window.aster.listWorktreeBases({ projectId: project.id }).then((catalog) => { setBaseCatalog(catalog); if (!catalog.bases.some((base) => base.ref === baseRef)) setBaseRef('HEAD') }).catch((reason: unknown) => onError(toErrorMessage(reason))) }}>刷新</button></div>
       {baseCatalog?.truncated && <p className="worktree-warning">基线列表已限制为前 500 项。</p>}
-      <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选新分支：codex/feature-name" /><button disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} onClick={() => void create()}><Plus size={13} />创建</button></div>
+      <div className="worktree-create"><input aria-label="工作树分支" value={branch} onChange={(event) => setBranch(event.target.value)} placeholder="可选新分支：aster/feature-name" /><button disabled={busy || !baseCatalog || baseCatalog.bases.length === 0} onClick={() => void create()}><Plus size={13} />创建</button></div>
     </>}
     <button disabled={busy} className={`worktree-row ${selected === null ? 'selected' : ''}`} onClick={() => void select(null)}><GitBranch size={14} /><span><strong>Local</strong><small>{project.path}</small></span></button>
     {items.map((item) => <div className={`worktree-row ${selected?.id === item.id ? 'selected' : ''}`} key={item.id}>
@@ -1466,21 +1476,23 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
     <div className="hero-orbit" aria-hidden="true"><div className="hero-core"><Sparkles size={27} /></div></div>
     <p className="eyebrow">LOCAL-FIRST CODING AGENT</p>
     <h1>{selectedProject ? `开始处理 ${selectedProject.name}` : '把复杂开发工作交给智能体'}</h1>
-    <p className="hero-subtitle">{selectedProject?.path ?? '由 Codex app-server 驱动的本地智能编程工作台'}</p>
+    <p className="hero-subtitle">{selectedProject?.path ?? 'Aster 本地优先智能编程工作台'}</p>
     {!selectedProject && <button className="primary-button" onClick={() => void openProject()} disabled={isOpening}>
       <FolderOpen size={17} /> {isOpening ? '正在打开…' : '打开本地项目'}
     </button>}
     <div className="capability-grid">
-      <article><Bot size={20} /><div><h2>Codex 任务</h2><p>{runtime?.version ? `${runtime.version} · ${String(runtime.models.length)} 个模型` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
+      <article><Bot size={20} /><div><h2>Aster 任务</h2><p>{runtime?.version ? `${String(runtime.models.length)} 个模型 · 智能体引擎 ${runtimeLabel(runtime)}` : '流式活动、审批与可中断任务'}</p></div><span className={`status-chip ${runtime?.phase === 'ready' ? 'connected' : 'planned'}`}>{runtime?.phase === 'ready' ? '已连接' : runtimeLabel(runtime)}</span></article>
       <article><GitBranch size={20} /><div><h2>隔离工作树</h2><p>并行开发，不干扰本地修改</p></div><span className="status-chip connected">已接入</span></article>
-      <article><ShieldCheck size={20} /><div><h2>安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
+      <article><ShieldCheck size={20} /><div><h2>Aster 安全工作台</h2><p>扫描、证据、修复与 SARIF</p></div><span className="status-chip connected">已接入</span></article>
     </div>
   </div>
 }
 
-function ActivityTimeline({ state, goal, openFile }: {
+function ActivityTimeline({ state, goal, projectId, worktreeId, openFile }: {
   state: AgentActivityState | null
   goal: ThreadGoal | null
+  projectId: string | null
+  worktreeId: string | null
   openFile: (path: string) => void
 }): React.JSX.Element {
   return <div className="activity-timeline" aria-label="智能体活动">
@@ -1493,12 +1505,17 @@ function ActivityTimeline({ state, goal, openFile }: {
     </article>}
     {!state || state.activities.length === 0
       ? <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
-      : state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
-    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Codex 正在工作</div>}
+      : state.activities.map((activity) => <ActivityCard activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
+    {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Aster 正在工作</div>}
   </div>
 }
 
-function ActivityCard({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
+function ActivityCard({ activity, projectId, worktreeId, openFile }: {
+  activity: AgentActivity
+  projectId: string | null
+  worktreeId: string | null
+  openFile: (path: string) => void
+}): React.JSX.Element {
   if (activity.type === 'thread' || activity.type === 'turn') return <></>
   const icon = activity.type === 'userMessage' || activity.type === 'agentMessage' ? <MessageSquare size={15} />
     : activity.type === 'reasoning' ? <Brain size={15} />
@@ -1507,14 +1524,19 @@ function ActivityCard({ activity, openFile }: { activity: AgentActivity; openFil
     <div className="activity-icon">{icon}</div>
     <div className="activity-body">
       <div className="activity-heading"><strong>{activityLabel(activity)}</strong><span>{activity.status}</span></div>
-      <ActivityContent activity={activity} openFile={openFile} />
+      <ActivityContent activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} />
     </div>
   </article>
 }
 
-function ActivityContent({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
+function ActivityContent({ activity, projectId, worktreeId, openFile }: {
+  activity: AgentActivity
+  projectId: string | null
+  worktreeId: string | null
+  openFile: (path: string) => void
+}): React.JSX.Element {
   if (activity.type === 'userMessage') return <p>{activity.content.filter(({ type }) => type === 'text').map((item) => item.type === 'text' ? item.text : '').join('\n')}</p>
-  if (activity.type === 'agentMessage') return <p>{activity.text}</p>
+  if (activity.type === 'agentMessage') return <AgentMessageContent text={activity.text} projectId={projectId} worktreeId={worktreeId} />
   if (activity.type === 'reasoning') return <p>{[...activity.summary, ...activity.content].join('\n')}</p>
   if (activity.type === 'command') return <><code>{activity.command}</code>{activity.output && <pre>{activity.output}</pre>}</>
   if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <button className="artifact-link" onClick={() => openFile(change.path)} key={`${change.path}:${change.kind}`}><FileCode2 size={12} />{change.kind} {change.path}</button>)}</>
@@ -1524,6 +1546,18 @@ function ActivityContent({ activity, openFile }: { activity: AgentActivity; open
   if (activity.type === 'webSearch') return <p>{activity.query}</p>
   if (activity.type === 'dynamicTool') return <p>{activity.namespace ? `${activity.namespace} / ` : ''}{activity.tool}</p>
   return <p>{activity.type}</p>
+}
+
+function AgentMessageContent({ text, projectId, worktreeId }: {
+  text: string
+  projectId: string | null
+  worktreeId: string | null
+}): React.JSX.Element {
+  return <div className="agent-message-content">{parseAgentMessage(text).map((part, index) => part.type === 'text'
+    ? <p key={`text:${String(index)}`}>{part.text}</p>
+    : <Suspense fallback={<div role="status">正在加载图片预览…</div>} key={`image:${part.path}:${String(index)}`}>
+      <AgentImage alt={part.alt} path={part.path} projectId={projectId} worktreeId={worktreeId} />
+    </Suspense>)}</div>
 }
 
 function IntegrationRequestPanel({ request, onError }: {
@@ -1566,7 +1600,7 @@ function IntegrationRequestPanel({ request, onError }: {
     <div className="integration-request-heading">
       <Wrench size={16} />
       <div>
-        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Codex 请求补充信息'}</strong>
+        <strong>{request.kind === 'mcpElicitation' ? `${request.serverName} 请求输入` : 'Aster 请求补充信息'}</strong>
         <p>{request.kind === 'mcpElicitation' ? request.message : request.questions[0]?.question}</p>
       </div>
     </div>
@@ -1602,7 +1636,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
     catch (reason) { onError(toErrorMessage(reason)) }
   }
   return <section className="approval-panel" aria-label="待审批操作">
-    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Codex 请求继续执行受保护操作。'}</p>
+    <div><strong>{approval.kind === 'command' ? '允许执行命令？' : approval.kind === 'fileChange' ? '允许修改文件？' : '授予额外权限？'}</strong><p>{approval.command ?? approval.reason ?? approval.grantRoot ?? 'Aster 请求继续执行受保护操作。'}</p>
       {approval.kind === 'permissions' && <div className="permission-request-list">{approval.permissions.map((permission) => <label key={permission.id}>
         <input type="checkbox" checked={selectedPermissions.has(permission.id)} onChange={(event) => {
           const checked = event.currentTarget.checked
@@ -1625,7 +1659,7 @@ function ApprovalPanel({ approval, onError }: { approval: PendingApproval; onErr
 function activityLabel(activity: AgentActivity): string {
   switch (activity.type) {
     case 'userMessage': return '你的指令'
-    case 'agentMessage': return 'Codex'
+    case 'agentMessage': return 'Aster'
     case 'reasoning': return '推理'
     case 'command': return '命令'
     case 'fileChange': return '文件变更'
@@ -1682,6 +1716,10 @@ function toErrorMessage(reason: unknown): string {
   if (reason instanceof Error) return reason.message
   if (typeof reason === 'string' && reason) return reason
   return '发生未知错误。'
+}
+
+function providerForModel(model: string): string {
+  return model.startsWith('deepseek-') ? 'deepseek' : 'openai'
 }
 
 function sortProjects(projects: ProjectSummary[]): ProjectSummary[] {

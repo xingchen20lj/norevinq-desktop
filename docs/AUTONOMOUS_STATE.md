@@ -1,17 +1,35 @@
 # 无人值守开发状态
 
-最后更新：2026-08-13（Asia/Shanghai）
+最后更新：2026-08-14（Asia/Shanghai）
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备（完成）；正在执行最终功能一致性逐项审计与体验缺口修复。
+阶段 20：桌面打包和发布准备（完成）；正在执行开源发布准备、最终功能一致性逐项审计与体验缺口修复。
 
 ## 当前任务
 
-- 完成工作树 Handoff 跨进程崩溃恢复状态机及安全恢复 UI 的完整质量门。
+- 完成面向普通用户的 Aster 产品身份统一、真实模型回答验证，以及本地私有目录从 `codex-home` 到 `agent-home` 的兼容迁移。
+- 完成 Codex Security 直接 DeepSeek Responses provider、隔离凭据环境、实时 token/缓存与人民币费用展示的真实在线验证和发布质量门。
 - 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
+
+- 复现并修复 macOS Deep Security discovery worker 的 `Operation not permitted`：官方 0.1.11 协调器在已经受 `codex_security_scan` 外层沙箱保护的进程内再次固定请求 `read-only` Seatbelt，而 Codex 上游明确记录 Seatbelt 不能可靠嵌套。Aster 仅在 macOS、deep 模式、存在官方 scan ID 且命令精确为 discovery worker `codex exec --experimental-json --sandbox read-only` 时改用非嵌套子进程；外层文件/网络权限边界继续生效。真实 DeepSeek Flash 一文件对照完成 discovery 1/1、validation、attack path、reporting 与 `completed + sealed`。协调器失败清单现在优先于二次 `complete-scan` 错误展示。
+- 开源历史凭据扫描改用 Gitleaks 8.30.1 扫描全部既有提交；唯一旧测试占位符以规则 ID、精确行和精确路径三重约束加入 allowlist，当前测试源码已移除凭据形状值，复扫为 0 泄漏。发布工作流全部第三方 Action 已固定 40 位提交 SHA。
+- 为顶栏 11 个纯图标动作增加随状态变化的原生悬停名称与可访问标签；真实 Electron 生命周期 E2E 覆盖全部 `title`/`aria-label` 名称。
+- 助手回复中的本地 Markdown 图片现可直接显示：仅接受当前项目/工作树与 Aster 私有 `agent-home/generated_images` 下的绝对路径，经主进程真实路径、符号链接、格式和 50 MiB 上限验证后签发 15 分钟不透明 `aster-file` URL；远程 URL、SVG、越界文件和任意 `file://` 均不加载。单元测试与真实 Electron PNG 解码截图通过。
+- 普通界面、活动作者、运行状态、审批、安全工作台和用户可见错误统一采用 Aster 产品身份；新建、恢复和分叉任务均注入透明的 Aster `developerInstructions`，要求日常回答自称 Aster、被询问架构/许可/模型时如实披露 OpenAI 开源 Codex app-server 与实际提供商。单元测试、Electron 生命周期协议断言通过，DeepSeek V4 Flash 真实在线身份测试于 4.5 秒返回包含 Aster 且不含 Codex 的普通回答。
+- Aster 默认私有运行时目录从 `userData/codex-home` 改为 `userData/agent-home`；首次启动时仅在新目录不存在且旧路径为真实目录时原地迁移，保留登录、任务、MCP 和技能状态。新公开覆盖变量为 `ASTER_AGENT_HOME`/`ASTER_AGENT_BINARY`，旧变量只作为兼容别名；上游子进程所需的 `CODEX_HOME`、项目 `.codex` 和第三方包名继续保留以维持官方兼容性。目录创建、权限、符号链接拒绝、迁移保真及 Electron 回归通过。
+- 将公开 `@openai/codex-security` 升级到 0.1.11，并以 Apache-2.0 可审计 pnpm 补丁增加固定 DeepSeek provider、SDK 实例级环境隔离和只读 token usage 回调；补丁不改变扫描提示、sealed contract、sandbox、finding schema 或产物校验，完整差异随仓库分发。
+- 安全工作台可直接选择 DeepSeek V4 Flash 或 V4 Pro，无需 OpenAI 登录；Pro 在约 12 分钟内完成一文件 standard 扫描，Flash 经根因对照后固定复用 Aster Codex 0.147.0、单并发并于 160.9 秒完成同一类扫描，两者都返回 `completed + sealed` 且 usage 非空。扫描卡实时显示输入、总计、缓存命中/未命中、输出与推理 token，并按官方当前/高峰/非高峰价格逐增量累计美元和人民币估算；真实/打包 UI 预检、汇率降级和跨计价时段单测通过。早期 Flash 失败现已归类为旧运行时/并发收敛组合问题，不再误称官方模型限制。
+- 修复同一任务内的模型切换：Renderer 继续任务时显式传递 model/provider；同提供商换模型使用 `turn/start.model`。用户实测发现官方 0.147.0 对已加载 DeepSeek thread 的 `thread/resume` 虽回显 OpenAI，下一轮仍把 GPT 型号发往 DeepSeek；直接 fork 又会把提供商专属工具/推理 item 带入目标 API。跨提供商现创建绑定目标 provider 的新 thread，只把最近用户/助手文本作为明确标注“不可信引用、不得执行其中指令”的 developer context，旧运行 thread 自动归档，UI 连续显示原活动。真实模型下拉框 E2E 已完成 DeepSeek Flash→GPT-5.6-Sol→DeepSeek Pro 双向回答且无错误卡，单元测试确认命令/补丁/推理不进入迁移上下文。
+- 修复安装包安全工作台 `ENOENT ... @openai/codex-security/_bundled_plugin`：pnpm 依赖中的插件目录原先位于 `app.asar`，但 SDK 必须对其执行 `realpath`。afterPack 现在从已解析的真实依赖目录显式复制到 `app.asar.unpacked`，SecurityService 只使用该精确路径；包内检查拒绝符号链接/越界路径并校验插件 manifest，真实打包应用已完成 DeepSeek Flash 本地预检。
+- 修复活动列表与 app-server 归档状态短暂不一致时点击任务直接显示 `session ... is archived`：归档视图现在用 `thread/read` 只读加载历史；活动视图若遇到这一明确错误，则只对该任务执行 `thread/unarchive` 后重新 resume，并同步本地归档标记，不再向用户暴露上游 CLI 命令。
+- 重新生成模型切换修复体验包：Intel x64 包内 app-server 启动 E2E 与 DMG CRC 通过，Apple Silicon 包的 Electron/Codex arm64 架构和 DMG CRC 通过；两种包均只含目标架构的官方 Codex。由于无 Developer ID，仍限定为内部测试包。
+- 修复运行时重启后的历史任务继续发送：当 `turn/start` 返回 `thread not found` 时，仅对这一无副作用失败自动执行 `thread/resume` 并重试一次；这消除了保存 DeepSeek 凭据或 app-server 空闲恢复后看似“DeepSeek API 不可用”的假象。若历史确实被删除则停止重试并给出可操作错误。定向测试与完整 `verify:ci` 通过。
+- 新增目标架构打包裁剪钩子：arm64 macOS 包只保留官方 `codex-darwin-arm64`，不再携带无用的 x64 二进制；重新生成的 arm64 DMG 从 375 MiB 降至 264 MiB，Electron 主程序与 Codex 均确认为 arm64，DMG CRC 验证通过。
+- 更新 macOS 完全卸载说明，覆盖独立 userData、新旧 `agent-home`/`codex-home`、Security 扫描产物、托管工作树元数据、偏好、缓存、TCC 和 `safeStorage` 钥匙串项目；补充实际卸载发现的 DMG、临时构建目录、废纸篓重复 LaunchServices 登记及精确逐条注销/垃圾回收流程，并明确禁止重置整个 LaunchServices 数据库及系统日志/备份边界。
+- 使用 Codex Security plugin 0.1.19 完成并密封标准单次部分覆盖扫描；确认默认 Aster Codex/Security 路径不与官方 `~/.codex` 冲突，同时将当前无签名 DMG 限定为可信项目内部体验包。扫描发现 3 项中等和 5 项低风险待修复问题，利用细节不写入未来公开仓库。
 
 - 初始化空 Git 仓库，默认分支为 `main`。
 - 获取 2026-08-10 当前 OpenAI Codex 官方手册。
@@ -21,7 +39,7 @@
 - 确认 Codex 自定义模型提供商当前以 Responses API 为正式 wire API，支持通过环境变量提供密钥。
 - 确认本机可用 Codex 内置 Node.js 24.14.0 与 pnpm 11.16.0。
 - 选择 Electron + React + TypeScript 作为初始桌面架构，并记录 ADR。
-- 完成 OpenAI Codex 0.147.0、Codex Security 0.1.8 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`。
+- 完成 OpenAI Codex 0.147.0、Codex Security 和 DeepSeek Responses 官方上游调查，详见 `docs/RESEARCH.md`；Security SDK 当前固定 0.1.11。
 - 使用已有安全凭据真实验证 `deepseek-v4-flash` 的非流式、SSE、函数调用回传和 Web Search；未记录或输出密钥。
 - 记录 `deepseek-v4-pro` 在 2026-08-10 仍不能调用 Responses API；2026-08-13 复核官方 reference/Codex catalog 后确认已开放，当前账户最小真实请求返回 `completed`、模型 `deepseek-v4-pro` 和精确输出 `ASTER_PRO_OK`。
 - 完成 `deepseek-v4-pro` 模型目录、能力注册、设置状态和专属在线 Electron E2E；随应用固定的官方 Codex 0.147.0 经 app-server 在 47.9 秒内真实调用 `apply_patch`，创建 `DEEPSEEK_PRO_TOOL_OK\n` 文件并返回 `ASTER_DEEPSEEK_PRO_OK`。
@@ -80,7 +98,7 @@
 - 完成提供商、MCP、技能、配置四页设置工作台及空状态、错误、loading、OAuth 和结果预览。
 - Electron E2E 真实读取 app-server MCP/技能/配置，持久化项目信任，并通过项目指令返回 `ASTER_INSTRUCTIONS_OK`。
 - 当前环境 `node_repl` MCP 通过 app-server 直接工具调用执行无副作用表达式；elicitation 与用户输入由自动替身闭环覆盖。
-- 集成公开 `@openai/codex-security` 0.1.8，并隔离其 Codex SDK/可执行文件 0.144.6 与 plugin 0.1.15。
+- 最初集成公开 `@openai/codex-security` 0.1.8（Codex SDK/可执行文件 0.144.6、plugin 0.1.15），随后升级并固定当前 0.1.11 / plugin 0.1.19。
 - 完成 SDK/Python/账户诊断、repository/path/refs/working-tree/deep 参数、preflight、费用、进度、Trusted Access、取消和错误分类。
 - 扫描输出固定在仓库外 `userData/security` 私有目录；只有 completed + sealed contract 的结果可导入。
 - 完成安全总览、扫描、漏洞、仓库和设置五页工作台，支持报告、finding、coverage、JSON/CSV/SARIF 与 2 MiB 有界预览。
@@ -198,16 +216,16 @@
 - 单元测试覆盖 GitHub 登录、fork/upstream、恶意 PR URL、密钥脱敏、stdin、超时与输出边界；Electron E2E 用真实临时 Git 仓库、本地 bare remote 和 CLI 替身完成 Draft PR 闭环及重复调用，未访问真实 GitHub。
 - 视觉检查覆盖 1320×840 完成态和 960×640 表单态；远端、登录、目标分支和 PR 卡片无明显溢出。
 - GitHub PR 线上修复后最终 `verify:ci`：34 个测试文件 159 项、覆盖率 80.62/69.16/85.40/87.45、2 项性能基准、类型、规范、脚本、workflow、105 包 notices、构建和 bundle 预算全部通过；定向 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
-- 仓库级 Git 身份固定为 `xingchen20lj <71823107+xingchen20lj@users.noreply.github.com>`；从首条提交到 GitHub PR 阶段提交的作者身份均已核对一致，无需重写历史。
-- 按用户授权创建私有仓库 `xingchen20lj/aster-code-desktop` 并首次推送完整 `main`；GitHub 回读确认 `PRIVATE`、默认分支 `main`，本地/远端 SHA 同为 `d154183f41783f2139e07b017800357b36a43ebc`。
-- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位 `/Users/cyber/bin/gh`，未发生外部写入；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
+- 仓库级 Git 身份使用维护者的 GitHub noreply 地址；提交作者身份已核对一致，无需重写历史。
+- 按用户授权创建独立 GitHub 仓库并首次推送完整 `main`；本地与远端提交一致。
+- 首次真实桌面 PR 测试准确发现 GUI 最小 PATH 无法定位用户级 `gh`；已增加跨平台 CLI 发现（显式绝对路径、PATH、用户 bin、Homebrew、Windows 标准位置）并保留命令名回退。
 - 第二次真实桌面测试已由 Aster 成功推送 `codex/github-pr-validation` 并创建 Draft PR #1，但创建后验证错误使用 `gh pr list --head owner:branch` 而未识别结果；改为纯分支过滤并严格匹配 `headRepositoryOwner.login`，避免重复创建和 fork 同名分支误认。
-- 第三次真实 Electron 回归通过 Aster 自身重新读取私有 GitHub Draft PR #1，精确验证仓库 `xingchen20lj/aster-code-desktop`、head `codex/github-pr-validation`、base `main`、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
+- 第三次真实 Electron 回归通过 Aster 自身重新读取测试 Draft PR，精确验证目标仓库、head/base、Draft 状态和同源 URL；重复创建在线返回 `created=false/pushed=false`，没有产生第二个 PR。
 - 实际检查真实 PR 完成态截图：GitHub 登录、origin head/base、Draft 卡片和“在 GitHub 打开”在 1320×840 浅色界面无明显溢出或错位。
 - 首次 GitHub Actions 远端运行准确暴露跨平台 notices 漂移：pnpm 将 Codex 与 `@napi-rs/canvas` 原生 alias 报告为不同的 `darwin-*`/`win32-*` 名称或版本，Windows checkout 还会物化 CRLF；生成器现规范化相同上游组件并以逻辑换行比较，macOS/Windows 输出保持确定性。
 - CI 的 feature branch `push` 与 `pull_request` 双触发已收敛为仅 `main` push + PR，单次 PR 更新不再重复执行两组矩阵并发送重复通知；本地完整 `verify:ci` 再次通过。
 - Windows PR runner 继续暴露出目标平台路径解析、工作树路径大小写、Codex launcher 子进程锁、CRLF、POSIX mode 断言和大小写环境变量等 7 类跨平台问题；产品代码与测试夹具已逐项修复，定向 21 项和本地完整 159 项回归通过。
-- 私有仓库 `main` ruleset/classic branch protection API 均返回 GitHub 403（当前套餐要求升级 GitHub Pro 或公开仓库）；为保护源码隐私未擅自公开，限制已作为外部仓库治理依赖记录。
+- 私有免费仓库的 `main` ruleset/classic branch protection API 返回 GitHub 403；公开后必须立即建立主分支保护，步骤已写入开源发布检查表。
 - Windows 远端 34 个测试文件已全部通过；随后性能夹具暴露出逐条造 3,000 条历史在 Windows 文件系统耗时约 58 秒，而实际查询/批量已读仅 418.5 ms。状态库现提供原子事务批量写入，新增回归后本地 160 项通过，3,000 条夹具与被测操作合计约 105 ms。
 - 事务批量写入后的 Windows 远端 160 项、性能和生产构建通过；Electron 冒烟准确打开安全工作台，但测试定位器同时命中总览卡片与弹窗同名标题，现按语义 dialog 范围限定安全/计划任务断言。
 - PR #1 最终 macOS/Windows 检查及合并后的 `main` 检查均通过；主分支运行 `31462134036` 两个平台为绿色，重复 PR workflow 邮件问题已关闭。
@@ -220,14 +238,14 @@
 - 2026-08-13 最新 Intel macOS 隔离体验包 `ba33d79` 真实验证：内置官方开源 `@openai/codex` 0.147.0，目录包与只读挂载 DMG 均通过 packaged E2E，私有 `codex-home` 为真实 `0700` 目录，DMG CRC 与 ZIP 全文件校验通过；DMG 为 263 MiB，SHA-256 `fb8e35f4199155432ee001d7a36c41e66ed215afeb9c58057dc66e2a73fbaa79`。
 - Codex home 隔离后完整 `verify:ci`：36 个测试文件 172 项、2 项性能基准、覆盖率 80.95/69.46/85.46/87.95，类型、规范、脚本、workflow、许可证、生产构建和 bundle 预算全部通过。
 - GitHub CI 于 2026-08-13 首次发现 GHSA-jmr9-qjv8-65gv：Codex Security 固定的 `extract-zip@2.0.1` 存在高危符号链接越界写入；公告所列 2.0.2 尚未发布，因此以 pnpm alias 替换为 Electron 官方兼容实现 `@electron-internal/extract-zip@1.0.5`，生产审计恢复 0 已知漏洞且 SDK 真实 preflight 通过。
-- 将 Aster app-server 的 `CODEX_HOME` 固定到独立 Electron `userData/codex-home`（macOS 实际为 `~/Library/Application Support/aster-code/codex-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界。
+- 将 Aster app-server 的上游兼容变量 `CODEX_HOME` 固定到独立 Electron `userData/agent-home`（macOS 实际为 `~/Library/Application Support/aster-code/agent-home`）；登录、thread、MCP/技能用户配置不再与官方 Codex 桌面 `~/.codex` 联动，DeepSeek 热重载也不能覆盖该边界；旧版 `codex-home` 自动迁移。
 - 完成整文件可恢复丢弃：staged/unstaged/untracked/rename 内容与 index 保真，恢复点存入 `refs/aster/discards/<uuid>`、最多 32 个，跨应用重启保持，不占用或删除用户已有 stash；目标出现新修改时失败关闭。
 - 完成 Git 面板丢弃确认、恢复历史与专属离线 Electron E2E；真实仓库跨重启恢复文件，单元测试覆盖用户 stash、rename 和占用目标。
 - 修复内嵌浏览器覆盖任务和输入框：宽屏改为可拖动/键盘缩放的右侧分栏，窄屏自动底部停靠；1200×760 与 800×640 Electron 布局断言和截图通过。
 - 本阶段完整 `verify:ci`：36 个测试文件 175 项、2 项性能基准，覆盖率 81.05/69.54/85.73/88.11，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算全部通过；Git/浏览器两项专属 Electron E2E 通过。
 - PR #5 首轮 macOS 15 全绿；Windows 2025 准确发现 runner 全局 `core.autocrlf` 使恢复后的测试文本按平台转换为 CRLF，并因断言提前失败导致 SQLite 句柄阻塞临时目录清理。测试仓库现固定 `core.autocrlf=false` 验证字节保真，清理增加 Windows 有界重试；产品仍尊重用户仓库配置。
-- 用户在试用 DMG 打开 `/Users/cyber/test/0811` 时准确发现普通文件夹被 `worktree:list` 当 Git 仓库执行，首页冒泡 `fatal: not a git repository`；实地只读复核确认该路径没有 `.git`。
-- 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Codex 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
+- 用户在试用 DMG 打开普通非 Git 文件夹时准确发现 `worktree:list` 冒泡 `fatal: not a git repository`；实地只读复核确认目标路径没有 `.git`。
+- 工作树服务现将普通文件夹建模为 Local-only：列表返回空状态、创建给出可操作提示，普通 Aster 任务不受影响；真实非 Git Electron E2E 与截图不再出现红色错误。
 - 完成工作树基线目录与选择器：最多 500 个 HEAD/本地分支/远端分支/标签，annotated tag 解析到 commit；UI 显示类型/ref/短 OID，创建时再次解析并匹配 expected OID，ref 移动失败关闭。
 - SQLite migration v10 持久化所选 `base_ref` 与实际 `base_oid`；真实仓库从非当前 `release/base` 创建 detached worktree，实际 HEAD、旧版本文件和 UI 闭环均经自动测试。
 - 本阶段完整 `verify:ci`：36 个测试文件 177 项、2 项性能基准，覆盖率 81.00/69.56/85.50/88.22，类型、规范、脚本、workflow、93 个生产组件声明、构建与 bundle 预算全部通过；两项专属 Electron E2E 与生产依赖审计（0 已知漏洞）通过。
@@ -235,12 +253,16 @@
 - Handoff 修改只有在任务→工作树关联落库成功后才清理恢复 ref；进程重启依据真实任务关联决定回滚源端或提交清理，不盲目重复 apply。
 - 恢复前逐项核对源/目标 HEAD、工作树 tree 与 index tree；崩溃后的人工修改进入 `needsAttention`，保留恢复 ref、阻止工作树移除并在工作树面板提供安全重试，不执行破坏性清理。
 - 真实 Git 测试覆盖 stash marker 尚未固化、目标已 apply 但任务仍在源端、目标在崩溃后又被人工修改三类窗口；Electron E2E 与 1320×840 截图验证恢复提示和重试不删除人工文件。
+- 建立 Apache-2.0 `LICENSE`、NOTICE、贡献/支持/行为准则、Issue/PR 模板、CODEOWNERS、新手构建指南与公开发布检查表；README 加入真实且无个人路径的产品截图。
+- Codex schema 同步默认改用锁定的 `@openai/codex` 0.147.0 项目依赖，生成清单不再记录本机路径或时间戳；稳定 schema/bindings 已重新生成并通过类型检查。
+- 新增 `check:open-source` CI 守门，检查 21 项公共文件、协议版本、打包法律资源、个人绝对路径和测试目录外凭据形状值。
+- 开源准备质量门：冻结安装、生产依赖审计（0 已知漏洞）、36 个测试文件 181 项、覆盖率 80.92/69.48/85.99/87.79、性能、类型、规范、构建、bundle、目录包与 packaged E2E 全部通过；真实 `.app` 内回读 LICENSE/NOTICE/第三方清单和官方 Codex 0.147.0 ready。
 
 ## 下一任务
 
-1. 完成本轮工作树 Handoff 恢复的完整质量门与跨平台 CI。
+1. 提交模型提供商迁移与打包 Security 插件修复，运行 macOS/Windows 跨平台 CI，并重建 x64/arm64 DMG。
 2. 完善 DeepSeek/provider 专属限流、重试和 Web Search 活动展示。
-3. 账户使用量恢复后补在线 E2E 和 Codex Security sealed 扫描。
+3. 使用签名目标平台安装包复验 Security 长扫描与取消恢复。
 
 ## 已做技术决策
 
@@ -256,6 +278,7 @@
 - GitHub：CLI 只在主进程运行；head/base 远端由登记仓库状态重建，PR 描述走 stdin，显式 push 和用户确认后才允许外部写入，创建结果必须结构化回读验证且保持幂等。
 - 安全扫描输出必须位于被扫描工作树之外，并使用私有权限目录。
 - Codex Security 只接受 completed + sealed SDK 结果；cost limit、中断和 contract 失败保留失败状态，不展示部分 finding。
+- Codex Security 的 DeepSeek 支持采用显式固定 provider 与最小公开补丁；Key 只进入每次 SDK 实例的白名单子进程环境，并从 Python workbench 环境剔除，不宣称是上游 0.1.11 未修改原生能力。
 - Security validate/patch/false-positive/export 使用官方 CLI 参数数组；patch 必须显式确认，renderer 不能提交路径或命令。
 - 计划任务由 Electron 主进程本地调度；不安装后台守护进程，也不伪装成 app-server/CLI 的计划任务 API。
 - 计划任务崩溃后不重放活动 turn；应用重新启动只按 run-once/skip 策略处理下一次到期，避免重复副作用。
@@ -270,16 +293,17 @@
 
 ## 当前失败测试
 
-当前无失败测试。工作树 Handoff 恢复阶段完整 `verify:ci` 通过：36 个测试文件 181 项、2 项性能基准，覆盖率 80.96/69.49/86.10/87.82，类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过；恢复/生命周期/非 Git 三项真实 Electron E2E 通过，生产依赖审计为 0 已知漏洞。上一 `main` 的 macOS 15/Windows 2025 CI 均绿色，本分支跨平台 CI 待提交后验证。
+当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Aster Codex 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `verify:ci` 为 38 个通过文件、1 个按凭据开关跳过文件、198 项通过及 1 项跳过，覆盖率 81.16/70.04/86.20/88.04，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过。生产依赖审计为 0 已知漏洞；x64 目录包内 Codex 0.147.0、解包 Security plugin 0.1.19 manifest 和真实打包应用 DeepSeek Security 预检全部通过。
 
 ## 已知问题
 
 - 开发环境仍可发现 ChatGPT 预发布 `0.147.0-alpha.6.5`，但发布包已固定并实际启动稳定 0.147.0；schema 继续按固定版本同步。
 - Windows 只能在 CI 中构建验证，当前 macOS 环境不能完成 Windows 真机运行验证。
 - 当前 bundle 预算基于 Intel macOS 构建；不同平台 chunk 哈希可不同，但 `check:bundle` 以生产 HTML 的真实入口资产计量。
-- Codex Security 0.1.8 元数据固定 Codex SDK/runtime 0.144.6；发布包为避免额外约 270 MiB 原生副本统一使用 0.147.0，需在使用量/权限恢复后执行 packaged sealed 扫描确认兼容。
+- Codex Security 0.1.11 元数据仍固定 Codex SDK/runtime 0.144.6；发布包为避免额外约 270 MiB 原生副本统一使用 0.147.0，打包预检已通过，仍需在签名目标包执行完整 sealed 长扫描确认兼容。
+- DeepSeek V4 Flash 的早期 Security 多智能体长流程曾分别出现 sealed 后修改和 sealed 后不及时返回；固定复用 Aster Codex 0.147.0 并将并发降为 1 后复验通过。当前保留串行策略，并等待上游 SDK 将内置 Codex 从 0.144.6 升级后再评估提高并发。
 - 首个 thread 的自动标题依赖上游异步 metadata；已监听名称通知并在 turn 完成后刷新 thread/read。
-- Codex Security standard 扫描即使仅 2 个目标文件也超过本次 $2 在线验证上限；提高预算前不能宣称真实 sealed 扫描完成。
+- OpenAI Codex Security standard 扫描即使仅 2 个目标文件也超过此前 $2 在线验证上限；DeepSeek 模式不使用上游未知模型的美元硬上限，而显示官方价格估算并明确由用户控制取消。
 - Stage 20 本地安全 diff 扫描完成源码、验证与攻击路径阶段，但 finalizer 拒绝 `/var` 符号链接形式扫描目录；按单次 finalization 规则保留为 unsealed 证据，不导入产品扫描历史。
 - 自动更新尚无发布者实际控制的 HTTPS 源和平台签名证书；本机只验证元数据/状态机/包内启停，不能宣称真实跨版本升级完成。
 
@@ -290,13 +314,13 @@
 ## 外部依赖
 
 - OpenAI/ChatGPT 凭据：在线 Codex 实测需要；缺失时使用协议测试替身。
-- 当前 ChatGPT/Codex 使用量已耗尽，服务端提示 2026-08-16 11:32 恢复；在此之前只保留既有在线证据并继续离线验证。
+- OpenAI/ChatGPT 在线额度可能受账户窗口限制；本轮 GPT-5.6-Sol 跨提供商真实轮次已成功，常规 CI 仍不依赖在线额度。
 - DeepSeek API Key：真实在线验证需要；缺失时使用本地 SSE 测试服务器。
-- Codex Security 权限与模型费用：当前认证/运行链路可进入 discovery；完整扫描仍需足够费用上限，受保护请求还可能需要 Trusted Access。
+- Codex Security 权限与模型费用：OpenAI 模式仍受账户 Security/Trusted Access 与费用约束；DeepSeek 模式直接使用 API Key，无需 OpenAI 登录，但会产生 DeepSeek API 费用。
 - Apple/Windows 代码签名证书：仅影响最终签名、公证与商店发布。
 - 自动更新发布域名/对象存储：源码已有私有 GitHub 远端，但尚无实际 HTTPS 更新源；跨版本更新需发布者提供域名并以同一平台签名身份构建两个版本。
-- GitHub 私有远端已建立并由系统 keyring 中的 `xingchen20lj` 账户验证；Aster 不保存或显示其 token。
-- GitHub 私有仓库主分支保护：当前账户套餐的 ruleset/classic protection API 返回 403；需要升级 GitHub Pro，公开仓库虽可启用但不符合用户要求的私有边界。
+- GitHub 远端已建立并由系统 keyring 中的维护者账户验证；Aster 不保存或显示其 token。
+- GitHub 主分支保护：私有免费仓库当前不能启用；仓库切换为 Public 后必须按 `docs/OPEN_SOURCE_RELEASE_CHECKLIST.md` 立即建立 ruleset。
 
 ## 待验证问题
 

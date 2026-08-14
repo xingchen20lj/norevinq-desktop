@@ -83,7 +83,7 @@ describe('CodexRuntimeSupervisor recovery', () => {
       discover: () => Promise.resolve({
         path: '/fake/codex', source: 'explicit', version: 'codex-cli 0.147.0-test',
       }),
-      fixedChildEnvironment: { CODEX_HOME: '/private/aster/codex-home' },
+      fixedChildEnvironment: { CODEX_HOME: '/private/aster/agent-home' },
       childEnvironment: { CODEX_HOME: '/shared/official/codex-home' },
       spawnProcess: (_command, _args, options) => {
         environments.push(options.env ?? {})
@@ -95,11 +95,11 @@ describe('CodexRuntimeSupervisor recovery', () => {
     })
     try {
       await runtime.start()
-      expect(environments[0]?.CODEX_HOME).toBe('/private/aster/codex-home')
+      expect(environments[0]?.CODEX_HOME).toBe('/private/aster/agent-home')
       await runtime.updateLaunchConfiguration({
         childEnvironment: { CODEX_HOME: '/another/shared/home', DEEPSEEK_API_KEY: 'test-key' },
       })
-      expect(environments[1]?.CODEX_HOME).toBe('/private/aster/codex-home')
+      expect(environments[1]?.CODEX_HOME).toBe('/private/aster/agent-home')
       expect(environments[1]?.DEEPSEEK_API_KEY).toBe('test-key')
     } finally {
       await runtime.stop()
@@ -142,7 +142,7 @@ describe('CodexRuntimeSupervisor recovery', () => {
         generation: 1,
         lastExitCode: 23,
       }), { timeout: 2_000 })
-      expect(runtime.getSnapshot().error).toContain('Automatic replay was disabled')
+      expect(runtime.getSnapshot().error).toContain('未自动重放任务')
       await new Promise((resolve) => setTimeout(resolve, 30))
       expect(getSpawnCount()).toBe(1)
     } finally {

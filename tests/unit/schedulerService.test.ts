@@ -60,7 +60,7 @@ describe('SchedulerService', () => {
     let attempts = 0
     const scheduler = new SchedulerService(fixture.database, () => {
       attempts += 1
-      return Promise.reject(new Error('api_key=sk-proj-secret123456 failed'))
+      return Promise.reject(new Error('api_key=[fixture-secret] failed'))
     }, {
       now: () => now,
       setTimer: () => 1 as unknown as ReturnType<typeof setTimeout>,
@@ -76,7 +76,7 @@ describe('SchedulerService', () => {
     await waitForAttempts(() => attempts, 2)
     const snapshot = scheduler.getSnapshot()
     expect(snapshot.runs.filter(({ status }) => status === 'failed')).toHaveLength(2)
-    expect(snapshot.runs.every(({ error }) => !error?.includes('sk-proj-secret123456'))).toBe(true)
+    expect(snapshot.runs.every(({ error }) => !error?.includes('[fixture-secret]'))).toBe(true)
     scheduler.stop()
     fixture.database.close()
   })

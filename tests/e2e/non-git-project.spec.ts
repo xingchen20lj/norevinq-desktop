@@ -9,7 +9,7 @@ test.skip(process.platform === 'win32', 'The deterministic Codex fixture wrapper
 test('opens a plain non-Git project without a worktree fatal error', async () => {
   const profile = mkdtempSync(join(tmpdir(), 'aster-non-git-e2e-'))
   const projectPath = join(profile, '0811')
-  const codexHome = join(profile, 'codex-home')
+  const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
@@ -23,17 +23,17 @@ test('opens a plain non-Git project without a worktree fatal error', async () =>
 
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_CODEX_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await expect(window.getByRole('heading', { name: `开始处理 ${project.name}` })).toBeVisible()
     await expect(window.getByRole('alert')).toHaveCount(0)
     await window.getByRole('button', { name: 'Local', exact: true }).click()
     const panel = window.getByRole('complementary', { name: '工作树' })
     await expect(panel).toContainText('此文件夹还不是 Git 仓库')
-    await expect(panel).toContainText('普通 Codex 任务仍可使用')
+    await expect(panel).toContainText('普通 Aster 任务仍可使用')
     await expect(panel.getByRole('button', { name: '创建', exact: true })).toHaveCount(0)
     await window.screenshot({ path: 'test-results/aster-non-git-project.png' })
   } finally {

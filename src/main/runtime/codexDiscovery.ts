@@ -112,8 +112,9 @@ export function getCodexBinaryCandidates(options: CodexDiscoveryOptions = {}): C
   if (options.explicitBinary) {
     candidates.push(...configuredCandidate(options.explicitBinary, 'explicit', platform, pathValue))
   }
-  if (env.CODEX_BINARY) {
-    candidates.push(...configuredCandidate(env.CODEX_BINARY, 'environment', platform, pathValue))
+  const environmentBinary = env.ASTER_AGENT_BINARY ?? env.CODEX_BINARY
+  if (environmentBinary) {
+    candidates.push(...configuredCandidate(environmentBinary, 'environment', platform, pathValue))
   }
   if (resourcesPath) {
     const bundledPath = getBundledCodexPath(resourcesPath, platform, arch)
@@ -183,6 +184,6 @@ export async function discoverCodexBinary(
 
   const detail = failures.length > 0 ? ` Probe failures: ${failures.join('; ')}` : ''
   throw new Error(
-    `Unable to find a working Codex binary. Configure one explicitly, set CODEX_BINARY, reinstall the bundled runtime, or add codex to PATH.${detail}`,
+    `Unable to find Aster's agent runtime. Configure one explicitly, set ASTER_AGENT_BINARY, reinstall the bundled runtime, or add the compatible runtime to PATH.${detail}`,
   )
 }

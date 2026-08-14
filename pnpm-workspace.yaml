@@ -1,8 +1,12 @@
 allowBuilds:
+  electron: true
   electron-winstaller: true
   esbuild: true
 minimumReleaseAgeExclude:
   - lucide-react@1.31.0
+  - '@openai/codex-security@0.1.11'
 overrides:
   extract-zip: npm:@electron-internal/extract-zip@1.0.5
   pdfjs-dist: 6.2.108
+patchedDependencies:
+  '@openai/codex-security@0.1.11': patches/@openai__codex-security@0.1.11.patch

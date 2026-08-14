@@ -2,10 +2,10 @@
 
 ## 当前基线
 
-- 生成时间：2026-08-10
-- 本机二进制：`codex-cli 0.147.0-alpha.6.5`
-- Stable schema SHA-256：`6e12bb6cb94d3cd91011bc861c5944ba5db7fbeeb406399a3cb9b9e771c27999`
-- TypeScript bindings SHA-256：`5f10c708c106231e983254987b980f4484a8bd654ba36a2226e6efd5be12cb8c`
+- 同步日期：2026-08-14
+- 锁定项目依赖：`codex-cli 0.147.0`
+- Stable schema SHA-256：`54fd6e4e4849d43f93c8573f325d5bac4bc66a57fabf2433ea1d3cd73d0754b2`
+- TypeScript bindings SHA-256：`045a3a0bda23dec6aa3c62ce464dd84fb9527f9f4f1de4d34eb60b7e77110efe`
 - 生成产物：642 个 TypeScript 文件、285 个 JSON Schema 文件。
 
 完整来源、二进制哈希和文件清单位于 `src/generated/codex/manifest.json`。重新同步：
@@ -14,7 +14,7 @@
 pnpm schema:sync
 ```
 
-工具按显式配置、`CODEX_BINARY`、`PATH`、ChatGPT macOS bundle 的顺序发现二进制；从同一个可执行文件读取版本并生成两类 schema。生成发生在临时目录，完成后原子替换，失败时保留原基线。
+工具按显式配置、`CODEX_BINARY`、锁定的 `node_modules/@openai/codex`、`PATH`、ChatGPT macOS bundle 的顺序发现二进制；默认因此可在全新 clone 安装依赖后复现稳定协议，不依赖贡献者的 ChatGPT 安装。生成清单只记录来源类别、版本和哈希，不记录本机绝对路径或生成时间。生成发生在临时目录，完成后原子替换，失败时保留原基线。
 
 ## Wire 约束
 
@@ -28,14 +28,16 @@ pnpm schema:sync
 
 ## 生命周期
 
-1. 在 Electron `userData/codex-home` 创建私有 `0700` Codex home；开发/E2E 仅允许用绝对 `ASTER_CODEX_HOME` 显式覆盖。
+1. 在 Electron `userData/agent-home` 创建私有 `0700` Aster 智能体目录；开发/E2E 仅允许用绝对 `ASTER_AGENT_HOME` 显式覆盖。旧版 `userData/codex-home` 会在新目录不存在时原地迁移，`ASTER_CODEX_HOME` 只作为兼容别名读取。
 2. 发现并探测 Codex 二进制。
 3. 启动 `codex app-server --listen stdio://`。
 4. 完成 initialize/initialized。
 5. 读取 `model/list` 并转换为稳定领域模型。
 6. 发布 `ready` snapshot 到类型化 IPC 和 UI。
 
-Aster 不读取或写入官方客户端默认的 `~/.codex`。登录、thread、用户级 MCP/技能设置保存在 Aster 私有 home；项目仓库中的 `.codex` 与 `AGENTS.md` 仍按 Codex 公开层级规则生效。首次运行需要在 Aster 内单独登录，避免退出登录、任务列表或技能切换影响官方 Codex 桌面客户端。
+Aster 不读取或写入官方客户端默认的 `~/.codex`。登录、thread、用户级 MCP/技能设置保存在 Aster 私有 `agent-home`；启动上游进程时仅通过兼容环境变量 `CODEX_HOME` 指向该目录。项目仓库中的 `.codex` 与 `AGENTS.md` 仍按上游公开层级规则生效。首次运行需要在 Aster 内单独登录，避免退出登录、任务列表或技能切换影响官方 Codex 桌面客户端。
+
+面向普通用户的产品身份为 Aster。新建、恢复和分叉任务均传入稳定的 `developerInstructions`，要求日常回答自称 Aster；当用户询问架构、许可、模型或诊断时，仍必须如实说明 OpenAI 开源 Codex app-server 与实际模型提供商。技术协议名和第三方归属不会被重命名或隐藏。
 
 空闲状态异常退出时最多指数退避重启三次。运行中 turn 异常退出时不自动重放，因为命令或文件修改可能已经产生副作用；客户端显示失败并等待显式恢复。
 

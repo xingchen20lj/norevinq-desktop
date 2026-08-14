@@ -13,6 +13,8 @@ import type {
   FileOpenInput,
   FilePathInput,
   FilePreviewKind,
+  AgentImagePreview,
+  AgentImagePreviewInput,
   ProjectDirectory,
   ProjectFileEntry,
   ProjectFilePreview,
@@ -34,18 +36,24 @@ type PreviewToken = {
   inode: number
   expiresAt: number
 }
-type FileServiceOptions = { now?: () => number; openPath?: (path: string) => Promise<string> }
+type FileServiceOptions = {
+  now?: () => number
+  openPath?: (path: string) => Promise<string>
+  trustedArtifactRoots?: string[]
+}
 
 export class FileService {
   readonly #database: StateDatabase
   readonly #now: () => number
   readonly #openPath: (path: string) => Promise<string>
+  readonly #trustedArtifactRoots: string[]
   readonly #tokens = new Map<string, PreviewToken>()
 
   constructor(database: StateDatabase, options: FileServiceOptions = {}) {
     this.#database = database
     this.#now = options.now ?? Date.now
     this.#openPath = options.openPath ?? (() => Promise.reject(new Error('External file opening is unavailable.')))
+    this.#trustedArtifactRoots = (options.trustedArtifactRoots ?? []).map((path) => resolve(path))
   }
 
   listDirectory(input: FilePathInput): ProjectDirectory {
@@ -92,6 +100,23 @@ export class FileService {
     }
     const token = this.#issueToken(absolute, mimeType, metadata.size, metadata.dev, metadata.ino)
     return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, `aster-file://preview/${token}`, false)
+  }
+
+  readAgentImage(input: AgentImagePreviewInput): AgentImagePreview {
+    const roots = [this.#root(input), ...this.#trustedArtifactRoots]
+    const absolute = this.#resolveTrustedAbsolute(roots, input.path)
+    const metadata = lstatSync(absolute)
+    if (!metadata.isFile()) throw new Error('Only regular image files can be previewed.')
+    const mimeType = mimeTypeFromName(absolute)
+    if (!SAFE_INLINE_IMAGE_MIMES.has(mimeType)) throw new Error('This image format cannot be displayed inline.')
+    if (metadata.size > MAX_IMAGE_BYTES) throw new Error('The image exceeds the safe preview limit.')
+    const token = this.#issueToken(absolute, mimeType, metadata.size, metadata.dev, metadata.ino)
+    return {
+      name: absolute.split(sep).at(-1) ?? 'image',
+      size: metadata.size,
+      mimeType,
+      url: `aster-file://preview/${token}`,
+    }
   }
 
   async openExternal(input: FileOpenInput): Promise<void> {
@@ -149,6 +174,38 @@ export class FileService {
     const canonical = realpathSync(absolute)
     if (canonical !== root && !canonical.startsWith(`${root}${sep}`)) throw new Error('File path escapes the project root.')
     return { absolute: canonical, relativePath: relative(root, canonical).split(sep).join('/') }
+  }
+
+  #resolveTrustedAbsolute(roots: string[], inputPath: string): string {
+    if (inputPath.includes('\0') || !isAbsolute(inputPath)) throw new Error('An absolute image path is required.')
+    const candidate = resolve(inputPath)
+    for (const configuredRoot of roots) {
+      try {
+        if (lstatSync(configuredRoot).isSymbolicLink()) continue
+        const lexicalRelative = relative(configuredRoot, candidate)
+        if (lexicalRelative && lexicalRelative !== '..' && !lexicalRelative.startsWith(`..${sep}`) && !isAbsolute(lexicalRelative)) {
+          let lexicalCurrent = configuredRoot
+          for (const segment of lexicalRelative.split(sep)) {
+            lexicalCurrent = join(lexicalCurrent, segment)
+            if (lstatSync(lexicalCurrent).isSymbolicLink()) throw new Error('Symbolic links cannot be traversed by the previewer.')
+          }
+        }
+        const canonicalRoot = realpathSync(configuredRoot)
+        const canonicalCandidate = realpathSync(candidate)
+        const relativePath = relative(canonicalRoot, canonicalCandidate)
+        if (!relativePath || relativePath === '..' || relativePath.startsWith(`..${sep}`) || isAbsolute(relativePath)) continue
+        let current = canonicalRoot
+        for (const segment of relativePath.split(sep)) {
+          current = join(current, segment)
+          if (lstatSync(current).isSymbolicLink()) throw new Error('Symbolic links cannot be traversed by the previewer.')
+        }
+        const canonical = realpathSync(current)
+        if (canonical.startsWith(`${canonicalRoot}${sep}`)) return canonical
+      } catch (error) {
+        if (error instanceof Error && error.message.includes('Symbolic links')) throw error
+      }
+    }
+    throw new Error('The image is outside the active project and Aster artifact directory.')
   }
 
   #issueToken(path: string, mimeType: string, size: number, device: number, inode: number): string {
@@ -236,6 +293,10 @@ const TEXT_EXTENSIONS = new Set([
 
 const DANGEROUS_EXTENSIONS = new Set([
   '.app', '.bat', '.cmd', '.com', '.command', '.exe', '.js', '.lnk', '.msi', '.msp', '.ps1', '.scr', '.sh', '.url', '.vbs',
+])
+
+const SAFE_INLINE_IMAGE_MIMES = new Set([
+  'image/avif', 'image/bmp', 'image/gif', 'image/x-icon', 'image/jpeg', 'image/png', 'image/webp',
 ])
 
 const MIME_TYPES: Record<string, string> = {

@@ -1,17 +1,15 @@
 {
   "manifestVersion": 1,
   "protocolSurface": "stable",
-  "generatedAt": "2026-08-09T16:57:31.212Z",
   "binary": {
-    "path": "/Applications/ChatGPT.app/Contents/Resources/codex",
-    "source": "chatgpt-bundle",
-    "version": "codex-cli 0.147.0-alpha.6.5",
-    "sha256": "59ac894ace269b3781c52990bfafe077566546ec822be327b1f7e719149a121b"
+    "source": "project-dependency",
+    "version": "codex-cli 0.147.0",
+    "sha256": "134063e133f0b4244fa3b251acf973d4fe4b4aeeacbdc135211bf480f59f1477"
   },
-  "schemaSha256": "6e12bb6cb94d3cd91011bc861c5944ba5db7fbeeb406399a3cb9b9e771c27999",
+  "schemaSha256": "54fd6e4e4849d43f93c8573f325d5bac4bc66a57fabf2433ea1d3cd73d0754b2",
   "outputs": {
     "typescript": {
-      "sha256": "5f10c708c106231e983254987b980f4484a8bd654ba36a2226e6efd5be12cb8c",
+      "sha256": "045a3a0bda23dec6aa3c62ce464dd84fb9527f9f4f1de4d34eb60b7e77110efe",
       "files": [
         "AbsolutePathBuf.ts",
         "AgentMessageInputContent.ts",
@@ -658,7 +656,7 @@
       ]
     },
     "jsonSchema": {
-      "sha256": "6e12bb6cb94d3cd91011bc861c5944ba5db7fbeeb406399a3cb9b9e771c27999",
+      "sha256": "54fd6e4e4849d43f93c8573f325d5bac4bc66a57fabf2433ea1d3cd73d0754b2",
       "files": [
         "ApplyPatchApprovalParams.json",
         "ApplyPatchApprovalResponse.json",

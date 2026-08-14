@@ -18,7 +18,7 @@ afterEach(async () => {
 test('official Codex app-server exposes account state, permission profiles, and the thread lifecycle', async () => {
   const root = await mkdtemp(join(tmpdir(), 'aster-codex-lifecycle-'))
   temporaryRoots.push(root)
-  const codexHome = join(root, 'codex-home')
+  const codexHome = join(root, 'agent-home')
   const projectPath = join(root, 'project')
   await Promise.all([mkdir(codexHome), mkdir(projectPath)])
   const entrypoint = bundledCodexEntrypoint()

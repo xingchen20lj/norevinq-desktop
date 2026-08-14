@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   DEEPSEEK_CODEX_CONFIG_OVERRIDES,
   DEEPSEEK_CODEX_MODELS,
+  createDeepSeekSecurityConfig,
   hasDeepSeekEnvironment,
 } from '../../src/main/providers/deepseek.js'
 
@@ -27,5 +28,29 @@ describe('DeepSeek Codex provider launch configuration', () => {
     expect(hasDeepSeekEnvironment({ DEEPSEEK_API_KEY: ' secret ' })).toBe(true)
     expect(hasDeepSeekEnvironment({ DEEPSEEK_API_KEY: '   ' })).toBe(false)
     expect(hasDeepSeekEnvironment({})).toBe(false)
+  })
+
+  it('pins Security to the selected Aster runtime and serializes Flash investigators', () => {
+    const flash = createDeepSeekSecurityConfig(
+      'deepseek-v4-flash',
+      'test-only-key',
+      '/private/security',
+      { PATH: '/usr/bin' },
+      '/opt/aster/codex-0.147.0',
+    )
+    const pro = createDeepSeekSecurityConfig(
+      'deepseek-v4-pro',
+      'test-only-key',
+      '/private/security',
+      { PATH: '/usr/bin' },
+      '/opt/aster/codex-0.147.0',
+    )
+    expect(flash.environment).toMatchObject({ CODEX_CLI_PATH: '/opt/aster/codex-0.147.0' })
+    expect(flash.codexOverrides).toMatchObject({
+      features: { multi_agent_v2: { enabled: true, max_concurrent_threads_per_session: 1 } },
+    })
+    expect(pro.codexOverrides).toMatchObject({
+      features: { multi_agent_v2: { enabled: true, max_concurrent_threads_per_session: 4 } },
+    })
   })
 })

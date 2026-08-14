@@ -1,13 +1,14 @@
 # 桌面构建与发布
 
-最后更新：2026-08-11。
+最后更新：2026-08-14。
 
 ## 发布基线
 
 - Node.js 24.14.0、pnpm 11.16.0、Electron 43.3.0、electron-builder 26.15.3、electron-updater 6.8.9；
 - 主 Codex runtime 固定为公开 `@openai/codex` 0.147.0，并随平台包内置；
-- Codex Security SDK 固定 0.1.8，其 SDK 元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，因此 Security 的打包兼容性必须通过目标账户 sealed 扫描复验；
+- Codex Security SDK 固定 0.1.11，其依赖元数据声明 Codex SDK/runtime 0.144.6；发布包为控制体积只保留主 Codex 0.147.0，DeepSeek Security 显式复用该二进制并已通过 Flash/Pro 标准 sealed 扫描；macOS Deep Scan 的官方外层沙箱兼容模式已完成一文件完整 sealed 对照；OpenAI 账户路径仍需签名目标包在线复验；
 - macOS 目标为 DMG + ZIP，Windows 目标为交互式 per-user NSIS；
+- 源码采用 Apache-2.0；安装包额外携带 `LICENSE.txt`、`NOTICE.txt` 和 `THIRD_PARTY_NOTICES.md`；
 - 构建不会自动发布，所有 builder 命令显式使用 `--publish never`。
 
 官方 OpenAI 文档说明 `codex app-server` 默认使用 stdio/JSONL，并且生成的 schema 与运行的 Codex 版本严格对应。Aster Code 因此直接固定并发现包内 0.147.0，而不是依赖用户 PATH 或 ChatGPT 安装。显式配置和 `CODEX_BINARY` 仍可覆盖包内版本用于诊断。
@@ -34,7 +35,7 @@ CSC_IDENTITY_AUTO_DISCOVERY=false pnpm package:mac
 pnpm package:win
 ```
 
-`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready。
+`test:e2e:packaged` 不是普通开发构建冒烟：它直接启动 `release/mac/Aster Code.app` 或 `release/win-unpacked/Aster Code.exe`，要求 runtime 路径来自 `app.asar.unpacked`、版本精确为稳定版 0.147.0（预发布后缀不通过）、模型目录非空并达到 ready；还会在真实临时 Git 仓库上执行 DeepSeek Security 本地预检。`afterPack` 必须把 Security `_bundled_plugin` 从已解析依赖路径复制到真实 `app.asar.unpacked` 目录，`check:package` 会拒绝缺失、符号链接、越界或 manifest 身份不匹配。
 
 应用注册 `aster-code` 自定义协议，只接受 `aster-code://project/<project-uuid>` 与 `aster-code://thread/<thread-uuid>?project=<project-uuid>`。URL 不接受本地路径、命令、凭据、片段或额外参数；主进程只会打开 SQLite 已知项目及已关联任务。`check:package` 会在 macOS 实际产物的 `Info.plist` 中验证 URL scheme；Windows NSIS 的协议注册需在目标系统安装后用同一两类 URL 复验。
 
@@ -113,7 +114,7 @@ Windows CI 会直接启动 `win-unpacked` 应用，验证随包 `codex.exe`。�
 
 ## 发布清单
 
-1. 更新版本号、CHANGELOG、自主状态和功能一致性表。
+1. 更新版本号、CHANGELOG、自主状态和功能一致性表；公开源码前逐项完成 `OPEN_SOURCE_RELEASE_CHECKLIST.md`。
 2. 同步并审阅 Codex schema；确认 package runtime 与 schema 版本。
 3. 运行 `pnpm verify:ci`、`pnpm audit:dependencies` 和平台 packaged E2E。
 4. 在目标系统安装产物，验证项目、任务、终端、Git、文件预览、DeepSeek 和安全诊断。

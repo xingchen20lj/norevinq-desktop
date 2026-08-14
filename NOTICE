@@ -1,0 +1,19 @@
+Aster Code
+Copyright 2026 Aster Code contributors
+
+This product is licensed under the Apache License, Version 2.0.
+
+Aster Code includes and interoperates with software from the OpenAI Codex
+and Codex Security projects. The generated protocol bindings under
+src/generated/codex are derived from the public Codex app-server schema.
+Those upstream components are distributed under the Apache License 2.0.
+
+Aster Code applies a documented patch to @openai/codex-security 0.1.11. The
+patch adds the fixed DeepSeek Responses provider, instance-scoped environment
+isolation, and a read-only token-usage callback. It does not remove sealed
+artifact validation, sandbox policy, output isolation, or scan contracts. The
+complete patch is distributed in patches/@openai__codex-security@0.1.11.patch.
+
+OpenAI, Codex, DeepSeek, Electron, GitHub, and other product names are
+trademarks of their respective owners. Aster Code is an independent project
+and is not endorsed by, sponsored by, or affiliated with OpenAI or DeepSeek.

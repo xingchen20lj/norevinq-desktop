@@ -18,6 +18,21 @@ const threads = new Map([
   [primaryThreadId, makeThread(primaryThreadId, 'Lifecycle primary', 20)],
   [secondaryThreadId, makeThread(secondaryThreadId, 'Lifecycle secondary', 10)],
 ])
+const generatedImagePath = join(process.env.CODEX_HOME ?? cwd, 'generated_images', 'lifecycle-proof.png')
+threads.get(primaryThreadId).turns = [{
+  id: 'turn-generated-image',
+  status: 'completed',
+  startedAt: 2,
+  completedAt: 3,
+  durationMs: 1_000,
+  error: null,
+  items: [{
+    type: 'agentMessage',
+    id: 'generated-image-message',
+    text: `图片保存在：\n\n![Aster 生成图片](<${generatedImagePath}>)`,
+    phase: 'final_answer',
+  }],
+}]
 const archived = new Set()
 const goals = new Map()
 let permissionRequestSent = false

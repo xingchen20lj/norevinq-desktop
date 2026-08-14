@@ -12,7 +12,7 @@ test('shows a durable handoff recovery without deleting post-crash user changes'
   test.setTimeout(45_000)
   const profile = mkdtempSync(join(tmpdir(), 'aster-worktree-recovery-e2e-'))
   const projectPath = join(profile, 'project')
-  const codexHome = join(profile, 'codex-home')
+  const codexHome = join(profile, 'agent-home')
   const wrapper = join(profile, 'fake-codex')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
@@ -47,11 +47,11 @@ test('shows a durable handoff recovery without deleting post-crash user changes'
   chmodSync(wrapper, 0o755)
   const application = await electron.launch({
     args: ['.', `--user-data-dir=${profile}`],
-    env: { ...process.env, ASTER_CODEX_HOME: codexHome, CODEX_BINARY: wrapper },
+    env: { ...process.env, ASTER_AGENT_HOME: codexHome, CODEX_BINARY: wrapper },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     await window.getByRole('button', { name: 'Local', exact: true }).click()
     const panel = window.getByRole('complementary', { name: '工作树' })
     const recovery = panel.getByRole('status').filter({ hasText: '工作树交接需要恢复' })

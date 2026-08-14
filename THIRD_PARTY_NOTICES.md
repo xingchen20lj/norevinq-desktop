@@ -40,7 +40,7 @@ Run `pnpm notices:generate` after changing production dependencies. CI runs `pnp
 | @openai/codex | 0.144.6 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
 | @openai/codex | 0.147.0 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
 | @openai/codex-sdk | 0.144.6 | Apache-2.0 | [link](https://github.com/openai/codex#readme) |
-| @openai/codex-security | 0.1.8 | Apache-2.0 | [link](https://developers.openai.com/codex/security) |
+| @openai/codex-security | 0.1.11 | Apache-2.0 | [link](https://developers.openai.com/codex/security) |
 | @scalar/openapi-types | 0.8.0 | MIT | [link](https://github.com/scalar/scalar) |
 | @toon-format/toon | 2.3.1 | MIT | [link](https://toonformat.dev/) |
 | @types/node | 26.2.0 | MIT | [link](https://github.com/DefinitelyTyped/DefinitelyTyped/tree/master/types/node) |

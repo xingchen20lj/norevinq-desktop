@@ -29,12 +29,12 @@ test('DeepSeek V4 Pro completes a real Codex apply_patch workflow', async () => 
     args: ['.', `--user-data-dir=${profile}`],
     env: {
       ...process.env,
-      ASTER_CODEX_HOME: join(profile, 'codex-home'),
+      ASTER_AGENT_HOME: join(profile, 'agent-home'),
     },
   })
   try {
     const window = await application.firstWindow()
-    await expect(window.locator('.runtime-pill')).toContainText('Codex 已就绪', { timeout: 20_000 })
+    await expect(window.locator('.runtime-pill')).toContainText('Aster 已就绪', { timeout: 20_000 })
     const models = await window.evaluate(async () => {
       const bridge = Reflect.get(window, 'aster') as {
         getRuntimeStatus: () => Promise<{ models: { id: string }[] }>

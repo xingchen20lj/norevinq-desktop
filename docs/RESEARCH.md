@@ -88,17 +88,19 @@
 
 ## Codex Security
 
-- 当前稳定：`@openai/codex-security@0.1.8`，ESM，Node `^22.13 || ^24 || ^26`，扫描还要求 Python 3.10+。
+- 当前项目固定：`@openai/codex-security@0.1.11`，ESM，Node `^22.13 || ^24 || ^26`，扫描还要求 Python 3.10+。
 - SDK 支持 repository/path/committed diff/working tree、standard/deep、preflight、预算、进度、取消和密封 artifacts。
-- 0.1.8 的隔离运行时锁定 `@openai/codex`/SDK 0.144.6，必须与桌面主 app-server 0.147.0 分离。
+- 0.1.11 的依赖元数据仍锁定 `@openai/codex`/SDK 0.144.6；Aster 的 DeepSeek Security 路径显式设置 `CODEX_CLI_PATH`，复用随应用验证的 0.147.0 二进制，同时保持独立 Codex home、配置和进程环境。
 - 历史、误报、部分导出、validate 和 patch 仍主要由 CLI 提供；不能直接绑定私有 workbench SQLite schema。
 - SDK 公开可安装不代表账户拥有扫描权限；认证缺失、Security access 缺失和 Trusted Access 未授予是不同状态。
+- 官方 SDK 文档允许通过 `codexOverrides` 配置其他 provider，并公开示例 Bedrock、OpenRouter 与 Fireworks；文档没有列出或认证 DeepSeek，也没有“Security 仅支持 DeepSeek Pro”的声明。Aster 的 DeepSeek 集成是可审计扩展，模型状态必须由真实 sealed 契约测试证明。
 - 本机 SDK 真实诊断：Node 24、隔离 Python 3.12、ChatGPT 存储登录均可用；preflight 返回 `gpt-5.6-sol`/`xhigh` 且产物目录位于仓库外。
 - 真实路径扫描已进入 discovery，说明认证、插件和模型链路可工作；以 `maxCostUsd=2` 运行时 SDK 在估算 $2.010621 后抛出 `ScanCostLimitExceededError`。该输出未 sealed，产品必须保留失败状态且不得导入其中的部分 finding。
+- DeepSeek V4 Pro 在一文件 standard 扫描中约 12 分钟返回 `completed + sealed`。V4 Flash 的早期 0.144.6/并发对照发生收敛异常；固定 Aster 0.147.0 且并发为 1 后，同类真实扫描于 160.9 秒返回 `completed + sealed`，说明早期现象不能归因成官方模型限制。
 
 来源：
 
-- [Codex Security 0.1.8 release](https://github.com/openai/codex-security/releases/tag/npm-v0.1.8)
+- [Codex Security releases](https://github.com/openai/codex-security/releases)
 - [Codex Security SDK 官方文档](https://learn.chatgpt.com/docs/security/sdk)
 - [TypeScript SDK 源码](https://github.com/openai/codex-security/tree/main/sdk/typescript)
 
