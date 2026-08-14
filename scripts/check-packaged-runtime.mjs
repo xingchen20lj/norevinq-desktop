@@ -5,13 +5,16 @@ import { promisify } from 'node:util'
 import { requireSecureUpdateUrl } from './update-release-config.mjs'
 
 const execute = promisify(execFile)
-const unpackedRoot = process.platform === 'darwin'
-  ? resolve('release/mac/Aster Code.app/Contents/Resources/app.asar.unpacked')
+const applicationRoot = process.platform === 'darwin'
+  ? await findMacApplicationRoot()
+  : null
+const unpackedRoot = applicationRoot
+  ? join(applicationRoot, 'Contents', 'Resources', 'app.asar.unpacked')
   : process.platform === 'win32'
     ? resolve('release/win-unpacked/resources/app.asar.unpacked')
     : null
-const resourcesRoot = process.platform === 'darwin'
-  ? resolve('release/mac/Aster Code.app/Contents/Resources')
+const resourcesRoot = applicationRoot
+  ? join(applicationRoot, 'Contents', 'Resources')
   : process.platform === 'win32'
     ? resolve('release/win-unpacked/resources')
     : null
@@ -25,8 +28,7 @@ if (binaries.length !== 1) {
 
 const binary = binaries[0]
 if (!binary) throw new Error('Packaged Codex binary is missing.')
-const { stdout, stderr } = await execute(binary, ['--version'], { timeout: 15_000, windowsHide: true })
-const version = `${stdout}\n${stderr}`.trim()
+const version = await readCodexVersion(binary, unpackedRoot)
 if (!/^codex(?:-cli)?\s+0\.147\.0$/iu.test(version)) {
   throw new Error(`Packaged Codex version does not match 0.147.0: ${version || '<empty>'}`)
 }
@@ -47,6 +49,27 @@ async function findCodexBinaries(directory) {
     }
   }
   return found
+}
+
+async function readCodexVersion(binary, directory) {
+  const target = process.platform === 'darwin'
+    ? binary.includes('aarch64-apple-darwin') ? { arch: 'arm64', packageName: 'codex-darwin-arm64' } : { arch: 'x86_64', packageName: 'codex-darwin-x64' }
+    : null
+  const hostArch = process.arch === 'arm64' ? 'arm64' : process.arch === 'x64' ? 'x86_64' : process.arch
+  if (!target || target.arch === hostArch) {
+    const { stdout, stderr } = await execute(binary, ['--version'], { timeout: 15_000, windowsHide: true })
+    return `${stdout}\n${stderr}`.trim()
+  }
+
+  const { stdout } = await execute('/usr/bin/lipo', ['-archs', binary], { timeout: 15_000 })
+  if (stdout.trim() !== target.arch) throw new Error(`Packaged Codex has unexpected architecture: ${stdout.trim()}`)
+  const packagePath = join(directory, 'node_modules', '@openai', target.packageName, 'package.json')
+  const packageDocument = JSON.parse(await readFile(packagePath, 'utf8'))
+  if (packageDocument?.version !== `0.147.0-darwin-${target.arch === 'arm64' ? 'arm64' : 'x64'}`) {
+    throw new Error(`Packaged Codex package has unexpected version: ${String(packageDocument?.version)}`)
+  }
+  console.log(`Packaged Codex cross-architecture check: ${target.arch}`)
+  return 'codex-cli 0.147.0'
 }
 
 async function verifySecurityPlugin(directory) {
@@ -75,11 +98,27 @@ async function verifyProtocolRegistration() {
   if (!configured) throw new Error('electron-builder is missing the aster-code protocol registration.')
 
   if (process.platform !== 'darwin') return
-  const infoPath = resolve('release/mac/Aster Code.app/Contents/Info.plist')
+  const infoPath = join(applicationRoot, 'Contents', 'Info.plist')
   const info = await readFile(infoPath, 'utf8')
   if (!/<key>CFBundleURLSchemes<\/key>[\s\S]*?<string>aster-code<\/string>/u.test(info)) {
     throw new Error(`Packaged Info.plist is missing the aster-code URL scheme: ${infoPath}`)
   }
+}
+
+async function findMacApplicationRoot() {
+  const candidates = [
+    resolve('release/mac/Aster Code.app'),
+    resolve('release/mac-arm64/Aster Code.app'),
+  ]
+  const existing = []
+  for (const candidate of candidates) {
+    const metadata = await lstat(candidate).catch(() => null)
+    if (metadata?.isDirectory() && !metadata.isSymbolicLink()) existing.push(candidate)
+  }
+  if (existing.length !== 1) {
+    throw new Error(`Expected exactly one packaged macOS application, found ${String(existing.length)}: ${existing.join(', ')}`)
+  }
+  return existing[0]
 }
 
 async function verifyUpdateConfiguration(directory) {
