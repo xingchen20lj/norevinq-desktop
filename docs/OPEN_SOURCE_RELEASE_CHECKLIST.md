@@ -23,27 +23,27 @@
 - [x] 在 GitHub 仓库设置中确认描述、主题和默认分支；
 - [x] 生成并验证完整 Git bundle 私有备份；当前没有 Developer ID、Windows 签名证书或其他本地签名资料，凭据未进入 Git。
 
-建议仓库主题：`electron`、`react`、`typescript`、`codex`、`deepseek`、`coding-agent`、`desktop-app`、`git-worktree`。
+当前仓库主题：`electron`、`react`、`typescript`、`deepseek`、`coding-agent`、`desktop-app`、`git-worktree`、`local-first`、`security`。
 
 ## 切换为 Public 后立即完成
 
-- [ ] 启用 GitHub Private Vulnerability Reporting；
-- [ ] 启用 Secret Scanning、Push Protection 和 Dependabot Alerts；
-- [ ] 创建 `main` ruleset：禁止 force push/删除，合并前要求 `Verify (macos-15)` 与 `Verify (windows-2025)`；
-- [ ] 要求 PR 审阅后合并；
-- [ ] 验证 README 的 CI/License badge、Issue 模板和 Security Advisory 入口；
-- [ ] 检查公开仓库的 Actions 日志，确认没有环境变量、签名资料、本地路径或安装产物泄漏。
+- [x] 启用 GitHub Private Vulnerability Reporting；
+- [x] 启用 Secret Scanning、Push Protection、Dependabot Alerts 和自动安全更新；
+- [x] 创建 `main` ruleset：禁止 force push/删除，合并前要求 `Verify (macos-15)` 与 `Verify (windows-2025)`；
+- [x] 要求所有变更通过 PR 合并，并要求审阅对话全部解决；个人维护阶段不强制其他账户批准；
+- [x] 验证 README 的 CI/License badge、Issue 模板和 Security Advisory 入口；
+- [x] 检查公开仓库的 Actions 日志，确认没有环境变量、签名资料、本地路径或安装产物泄漏。
 
-私有免费仓库当前无法配置 ruleset/classic branch protection；公开后应立即执行以上设置，避免 `main` 长时间处于未保护状态。
+仓库已于 2026-08-15 切换为 Public；上述安全设置与 `Protect main` ruleset 已立即生效。
 
 ## 首个源码预览版本
 
 - [x] 将 `package.json` 固定为首个源码预览版本 `0.1.0`；
 - [x] 把 CHANGELOG 中 `0.1.0` 改为发布日期 2026-08-15；
 - [x] 运行完整质量门和依赖审计；
-- [ ] 创建带注释的 Git tag；
-- [ ] 由 GitHub tag 自动提供源码归档，并发布变更说明和已知限制；
-- [ ] 确认 Release/Actions 中不存在预编译安装包。
+- [x] 创建带注释的 Git tag `v0.1.0`；
+- [x] 由 GitHub tag 自动提供源码归档，并发布变更说明和已知限制；
+- [x] 确认 Release/Actions 中不存在预编译安装包。
 
 ## GitHub 之外如需提供正式安装包
 
@@ -62,11 +62,13 @@
 - 未验证的漏洞细节、攻击代码或第三方私密报告；
 - 使用真实外部服务产生但未经脱敏和授权的测试数据。
 
-## 2026-08-14 验证证据
+## 2026-08-15 验证证据
 
 - Gitleaks 8.30.1 扫描全部既有历史提交：0 泄漏；旧测试占位符使用规则 ID、精确行与精确路径限定的 allowlist；
 - `pnpm audit --prod --audit-level high`：0 已知漏洞；生产依赖许可证清单：93 个包；
-- `pnpm verify:ci`：40 个测试文件，206 项通过、1 项需要显式在线环境的测试跳过；覆盖率 statements 81.33%、branches 70.21%、functions 86.33%、lines 88.23%；
+- `pnpm verify:ci`：42 个测试文件中 41 个通过、1 个需要显式在线环境的测试跳过；214 项通过、1 项跳过；覆盖率 statements 81.33%、branches 70.30%、functions 86.40%、lines 88.24%；
 - 真实 Electron 主流程 E2E：1 项通过；packaged app runtime E2E：1 项通过；
+- GitHub PR #11 的 macOS 15、Windows 2025 与离线 Electron smoke 均通过；
+- GitHub Release `v0.1.0` 为源码预发布，资产列表为空；仅提供 GitHub 自动生成的源码归档；
 - Intel x64 与 Apple Silicon arm64 DMG 均通过 `hdiutil verify`，包内 Electron 与 Codex 架构匹配；
 - 四张 README 产品截图由上述真实 Electron E2E 生成并人工检查，无用户目录、真实凭据或私人项目内容。
