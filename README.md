@@ -8,6 +8,8 @@ Aster Code 是一款面向 macOS 和 Windows 的本地优先桌面智能编程�
 
 > 当前处于 `0.1.0` 预览阶段。源码、测试和无签名内部安装包已经过验证；正式公开安装包仍需要平台签名、公证和 Windows 真机发布验证。Aster Code 是独立开源项目，不是 OpenAI 或 DeepSeek 官方产品。
 
+> **官方来源：** Aster Code 由 [xingchen20lj](https://github.com/xingchen20lj) 创建和维护，当前唯一规范源码仓库是 [xingchen20lj/aster-code-desktop](https://github.com/xingchen20lj/aster-code-desktop)。未由该仓库发布或明确链接的副本、修改版和安装包不是官方发行版。
+
 ![Aster Code 命令面板](docs/assets/screenshots/command-palette.png)
 
 ## 已实现能力
@@ -79,6 +81,8 @@ Aster 使用独立 Electron `userData` 目录保存 SQLite、日志、工作树�
 - [发布流程](docs/RELEASING.md)
 - [当前开发状态](docs/AUTONOMOUS_STATE.md)
 - [第三方许可证](THIRD_PARTY_NOTICES.md)
+- [作者与贡献者](AUTHORS.md)
+- [引用信息](CITATION.cff)
 - [品牌与第三方商标说明](TRADEMARKS.md)
 
 ## 参与贡献
