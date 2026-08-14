@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { lstatSync, readFileSync, realpathSync } from 'node:fs'
+import { closeSync, constants, fstatSync, lstatSync, openSync, readSync, realpathSync } from 'node:fs'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -141,7 +141,7 @@ async function trackedDiff(
   status: string,
   mode: DiffMode,
 ): Promise<DiffFile> {
-  const args = ['diff', '--no-ext-diff', '--no-color', '--unified=3']
+  const args = ['-c', 'core.fsmonitor=false', 'diff', '--no-ext-diff', '--no-color', '--unified=3']
   if (mode === 'staged') args.push('--cached')
   args.push('--', path)
   const result = await execFileAsync('git', args, {
@@ -156,9 +156,23 @@ function untrackedDiff(root: string, path: string): DiffFile {
   const absolute = safeRepositoryPath(root, path)
   const stats = lstatSync(absolute)
   if (!stats.isFile()) return emptyBinaryDiff(path, '??')
+  if (stats.size > MAX_FILE_PATCH) return emptyTruncatedDiff(path, '??')
   const real = realpathSync(absolute)
   if (!isWithinRoot(root, real)) throw new Error('Untracked path resolves outside the repository.')
-  const content = readFileSync(real)
+  const descriptor = openSync(real, constants.O_RDONLY | constants.O_NOFOLLOW)
+  let content: Buffer
+  try {
+    const opened = fstatSync(descriptor)
+    if (!opened.isFile() || opened.dev !== stats.dev || opened.ino !== stats.ino) {
+      throw new Error('Untracked file changed while its diff was being read.')
+    }
+    if (opened.size > MAX_FILE_PATCH) return emptyTruncatedDiff(path, '??')
+    content = Buffer.allocUnsafe(opened.size)
+    const read = readSync(descriptor, content, 0, opened.size, 0)
+    content = content.subarray(0, read)
+  } finally {
+    closeSync(descriptor)
+  }
   if (content.includes(0)) return emptyBinaryDiff(path, '??')
   const text = content.toString('utf8')
   const lineCount = text.split('\n').length - (text.endsWith('\n') ? 1 : 0)
@@ -186,6 +200,10 @@ function isWithinRoot(root: string, candidate: string): boolean {
 
 function emptyBinaryDiff(path: string, status: string): DiffFile {
   return { path, oldPath: null, status, additions: 0, deletions: 0, binary: true, patch: '', truncated: false, hunks: [] }
+}
+
+function emptyTruncatedDiff(path: string, status: string): DiffFile {
+  return { path, oldPath: null, status, additions: 0, deletions: 0, binary: false, patch: '', truncated: true, hunks: [] }
 }
 
 function finalizeDiff(path: string, oldPath: string | null, status: string, rawPatch: string): DiffFile {
@@ -253,7 +271,7 @@ function parseHunk(lines: string[]): DiffHunk | null {
 
 async function runGitWithInput(cwd: string, args: string[], input: string): Promise<void> {
   await new Promise<void>((resolvePromise, reject) => {
-    const child = spawn('git', args, {
+    const child = spawn('git', ['-c', 'core.fsmonitor=false', ...args], {
       cwd,
       windowsHide: true,
       stdio: ['pipe', 'ignore', 'pipe'],

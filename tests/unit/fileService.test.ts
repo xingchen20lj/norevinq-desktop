@@ -52,6 +52,19 @@ describe('FileService', () => {
     fixture.database.close()
   })
 
+  it('bounds directory enumeration before loading every entry', () => {
+    const fixture = createFixture()
+    for (let index = 0; index < 501; index += 1) {
+      writeFileSync(join(fixture.root, `entry-${String(index).padStart(3, '0')}.txt`), '')
+    }
+    const service = new FileService(fixture.database)
+
+    const directory = service.listDirectory({ projectId: fixture.projectId, path: '' })
+    expect(directory.entries).toHaveLength(500)
+    expect(directory.truncated).toBe(true)
+    fixture.database.close()
+  })
+
   it('issues opaque expiring media URLs and never serializes project paths into them', () => {
     const fixture = createFixture()
     writeFileSync(join(fixture.root, 'proof.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))

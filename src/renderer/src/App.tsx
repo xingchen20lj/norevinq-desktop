@@ -1201,7 +1201,7 @@ function GitPanel({ project, snapshot, close, update, onError, onComment }: {
       refreshRepository={async () => update(await window.norevinq.getGitStatus({ projectId: project.id }))}
       onComment={onComment}
       onError={onError}
-    /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{project.name} 还不是 Git 仓库。</p><button className="primary-button" disabled={busy} onClick={() => void act(() => window.norevinq.initializeGit({ projectId: project.id }))}>初始化仓库</button></div> : <>
+    /> : !snapshot?.initialized ? <div className="git-empty"><GitBranch size={24} /><p>{snapshot?.error ?? `${project.name} 还不是 Git 仓库。`}</p>{!snapshot?.error && <button className="primary-button" disabled={busy} onClick={() => void act(() => window.norevinq.initializeGit({ projectId: project.id }))}>初始化仓库</button>}</div> : <>
       <div className="git-summary"><span>{snapshot.upstream ?? '无上游'}</span><span>↑ {snapshot.ahead} ↓ {snapshot.behind}</span><button onClick={() => void act(() => window.norevinq.getGitStatus({ projectId: project.id }))}>刷新</button></div>
       <div className="diff-actions"><button disabled={busy || unstaged.length === 0} onClick={() => void review('working')}>审阅未暂存</button><button disabled={busy || staged.length === 0} onClick={() => void review('staged')}>审阅已暂存</button></div>
       <GitFileGroup title="已暂存" files={staged} actionLabel="取消暂存" action={(path) => act(() => window.norevinq.unstageGitPaths({ projectId: project.id, paths: [path] }))} secondaryActionLabel="可恢复丢弃" secondaryAction={(file) => file.worktreeStatus === '.' ? discardFile(file.path) : Promise.resolve()} showSecondary={(file) => file.worktreeStatus === '.'} />

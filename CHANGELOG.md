@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-08-15
+
 ### Added
 
 - Apache-2.0 开源许可证、贡献指南、行为准则、支持说明和 GitHub 模板。
@@ -16,7 +18,7 @@
 
 - Codex app-server 协议绑定改为由锁定的 `@openai/codex` 项目依赖生成，清单不再记录本机绝对路径或非稳定 ChatGPT bundle 版本。
 - Codex Security 升级到 0.1.11，并以公开 Apache-2.0 补丁增加固定 DeepSeek provider、实例级凭据环境和 token usage 回调；补丁范围与上游限制均公开记录。
+- 开源安全复核的 3 项中风险问题已修复：Git 不再扩大到所选目录之外的父仓库、被动 Git 操作禁用仓库可控的 fsmonitor、Security 扫描不再拥有主机根目录读取权限。
+- 文件预览改为同一文件描述符校验和读取；目录枚举与未跟踪文件 diff 在读取前执行硬上限，避免大目录/大文件造成无界同步工作。
 
-## [0.1.0] - Unreleased
-
-首个公开预览版本正在准备中。功能完成度与验证状态见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)。
+首个公开源码预览版本。功能完成度与验证状态见 [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md)。

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -64,6 +64,42 @@ describe('GitService', () => {
 
     await expect(service.stage({ projectId: project.id, paths: ['/etc/passwd'] })).rejects.toThrow('project-relative')
     await expect(service.stage({ projectId: project.id, paths: ['../escape'] })).rejects.toThrow('escapes')
+    database.close()
+  })
+
+  it('refuses to expand a selected nested project into an ancestor repository', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-boundary-'))
+    temporaryPaths.push(root)
+    runGit(root, ['init', '-b', 'main'])
+    const projectPath = join(root, 'selected-project')
+    mkdirSync(projectPath)
+    writeFileSync(join(root, 'private-sibling.txt'), 'must stay outside the selected project\n')
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+
+    const status = await service.getStatus({ projectId: project.id })
+    expect(status.initialized).toBe(false)
+    expect(status.root).toBeNull()
+    expect(status.files).toEqual([])
+    expect(status.error).toContain('Git 仓库根目录')
+    expect(JSON.stringify(status)).not.toContain('private-sibling.txt')
+    database.close()
+  })
+
+  it('does not execute a repository-controlled core.fsmonitor helper during passive status', async () => {
+    const root = mkdtempSync(join(tmpdir(), 'norevinq-git-fsmonitor-'))
+    temporaryPaths.push(root)
+    const projectPath = mkdtempSync(join(root, 'project-'))
+    const marker = join(root, 'fsmonitor-ran')
+    runGit(projectPath, ['init', '-b', 'main'])
+    runGit(projectPath, ['config', 'core.fsmonitor', `sh -c 'printf compromised > "${marker}"'`])
+    const database = new StateDatabase(join(root, 'state.sqlite3'))
+    const project = database.upsertProject(projectPath)
+    const service = new GitService(database)
+
+    expect((await service.getStatus({ projectId: project.id })).initialized).toBe(true)
+    expect(existsSync(marker)).toBe(false)
     database.close()
   })
 

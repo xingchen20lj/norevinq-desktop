@@ -1,18 +1,21 @@
 # 无人值守开发状态
 
-最后更新：2026-08-14（Asia/Shanghai）
+最后更新：2026-08-15（Asia/Shanghai）
 
 ## 当前阶段
 
-阶段 20：桌面打包和发布准备（完成）；正在执行开源发布准备、最终功能一致性逐项审计与体验缺口修复。
+阶段 20：桌面打包和发布准备（完成）；开源安全阻塞已完成修复复验，正在提交、合并并配置首个公开源码预览。
 
 ## 当前任务
 
-- 完成 Norevinq 独立产品命名、源码仓库更名、旧 Aster 安装数据的安全迁移和开源前文档一致性收口。
-- GitHub 仅发布源码、源码标签、CI 和本地构建说明，不生成或上传 DMG、EXE、ZIP、blockmap 或自动更新元数据。
+- 提交 2026-08-14 sealed 扫描的修复，合并开源准备 PR，将仓库切换为 Public，并立即启用 GitHub 安全功能与 main ruleset。
+- 创建 `v0.1.0` 带注释标签和只含源码的 GitHub Release；确认不生成或上传 DMG、EXE、ZIP、blockmap 或自动更新元数据。
 - 随后继续逐项审计提供商错误体验、Web Search 活动和剩余“部分实现”功能。
 
 ## 已完成任务
+
+- 完成开源 sealed 扫描 8 项发现的逐项闭环：3 项中风险全部修复；5 项低风险中 4 项修复或由源码分发架构关闭，1 项 Renderer 确认纵深防御风险在补偿控制下明确接受。Git 项目根边界、`core.fsmonitor=false`、Security 最小权限、同句柄文件预览、目录/大 diff 前置预算均有自动回归。
+- 加固后的 Codex Security pnpm 补丁从干净依赖重放成功，真实 SDK preflight 通过；`pnpm verify:ci` 为 214 通过/1 跳过，生产依赖 0 个已知高危漏洞，离线 Electron IPC 对抗与实际目录包 app-server 启动测试通过。
 
 - 产品从临时名称 Aster Code 全面更名为 Norevinq；应用名、包名、Bundle ID、深链接、文件预览协议、IPC、诊断、界面、测试、截图和文档均已同步。名称已完成搜索引擎、GitHub、npm、PyPI、App Store 与 `.com` 注册状态的初步排查，未发现精确同名产品；该记录不替代目标市场的正式商标检索。
 - 删除 GitHub 桌面打包/上传 workflow，并为 workflow 守门增加 DMG/EXE 相关构建与 `release/` 上传禁令；GitHub 只承载源码。开发者仍可按构建文档在本机生成自用安装包。

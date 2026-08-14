@@ -1,12 +1,15 @@
 import { randomUUID } from 'node:crypto'
 import {
   closeSync,
+  constants,
+  fstatSync,
   lstatSync,
+  opendirSync,
   openSync,
   readSync,
-  readdirSync,
   realpathSync,
 } from 'node:fs'
+import type { Dirent } from 'node:fs'
 import { extname, isAbsolute, join, normalize, relative, resolve, sep } from 'node:path'
 import type {
   FileContextInput,
@@ -61,13 +64,28 @@ export class FileService {
     const { absolute, relativePath } = this.#resolve(root, input.path, true)
     const metadata = lstatSync(absolute)
     if (!metadata.isDirectory()) throw new Error('The requested path is not a directory.')
-    const all = readdirSync(absolute, { withFileTypes: true })
-      .filter(({ name }) => name !== '.git')
-      .sort((left, right) => {
+    const all: Dirent[] = []
+    const directory = opendirSync(absolute)
+    let truncated = false
+    try {
+      for (;;) {
+        const entry = directory.readSync()
+        if (!entry) break
+        if (entry.name === '.git') continue
+        if (all.length >= MAX_DIRECTORY_ENTRIES) {
+          truncated = true
+          break
+        }
+        all.push(entry)
+      }
+    } finally {
+      directory.closeSync()
+    }
+    all.sort((left, right) => {
         const directoryOrder = Number(right.isDirectory()) - Number(left.isDirectory())
         return directoryOrder || left.name.localeCompare(right.name, undefined, { numeric: true })
       })
-    const entries = all.slice(0, MAX_DIRECTORY_ENTRIES).map((entry): ProjectFileEntry => {
+    const entries = all.map((entry): ProjectFileEntry => {
       const childRelativePath = relativePath ? `${relativePath}/${entry.name}` : entry.name
       const childPath = join(absolute, entry.name)
       const child = lstatSync(childPath)
@@ -81,7 +99,7 @@ export class FileService {
         previewKind: kind === 'file' ? previewKindFromName(entry.name, child.size) : null,
       }
     })
-    return { ...input, path: relativePath, entries, truncated: all.length > MAX_DIRECTORY_ENTRIES }
+    return { ...input, path: relativePath, entries, truncated }
   }
 
   readPreview(input: FilePathInput): ProjectFilePreview {
@@ -89,17 +107,23 @@ export class FileService {
     const { absolute, relativePath } = this.#resolve(root, input.path, false)
     const metadata = lstatSync(absolute)
     if (!metadata.isFile()) throw new Error('Only regular files can be previewed.')
-    const mimeType = mimeTypeFromName(relativePath)
-    const detected = detectPreviewKind(absolute, relativePath, metadata.size)
-    if (detected === 'text') {
-      const { content, truncated } = readBoundedText(absolute, metadata.size)
-      return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, 'text', content, null, truncated)
+    const descriptor = openRegularFileWithoutFollowingLinks(absolute, metadata.dev, metadata.ino)
+    try {
+      const opened = fstatSync(descriptor)
+      const mimeType = mimeTypeFromName(relativePath)
+      const detected = detectPreviewKind(descriptor, relativePath, opened.size)
+      if (detected === 'text') {
+        const { content, truncated } = readBoundedText(descriptor, opened.size)
+        return preview(input, relativePath, opened.size, opened.mtime, mimeType, 'text', content, null, truncated)
+      }
+      if (detected === 'too-large' || detected === 'binary') {
+        return preview(input, relativePath, opened.size, opened.mtime, mimeType, detected, null, null, false)
+      }
+      const token = this.#issueToken(absolute, mimeType, opened.size, opened.dev, opened.ino)
+      return preview(input, relativePath, opened.size, opened.mtime, mimeType, detected, null, `norevinq-file://preview/${token}`, false)
+    } finally {
+      closeSync(descriptor)
     }
-    if (detected === 'too-large' || detected === 'binary') {
-      return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, null, false)
-    }
-    const token = this.#issueToken(absolute, mimeType, metadata.size, metadata.dev, metadata.ino)
-    return preview(input, relativePath, metadata.size, metadata.mtime, mimeType, detected, null, `norevinq-file://preview/${token}`, false)
   }
 
   readAgentImage(input: AgentImagePreviewInput): AgentImagePreview {
@@ -240,18 +264,13 @@ function preview(
   return { ...input, path, name: path.split('/').at(-1) ?? path, size, modifiedAt: modifiedAt.toISOString(), mimeType, kind, content, url, truncated }
 }
 
-function detectPreviewKind(path: string, name: string, size: number): FilePreviewKind {
+function detectPreviewKind(descriptor: number, name: string, size: number): FilePreviewKind {
   const kind = previewKindFromName(name, size)
   if (kind !== 'binary') return kind
   const length = Math.min(size, 8_192)
   const sample = Buffer.allocUnsafe(length)
-  const descriptor = openSync(path, 'r')
-  try {
-    const read = readSync(descriptor, sample, 0, length, 0)
-    return sample.subarray(0, read).includes(0) ? 'binary' : 'text'
-  } finally {
-    closeSync(descriptor)
-  }
+  const read = readSync(descriptor, sample, 0, length, 0)
+  return sample.subarray(0, read).includes(0) ? 'binary' : 'text'
 }
 
 function previewKindFromName(name: string, size: number): FilePreviewKind {
@@ -264,16 +283,25 @@ function previewKindFromName(name: string, size: number): FilePreviewKind {
   return 'binary'
 }
 
-function readBoundedText(path: string, size: number): { content: string; truncated: boolean } {
+function readBoundedText(descriptor: number, size: number): { content: string; truncated: boolean } {
   const length = Math.min(size, MAX_TEXT_BYTES + 1)
   const bytes = Buffer.allocUnsafe(length)
-  const descriptor = openSync(path, 'r')
+  const read = readSync(descriptor, bytes, 0, length, 0)
+  const truncated = size > MAX_TEXT_BYTES
+  return { content: new TextDecoder('utf-8').decode(bytes.subarray(0, truncated ? Math.min(read, MAX_TEXT_BYTES) : read)), truncated }
+}
+
+function openRegularFileWithoutFollowingLinks(path: string, expectedDevice: number, expectedInode: number): number {
+  const descriptor = openSync(path, constants.O_RDONLY | constants.O_NOFOLLOW)
   try {
-    const read = readSync(descriptor, bytes, 0, length, 0)
-    const truncated = size > MAX_TEXT_BYTES
-    return { content: new TextDecoder('utf-8').decode(bytes.subarray(0, truncated ? Math.min(read, MAX_TEXT_BYTES) : read)), truncated }
-  } finally {
+    const metadata = fstatSync(descriptor)
+    if (!metadata.isFile() || metadata.dev !== expectedDevice || metadata.ino !== expectedInode) {
+      throw new Error('The file changed while it was being opened. Refresh and try again.')
+    }
+    return descriptor
+  } catch (error) {
     closeSync(descriptor)
+    throw error
   }
 }
 

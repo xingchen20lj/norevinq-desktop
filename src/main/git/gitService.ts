@@ -1,6 +1,6 @@
 import { execFile, type ExecException } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { lstatSync } from 'node:fs'
+import { lstatSync, realpathSync } from 'node:fs'
 import { isAbsolute, join, normalize, sep } from 'node:path'
 import { promisify } from 'node:util'
 import type {
@@ -35,7 +35,14 @@ export class GitService {
     const project = this.#requireProject(input.projectId)
     try {
       const rootResult = await this.#git(project.path, ['rev-parse', '--show-toplevel'])
-      const root = rootResult.stdout.trim()
+      const selectedRoot = realpathSync(project.path)
+      const root = realpathSync(rootResult.stdout.trim())
+      if (root !== selectedRoot) {
+        return emptySnapshot(
+          input.projectId,
+          '所选项目位于另一个 Git 仓库内。为防止读取或修改项目目录外的文件，请改为打开该 Git 仓库根目录。',
+        )
+      }
       const [statusResult, remoteResult, discards] = await Promise.all([
         this.#git(project.path, ['status', '--porcelain=v2', '--branch', '-z', '--untracked-files=all']),
         this.#git(project.path, ['remote', '-v']),
@@ -175,7 +182,7 @@ export class GitService {
 
   async #git(cwd: string, args: string[], timeout = DEFAULT_TIMEOUT_MS): Promise<{ stdout: string; stderr: string }> {
     try {
-      return await execFileAsync('git', args, {
+      return await execFileAsync('git', ['-c', 'core.fsmonitor=false', ...args], {
         cwd,
         encoding: 'utf8',
         maxBuffer: MAX_OUTPUT_BYTES,
@@ -311,7 +318,7 @@ function sanitizeRemoteUrl(value: string): string {
   }
 }
 
-function emptySnapshot(projectId: string): GitRepositorySnapshot {
+function emptySnapshot(projectId: string, error: string | null = null): GitRepositorySnapshot {
   return {
     projectId,
     initialized: false,
@@ -325,7 +332,7 @@ function emptySnapshot(projectId: string): GitRepositorySnapshot {
     files: [],
     discards: [],
     remotes: [],
-    error: null,
+    error,
   }
 }
 
