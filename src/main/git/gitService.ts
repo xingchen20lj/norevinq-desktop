@@ -37,7 +37,7 @@ export class GitService {
       const rootResult = await this.#git(project.path, ['rev-parse', '--show-toplevel'])
       const selectedRoot = realpathSync(project.path)
       const root = realpathSync(rootResult.stdout.trim())
-      if (root !== selectedRoot) {
+      if (!sameCanonicalPath(root, selectedRoot)) {
         return emptySnapshot(
           input.projectId,
           '所选项目位于另一个 Git 仓库内。为防止读取或修改项目目录外的文件，请改为打开该 Git 仓库根目录。',
@@ -253,6 +253,14 @@ type DiscardMetadata = { path: string; paths: DiscardPathMetadata[] }
 function pathExists(path: string): boolean {
   try { lstatSync(path); return true }
   catch { return false }
+}
+
+function sameCanonicalPath(left: string, right: string): boolean {
+  const normalizedLeft = normalize(left)
+  const normalizedRight = normalize(right)
+  return process.platform === 'win32'
+    ? normalizedLeft.toLocaleLowerCase('en-US') === normalizedRight.toLocaleLowerCase('en-US')
+    : normalizedLeft === normalizedRight
 }
 
 function parseDiscardMetadata(encoded: string): DiscardMetadata {
