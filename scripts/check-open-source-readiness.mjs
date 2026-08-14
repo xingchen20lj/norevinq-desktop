@@ -34,6 +34,7 @@ const requiredFiles = [
   'docs/BRANDING.md',
   'docs/OPEN_SOURCE_RELEASE_CHECKLIST.md',
   'docs/assets/screenshots/command-palette.png',
+  'docs/assets/screenshots/workspace-overview.png',
   'docs/assets/screenshots/provider-settings.png',
   'docs/assets/screenshots/scheduled-task-editor.png',
   'docs/assets/screenshots/security-workbench.png',

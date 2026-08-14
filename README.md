@@ -10,7 +10,13 @@ Norevinq 是一款面向 macOS 和 Windows 的本地优先桌面智能编程客�
 
 > **官方来源：** Norevinq 由 [xingchen20lj](https://github.com/xingchen20lj) 创建和维护，当前唯一规范源码仓库是 [xingchen20lj/norevinq-desktop](https://github.com/xingchen20lj/norevinq-desktop)。未由该仓库发布或明确链接的副本、修改版和安装包不是官方发行版。
 
-![Norevinq 命令面板](docs/assets/screenshots/command-palette.png)
+![Norevinq 完整工作区](docs/assets/screenshots/workspace-overview.png)
+
+## 一分钟了解 Norevinq
+
+演示视频将依次展示真实的多模型任务、命令面板、模型提供商、安全工作台和计划任务。
+
+https://github.com/user-attachments/assets/2bba3f47-3a63-45a2-9c9e-1ce239e69960
 
 ## 已实现能力
 
@@ -67,9 +73,11 @@ Norevinq 使用独立 Electron `userData` 目录保存 SQLite、日志、工作�
 
 ## 更多界面
 
-| 模型提供商 | 计划任务 | 安全工作台 |
-| --- | --- | --- |
-| ![提供商设置](docs/assets/screenshots/provider-settings.png) | ![计划任务编辑器](docs/assets/screenshots/scheduled-task-editor.png) | ![安全工作台](docs/assets/screenshots/security-workbench.png) |
+| 命令面板 | 模型提供商 |
+| --- | --- |
+| ![命令面板](docs/assets/screenshots/command-palette.png) | ![提供商设置](docs/assets/screenshots/provider-settings.png) |
+| 计划任务 | 安全工作台 |
+| ![计划任务编辑器](docs/assets/screenshots/scheduled-task-editor.png) | ![安全工作台](docs/assets/screenshots/security-workbench.png) |
 
 ## 文档
 
