@@ -75,7 +75,7 @@ import type {
   SecuritySubscription,
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
-import type { FileOpenInput, FilePathInput } from '../shared/files.js'
+import type { AgentImagePreviewInput, FileOpenInput, FilePathInput } from '../shared/files.js'
 import type {
   BrowserBounds,
   BrowserExternalInput,
@@ -274,6 +274,7 @@ const api: AsterDesktopApi = {
   },
   listProjectDirectory: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesList, input),
   previewProjectFile: (input: FilePathInput) => ipcRenderer.invoke(IPC_CHANNELS.filesPreview, input),
+  previewAgentImage: (input: AgentImagePreviewInput) => ipcRenderer.invoke(IPC_CHANNELS.filesAgentImagePreview, input),
   openProjectFileExternal: (input: FileOpenInput) => ipcRenderer.invoke(IPC_CHANNELS.filesOpenExternal, input),
   getBrowserState: () => ipcRenderer.invoke(IPC_CHANNELS.browserState),
   openBrowser: (input: BrowserOpenInput) => ipcRenderer.invoke(IPC_CHANNELS.browserOpen, input),

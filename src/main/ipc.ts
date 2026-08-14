@@ -68,7 +68,14 @@ import type {
   SecuritySubscription,
 } from '../shared/security.js'
 import type { ScheduledTaskInput, SchedulerSnapshot, SchedulerSubscription } from '../shared/scheduler.js'
-import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from '../shared/files.js'
+import type {
+  AgentImagePreview,
+  AgentImagePreviewInput,
+  FileOpenInput,
+  FilePathInput,
+  ProjectDirectory,
+  ProjectFilePreview,
+} from '../shared/files.js'
 import type { BrowserBounds, BrowserSnapshot, BrowserSubscription } from '../shared/browser.js'
 import type { UpdateSnapshot, UpdateSubscription } from '../shared/update.js'
 import type { DiagnosticsExportResult, DiagnosticsSnapshot } from '../shared/diagnostics.js'
@@ -236,6 +243,7 @@ export type SchedulerController = {
 export type FileController = {
   listDirectory: (input: FilePathInput) => ProjectDirectory
   readPreview: (input: FilePathInput) => ProjectFilePreview
+  readAgentImage: (input: AgentImagePreviewInput) => AgentImagePreview
   openExternal: (input: FileOpenInput) => Promise<void>
 }
 
@@ -691,6 +699,10 @@ export function registerIpc(
   ipcMain.handle(IPC_CHANNELS.filesPreview, (_event, input: unknown) => {
     const parsed = filePathSchema.parse(input)
     return files.readPreview({ projectId: parsed.projectId, path: parsed.path, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
+  })
+  ipcMain.handle(IPC_CHANNELS.filesAgentImagePreview, (_event, input: unknown) => {
+    const parsed = filePathSchema.parse(input)
+    return files.readAgentImage({ projectId: parsed.projectId, path: parsed.path, ...(parsed.worktreeId ? { worktreeId: parsed.worktreeId } : {}) })
   })
   ipcMain.handle(IPC_CHANNELS.filesOpenExternal, (_event, input: unknown) => {
     const parsed = fileOpenSchema.parse(input)

@@ -16,6 +16,11 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   const helper = resolve('tests/helpers/fakeCodexLifecycle.mjs')
   mkdirSync(projectPath)
   mkdirSync(codexHome)
+  mkdirSync(join(codexHome, 'generated_images'))
+  writeFileSync(join(codexHome, 'generated_images', 'lifecycle-proof.png'), Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+    'base64',
+  ))
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.name', 'Aster Lifecycle'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.email', 'aster-lifecycle@example.invalid'], { cwd: projectPath })
@@ -89,6 +94,10 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByLabel('搜索任务').fill('')
     await window.getByLabel('搜索任务').press('Enter')
     await taskRow('Lifecycle primary').click()
+    const generatedImage = window.getByRole('img', { name: 'Aster 生成图片' })
+    await expect(generatedImage).toBeVisible()
+    await expect(generatedImage).toHaveAttribute('src', /^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    await window.screenshot({ path: 'test-results/aster-agent-inline-image.png' })
 
     const topbarActions = window.locator('.topbar-actions')
     for (const label of [

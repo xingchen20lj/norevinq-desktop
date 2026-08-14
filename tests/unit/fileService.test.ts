@@ -68,6 +68,44 @@ describe('FileService', () => {
     fixture.database.close()
   })
 
+  it('issues inline image previews only for active projects or the trusted Aster artifact directory', () => {
+    const fixture = createFixture()
+    const artifacts = join(fixture.root, '..', 'agent-home', 'generated_images')
+    mkdirSync(artifacts, { recursive: true })
+    const projectImage = join(fixture.root, 'project-image.png')
+    const generatedImage = join(artifacts, 'generated image.webp')
+    writeFileSync(projectImage, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    writeFileSync(generatedImage, Buffer.from([0x52, 0x49, 0x46, 0x46]))
+    const service = new FileService(fixture.database, { trustedArtifactRoots: [artifacts] })
+
+    expect(service.readAgentImage({ projectId: fixture.projectId, path: projectImage })).toMatchObject({
+      name: 'project-image.png', mimeType: 'image/png',
+    })
+    expect(service.readAgentImage({ projectId: fixture.projectId, path: generatedImage })).toMatchObject({
+      name: 'generated image.webp', mimeType: 'image/webp',
+    })
+    expect(service.readAgentImage({ projectId: fixture.projectId, path: generatedImage }).url)
+      .toMatch(/^aster-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    fixture.database.close()
+  })
+
+  it('rejects agent image paths outside trusted roots and active content such as SVG', () => {
+    const fixture = createFixture()
+    const artifacts = join(fixture.root, '..', 'agent-home', 'generated_images')
+    const outside = mkdtempSync(join(tmpdir(), 'aster-agent-image-outside-'))
+    temporaryPaths.push(outside)
+    mkdirSync(artifacts, { recursive: true })
+    const outsideImage = join(outside, 'outside.png')
+    const svg = join(artifacts, 'active.svg')
+    writeFileSync(outsideImage, Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+    writeFileSync(svg, '<svg xmlns="http://www.w3.org/2000/svg"><script>throw new Error()</script></svg>')
+    const service = new FileService(fixture.database, { trustedArtifactRoots: [artifacts] })
+
+    expect(() => service.readAgentImage({ projectId: fixture.projectId, path: outsideImage })).toThrow(/outside/u)
+    expect(() => service.readAgentImage({ projectId: fixture.projectId, path: svg })).toThrow(/format/u)
+    fixture.database.close()
+  })
+
   it('rejects traversal, absolute paths, and every symbolic-link component', () => {
     const fixture = createFixture()
     const outside = mkdtempSync(join(tmpdir(), 'aster-files-outside-'))

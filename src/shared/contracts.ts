@@ -84,7 +84,7 @@ import type {
   SchedulerSnapshot,
   SchedulerSubscription,
 } from './scheduler.js'
-import type { FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from './files.js'
+import type { AgentImagePreview, AgentImagePreviewInput, FileOpenInput, FilePathInput, ProjectDirectory, ProjectFilePreview } from './files.js'
 import type {
   BrowserBounds,
   BrowserExternalInput,
@@ -209,6 +209,7 @@ export const IPC_CHANNELS = {
   schedulerChanged: 'scheduler:changed',
   filesList: 'files:list',
   filesPreview: 'files:preview',
+  filesAgentImagePreview: 'files:agent-image-preview',
   filesOpenExternal: 'files:open-external',
   browserState: 'browser:state',
   browserOpen: 'browser:open',
@@ -369,6 +370,7 @@ export type AsterDesktopApi = {
   onSchedulerChanged: (subscription: SchedulerSubscription) => () => void
   listProjectDirectory: (input: FilePathInput) => Promise<ProjectDirectory>
   previewProjectFile: (input: FilePathInput) => Promise<ProjectFilePreview>
+  previewAgentImage: (input: AgentImagePreviewInput) => Promise<AgentImagePreview>
   openProjectFileExternal: (input: FileOpenInput) => Promise<void>
   getBrowserState: () => Promise<BrowserSnapshot>
   openBrowser: (input: BrowserOpenInput) => Promise<BrowserSnapshot>

@@ -206,7 +206,10 @@ if (!gotLock) {
     )
     process.env.CODEX_HOME = agentHome
     database = new StateDatabase(join(userData, 'aster-code.sqlite3'))
-    const createdFileService = new FileService(database, { openPath: (path) => shell.openPath(path) })
+    const createdFileService = new FileService(database, {
+      openPath: (path) => shell.openPath(path),
+      trustedArtifactRoots: [join(agentHome, 'generated_images')],
+    })
     fileService = createdFileService
     protocol.handle('aster-file', (request) => serveFilePreview(request, createdFileService))
     const credentialStore = new CredentialStore(join(userData, 'credentials.json'), {

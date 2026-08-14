@@ -13,6 +13,17 @@ export type FileOpenInput = FilePathInput & {
   confirmed: true
 }
 
+export type AgentImagePreviewInput = FileContextInput & {
+  path: string
+}
+
+export type AgentImagePreview = {
+  name: string
+  size: number
+  mimeType: string
+  url: string
+}
+
 export type ProjectFileEntry = {
   name: string
   path: string

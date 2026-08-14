@@ -66,6 +66,8 @@ import type { UpdateSnapshot } from '../../shared/update'
 import type { DiagnosticsSnapshot } from '../../shared/diagnostics'
 import type { AccountSnapshot } from '../../shared/account'
 import type { CommandAction } from './CommandPalette'
+import type { AgentImagePreview } from '../../shared/files'
+import { parseAgentMessage } from '../../shared/agentMessage'
 
 const BrowserWorkbench = lazy(() => import('./BrowserWorkbench').then(({ BrowserWorkbench: component }) => ({ default: component })))
 const CommandPalette = lazy(() => import('./CommandPalette').then(({ CommandPalette: component }) => ({ default: component })))
@@ -791,7 +793,13 @@ export function App(): React.JSX.Element {
 
         <section className={`workspace ${selectedThread && !newTask ? 'conversation-workspace' : ''}`}>
           {selectedThread && !newTask ? (
-            <ActivityTimeline state={activityState} goal={selectedGoal} openFile={(path) => openFiles(path)} />
+            <ActivityTimeline
+              state={activityState}
+              goal={selectedGoal}
+              projectId={selectedProject?.id ?? null}
+              worktreeId={selectedWorktree?.id ?? null}
+              openFile={(path) => openFiles(path)}
+            />
           ) : (
             <Welcome selectedProject={selectedProject} runtime={runtime} isOpening={isOpening} openProject={openProject} />
           )}
@@ -1480,9 +1488,11 @@ function Welcome({ selectedProject, runtime, isOpening, openProject }: {
   </div>
 }
 
-function ActivityTimeline({ state, goal, openFile }: {
+function ActivityTimeline({ state, goal, projectId, worktreeId, openFile }: {
   state: AgentActivityState | null
   goal: ThreadGoal | null
+  projectId: string | null
+  worktreeId: string | null
   openFile: (path: string) => void
 }): React.JSX.Element {
   return <div className="activity-timeline" aria-label="智能体活动">
@@ -1495,12 +1505,17 @@ function ActivityTimeline({ state, goal, openFile }: {
     </article>}
     {!state || state.activities.length === 0
       ? <div className="empty-timeline"><MessageSquare size={23} /><p>任务已创建，等待第一条活动。</p></div>
-      : state.activities.map((activity) => <ActivityCard activity={activity} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
+      : state.activities.map((activity) => <ActivityCard activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} key={`${activity.type}:${activity.id}`} />)}
     {state?.turnStatus === 'inProgress' && <div className="running-row"><LoaderCircle size={14} className="spin" /> Aster 正在工作</div>}
   </div>
 }
 
-function ActivityCard({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
+function ActivityCard({ activity, projectId, worktreeId, openFile }: {
+  activity: AgentActivity
+  projectId: string | null
+  worktreeId: string | null
+  openFile: (path: string) => void
+}): React.JSX.Element {
   if (activity.type === 'thread' || activity.type === 'turn') return <></>
   const icon = activity.type === 'userMessage' || activity.type === 'agentMessage' ? <MessageSquare size={15} />
     : activity.type === 'reasoning' ? <Brain size={15} />
@@ -1509,14 +1524,19 @@ function ActivityCard({ activity, openFile }: { activity: AgentActivity; openFil
     <div className="activity-icon">{icon}</div>
     <div className="activity-body">
       <div className="activity-heading"><strong>{activityLabel(activity)}</strong><span>{activity.status}</span></div>
-      <ActivityContent activity={activity} openFile={openFile} />
+      <ActivityContent activity={activity} projectId={projectId} worktreeId={worktreeId} openFile={openFile} />
     </div>
   </article>
 }
 
-function ActivityContent({ activity, openFile }: { activity: AgentActivity; openFile: (path: string) => void }): React.JSX.Element {
+function ActivityContent({ activity, projectId, worktreeId, openFile }: {
+  activity: AgentActivity
+  projectId: string | null
+  worktreeId: string | null
+  openFile: (path: string) => void
+}): React.JSX.Element {
   if (activity.type === 'userMessage') return <p>{activity.content.filter(({ type }) => type === 'text').map((item) => item.type === 'text' ? item.text : '').join('\n')}</p>
-  if (activity.type === 'agentMessage') return <p>{activity.text}</p>
+  if (activity.type === 'agentMessage') return <AgentMessageContent text={activity.text} projectId={projectId} worktreeId={worktreeId} />
   if (activity.type === 'reasoning') return <p>{[...activity.summary, ...activity.content].join('\n')}</p>
   if (activity.type === 'command') return <><code>{activity.command}</code>{activity.output && <pre>{activity.output}</pre>}</>
   if (activity.type === 'fileChange') return <>{activity.changes.map((change) => <button className="artifact-link" onClick={() => openFile(change.path)} key={`${change.path}:${change.kind}`}><FileCode2 size={12} />{change.kind} {change.path}</button>)}</>
@@ -1526,6 +1546,47 @@ function ActivityContent({ activity, openFile }: { activity: AgentActivity; open
   if (activity.type === 'webSearch') return <p>{activity.query}</p>
   if (activity.type === 'dynamicTool') return <p>{activity.namespace ? `${activity.namespace} / ` : ''}{activity.tool}</p>
   return <p>{activity.type}</p>
+}
+
+function AgentMessageContent({ text, projectId, worktreeId }: {
+  text: string
+  projectId: string | null
+  worktreeId: string | null
+}): React.JSX.Element {
+  return <div className="agent-message-content">{parseAgentMessage(text).map((part, index) => part.type === 'text'
+    ? <p key={`text:${String(index)}`}>{part.text}</p>
+    : <AgentImage key={`image:${part.path}:${String(index)}`} alt={part.alt} path={part.path} projectId={projectId} worktreeId={worktreeId} />)}</div>
+}
+
+function AgentImage({ alt, path, projectId, worktreeId }: {
+  alt: string
+  path: string
+  projectId: string | null
+  worktreeId: string | null
+}): React.JSX.Element {
+  const [preview, setPreview] = useState<AgentImagePreview | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let active = true
+    setPreview(null)
+    setLoadError(null)
+    if (!projectId) {
+      setLoadError('当前任务没有可用于验证图片路径的项目。')
+      return () => { active = false }
+    }
+    void window.aster.previewAgentImage({ projectId, path, ...(worktreeId ? { worktreeId } : {}) })
+      .then((value) => { if (active) setPreview(value) })
+      .catch((reason: unknown) => { if (active) setLoadError(toErrorMessage(reason)) })
+    return () => { active = false }
+  }, [path, projectId, worktreeId])
+
+  if (loadError) return <div className="agent-image-error" role="note"><FileCode2 size={14} /><span>图片无法安全预览：{loadError}</span></div>
+  if (!preview) return <div className="agent-image-loading" role="status"><LoaderCircle size={14} className="spin" />正在验证本地图片…</div>
+  return <figure className="agent-image">
+    <img src={preview.url} alt={alt || preview.name} onError={() => setLoadError('图片读取失败或预览凭据已过期。')} />
+    <figcaption>{alt || preview.name}</figcaption>
+  </figure>
 }
 
 function IntegrationRequestPanel({ request, onError }: {
