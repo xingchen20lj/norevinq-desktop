@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { scanRuntimeCodexConfig } from '../../node_modules/@openai/codex-security/dist/api.js'
 
 describe('Codex Security runtime permissions', () => {
-  it('limits scans to runtime support paths, workspace reads, and explicit state writes', () => {
+  it('preserves the official repository-read and scan-workspace-write profile', () => {
     const stateDirectory = '/private/norevinq/security-state'
     const credentialHome = '/private/norevinq/security-credentials'
     const config = scanRuntimeCodexConfig({ sandbox_mode: 'danger-full-access' }, stateDirectory, credentialHome)
@@ -13,11 +13,10 @@ describe('Codex Security runtime permissions', () => {
     expect(config.allow_login_shell).toBe(false)
     expect(config.default_permissions).toBe('codex_security_scan')
     expect(filesystem).toEqual({
-      ':minimal': 'read',
-      ':workspace_roots': 'read',
+      ':root': 'read',
+      ':workspace_roots': 'write',
       [stateDirectory]: 'write',
       [credentialHome]: 'read',
     })
-    expect(filesystem).not.toHaveProperty(':root')
   })
 })

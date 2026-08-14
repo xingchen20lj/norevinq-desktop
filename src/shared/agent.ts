@@ -136,6 +136,13 @@ export type WebSearchActivity = AgentActivityBase & {
   results: SerializableValue[]
 }
 
+export type ImageGenerationActivity = AgentActivityBase & {
+  type: 'imageGeneration'
+  revisedPrompt: string | null
+  savedPath: string | null
+  transparentBackground: boolean | null
+}
+
 export type CollabActivity = AgentActivityBase & {
   type: 'collab'
   tool: string
@@ -194,6 +201,7 @@ export type AgentActivity =
   | McpToolActivity
   | DynamicToolActivity
   | WebSearchActivity
+  | ImageGenerationActivity
   | CollabActivity
   | SubagentActivity
   | PlanActivity

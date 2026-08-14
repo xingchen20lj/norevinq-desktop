@@ -68,16 +68,6 @@ index 1b23e72..a3338c6 100644
                  onCost: options.onCost === undefined && options.maxCostUsd === undefined
                      ? undefined
                      : (cost) => {
-@@ -1685,7 +1694,7 @@ export function scanRuntimeCodexConfig(config, stateDirectory, protectedCredenti
-             [SCAN_PERMISSION_PROFILE]: {
-                 filesystem: {
--                    ":root": "read",
--                    ":workspace_roots": "write",
-+                    ":minimal": "read",
-+                    ":workspace_roots": "read",
-                     [stateDirectory]: "write",
-                     ...(protectedCredentialHome === undefined
-                         ? {}
 diff --git a/dist/config.d.ts b/dist/config.d.ts
 index 2782296..36dfd90 100644
 --- a/dist/config.d.ts

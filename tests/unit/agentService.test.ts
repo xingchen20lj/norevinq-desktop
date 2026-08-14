@@ -246,6 +246,24 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('reselects cached history without requiring the restarted runtime to resume it', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    await service.loadProject({ projectId })
+    const first = await service.selectThread('thread-1')
+    expect(first.threadStates['thread-1']?.activities.length).toBeGreaterThan(0)
+    runtime.missingThreadPermanently = true
+    const requestCount = runtime.requests.length
+
+    const selected = await service.selectThread('thread-1')
+
+    expect(selected.selectedThreadId).toBe('thread-1')
+    expect(runtime.requests.slice(requestCount).map(({ method }) => method)).toEqual(['thread/goal/get'])
+    service.dispose()
+    database.close()
+  })
+
   it('reads archived history without trying to resume it', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()

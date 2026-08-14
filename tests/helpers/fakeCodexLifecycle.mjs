@@ -27,9 +27,17 @@ threads.get(primaryThreadId).turns = [{
   durationMs: 1_000,
   error: null,
   items: [{
+    type: 'imageGeneration',
+    id: 'generated-image-item',
+    status: 'completed',
+    revisedPrompt: 'Norevinq 生成图片',
+    result: null,
+    transparentBackground: false,
+    savedPath: generatedImagePath,
+  }, {
     type: 'agentMessage',
     id: 'generated-image-message',
-    text: `图片保存在：\n\n![Norevinq 生成图片](<${generatedImagePath}>)`,
+    text: '图片已经生成并显示在消息中。',
     phase: 'final_answer',
   }],
 }]

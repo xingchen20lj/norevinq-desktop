@@ -6,6 +6,8 @@ Norevinq 固定使用公开 `@openai/codex-security` 0.1.11。该包内置 Codex
 
 上游 0.1.11 的外部提供商白名单只包含 OpenRouter、Fireworks 和 Bedrock，即使 `codexOverrides` 接受 `model_providers`，运行时也会删除其他 provider。Norevinq 因此在 Apache-2.0 许可范围内应用最小公开补丁 `patches/@openai__codex-security@0.1.11.patch`：加入固定 DeepSeek Responses 定义、实例级环境隔离和只读 token usage 回调，并确保传给 Python workbench 的环境继续剔除模型 API Key。补丁不修改扫描提示、技能、sealed contract、finding schema、沙箱或产物校验。该差异由 lockfile、NOTICE、自动测试和开源检查共同审计，不能描述为上游原生未修改能力。
 
+SDK 官方运行 profile 必须保留 `:root=read`、`:workspace_roots=write`：前者让扫描智能体读取用户选择的本地仓库，后者只允许向 SDK 选定的私有扫描工作目录写入 draft/sealed 产物。2026-08-15 曾发现 Norevinq 补丁误把两者改为 `:minimal=read`、`:workspace_roots=read`，导致模型只能尝试公共网络回退且无法创建 `scan-manifest.json`、`findings.json`、`coverage.json`。该覆盖已删除，并由安装依赖权限单测和全新上游 tarball 补丁重放检查防止复发。此处恢复的是上游官方权限边界，不是给模型增加任意本机写权限。
+
 SDK state、凭据 home 和扫描产物均位于 Electron `userData/security` 下。目录在 macOS/Linux 强制为 `0700`，扫描输出固定为 `security/scans/<scan-id>`，不会写入被扫描仓库。
 
 macOS 正式包的实际默认路径如下：
@@ -28,6 +30,7 @@ Norevinq 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量
 4. 扫描回调持续记录 phase、文件进度、活动、费用和 Trusted Access；同一应用实例只允许一个扫描，避免费用和资源并发失控。
 5. 取消使用 `AbortSignal`。cost limit、认证、Security access、Python、插件、contract 和输出目录错误分别分类。
 6. 只有 SDK 返回完整 `ScanResult` 且 sealed contract 验证通过后，才保存 finding/coverage/report/SARIF 元数据。
+7. 扫描前可选择中文或英文报告语言；语言指令在扫描开始前传入，不会在 sealed 后改写产物。完成结果可经系统保存对话框导出报告、JSON、CSV 或 SARIF，Renderer 不能自行指定任意写入路径。
 
 ## DeepSeek 与费用
 
@@ -44,12 +47,13 @@ Norevinq 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量
 - 漏洞页显示 SDK 结构化严重程度、置信度、CWE、位置、代码证据、验证、攻击路径、修复和预防控制。
 - 报告、manifest、findings、coverage 和 SARIF 只能通过固定枚举读取；realpath 必须仍在对应 scan root 内。
 - renderer 每次最多接收 2 MiB，超出时明确显示截断。
-- JSON/CSV/SARIF 导出使用官方 CLI；validate、patch、false-positive 同样使用参数数组，不解析 TUI 文字作为运行协议。
+- JSON/CSV/SARIF 生成使用官方 CLI；报告及所有结构化格式通过主进程固定枚举读取，再由系统保存对话框复制到用户选择的位置。validate、patch、false-positive 同样使用参数数组，不解析 TUI 文字作为运行协议。
 - patch 会修改仓库，UI 必须二次确认；false-positive 必须提供原因。修复验证通过重新扫描形成新结果，不覆写旧 sealed 记录。
 
 ## 当前在线验证
 
 - SDK metadata、Python 3.12、ChatGPT 登录与真实 repository/path preflight 已通过。
+- 修复本地权限 profile 后，DeepSeek V4 Flash 对一文件真实 Git 仓库的 standard 扫描于 151.98 秒返回完整 `completed + sealed`；SDK 成功读取仓库、写入 draft 产物并完成最终密封。该测试不代表 2,117 文件仓库已重新付费扫描。
 - 对 `src/main/security` 的真实 standard scan 成功进入 discovery，但因设置的 2 美元硬上限在估算 $2.010621 时中断。
 - 中断产物没有 sealed，因此没有被导入、展示为漏洞或标记完成。这是预期的预算安全行为。
 - completed finding 的 UI/持久化、取消、错误、报告和导出使用官方数据形状的自动测试覆盖；下一次在线完成扫描需要明确提高模型费用上限。

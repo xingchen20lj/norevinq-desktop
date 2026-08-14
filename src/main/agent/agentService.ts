@@ -186,6 +186,12 @@ export class AgentService {
 
   async selectThread(threadId: string): Promise<ConversationSnapshot> {
     this.#requireVisibleThread(threadId)
+    const cachedState = this.#snapshot.threadStates[threadId]
+    if (!this.#snapshot.listArchived && cachedState && cachedState.activities.length > 0) {
+      this.#update({ selectedThreadId: threadId, error: null })
+      await this.#loadThreadGoal(threadId)
+      return this.#snapshot
+    }
     await this.#runtime.start()
     const result = this.#snapshot.listArchived
       ? asRecord(await this.#runtime.request('thread/read', { threadId, includeTurns: true }))
@@ -904,12 +910,14 @@ export class AgentService {
     for (const rawTurn of asArray(thread.turns)) {
       const turn = asRecord(rawTurn)
       const turnId = requireString(turn.id, 'turn.id')
-      state = reduceAgentActivity(state, { method: 'turn/started', params: { threadId, turn } })
+      const startedAtMs = typeof turn.startedAt === 'number' ? turn.startedAt * 1_000 : undefined
+      const completedAtMs = typeof turn.completedAt === 'number' ? turn.completedAt * 1_000 : startedAtMs
+      state = reduceAgentActivity(state, { method: 'turn/started', params: { threadId, turn }, ...(startedAtMs === undefined ? {} : { emittedAtMs: startedAtMs }) })
       for (const item of asArray(turn.items)) {
-        state = reduceAgentActivity(state, { method: 'item/started', params: { threadId, turnId, item } })
-        state = reduceAgentActivity(state, { method: 'item/completed', params: { threadId, turnId, item } })
+        state = reduceAgentActivity(state, { method: 'item/started', params: { threadId, turnId, item }, ...(startedAtMs === undefined ? {} : { emittedAtMs: startedAtMs }) })
+        state = reduceAgentActivity(state, { method: 'item/completed', params: { threadId, turnId, item }, ...(completedAtMs === undefined ? {} : { emittedAtMs: completedAtMs }) })
       }
-      state = reduceAgentActivity(state, { method: 'turn/completed', params: { threadId, turn } })
+      state = reduceAgentActivity(state, { method: 'turn/completed', params: { threadId, turn }, ...(completedAtMs === undefined ? {} : { emittedAtMs: completedAtMs }) })
     }
     this.#update({
       threads: upsertThread(this.#snapshot.threads, this.#toThreadSummary(thread)),

@@ -87,13 +87,13 @@
 | 计划任务 | 本地/隔离工作树执行 | 部分实现 | Local 真实 app-server E2E 通过；托管 worktree 与计划执行均已接入，专属在线组合回归待补 |
 | 计划任务 | 运行历史、未读、重试 | 已测试 | 收件箱、成功/失败/取消/跳过、未读、1–4 次退避、敏感错误脱敏和崩溃不重放 |
 | 安全 | 安全总览 | 已测试 | 总览/扫描/漏洞/仓库/设置五页工作台；Electron 浅色 1320×840 真机截图通过 |
-| 安全 | 普通仓库/路径扫描 | 部分实现 | 官方 SDK 真实进入 discovery；本次受 $2 硬预算中断，未把部分产物标记完成；sealed 成功/失败由自动替身覆盖 |
+| 安全 | 普通仓库/路径扫描 | 已测试 | 修复官方权限 profile 回归后，DeepSeek V4 Flash 对一文件真实 Git 仓库于 151.98 秒完成 standard 扫描并返回 `completed + sealed`；2,117 文件大型仓库未为回归再次付费扫描，仍需由用户按费用预期运行 |
 | 安全 | 深度扫描 | 已测试 | SDK deep 参数、目标约束和 UI 已接入；DeepSeek Flash 一文件真实执行 discovery、validation、attack path、reporting 并返回 completed + sealed。macOS 对官方外层已验证沙箱内的 worker 使用非嵌套兼容模式，修复 Seatbelt EPERM；大型仓库仍会产生显著模型费用 |
 | 安全 | commit/工作区 diff 扫描 | 部分实现 | `DiffTarget.refs/workingTree` 已接入且深度模式本地拒绝；真实在线 diff 扫描待有界验证 |
 | 安全 | 预检、预算、取消、进度 | 已测试 | 真实 SDK preflight、Python/账户诊断和 $2 cost-limit 终止；AbortSignal/进度/费用/Trusted Access 回调自动测试 |
 | 安全 | 漏洞证据、严重程度、攻击路径 | 已测试 | sealed findings 映射、证据/位置/验证/攻击路径 UI 与持久化自动测试；真实扫描未完成所以当前没有伪造漏洞 |
 | 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
-| 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、固定产物路径、2 MiB 预览、CLI JSON/CSV 与 SDK SARIF；自动测试通过 |
+| 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、中文/英文报告选择、固定产物路径、2 MiB 自动换行预览、CLI JSON/CSV 与 SDK SARIF；系统保存对话框真实导出且自动/Electron 测试通过 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
 | 安全 | DeepSeek Responses 独立扫描与实时计费 | 已测试 | 固定 provider、实例环境隔离和 SDK preflight 自动验证；V4 Pro standard 在线扫描约 12 分钟后完整返回 `completed + sealed`；V4 Flash 固定 Norevinq 0.147.0、单并发后同一夹具于 160.9 秒完整返回 `completed + sealed`；两者均无需 OpenAI 登录且 usage 非空。实时 token/缓存/人民币估算通过单元及真实 UI；发布包将 SDK bundled plugin 置于真实 `app.asar.unpacked` 路径，manifest 检查和打包应用 DeepSeek 预检通过 |
 | 安全 | 依赖、IPC、预览与子进程环境加固 | 已测试 | 生产 audit 0 漏洞；PDF.js 高危已覆盖修复，extract-zip 高危已替换为 Electron 官方安全兼容实现；非主 Renderer IPC 对抗、文件身份绑定和环境白名单回归通过 |

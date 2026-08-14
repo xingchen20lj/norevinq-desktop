@@ -1,6 +1,6 @@
 import { _electron as electron, expect, test, type Locator } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, copyFileSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
@@ -17,10 +17,7 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
   mkdirSync(projectPath)
   mkdirSync(codexHome)
   mkdirSync(join(codexHome, 'generated_images'))
-  writeFileSync(join(codexHome, 'generated_images', 'lifecycle-proof.png'), Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-    'base64',
-  ))
+  copyFileSync(resolve('build/icon.png'), join(codexHome, 'generated_images', 'lifecycle-proof.png'))
   execFileSync('git', ['init', '-b', 'main'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.name', 'Norevinq Lifecycle'], { cwd: projectPath })
   execFileSync('git', ['config', 'user.email', 'norevinq-lifecycle@example.invalid'], { cwd: projectPath })
@@ -97,6 +94,12 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     const generatedImage = window.getByRole('img', { name: 'Norevinq 生成图片' })
     await expect(generatedImage).toBeVisible()
     await expect(generatedImage).toHaveAttribute('src', /^norevinq-file:\/\/preview\/[0-9a-f-]{36}$/u)
+    await expect(window.locator('.activity-card.imageGeneration')).toContainText('生成图片')
+    await expect(window.locator('.activity-card.agentMessage').last()).toContainText('图片已经生成并显示在消息中。')
+    await expect(window.locator('.activity-card.agentMessage').last().getByRole('button', { name: /复制/u })).toBeVisible()
+    await expect(window.locator('.activity-status').filter({ hasText: '已完成' }).first()).toBeVisible()
+    await expect(window.locator('.activity-meta time').first()).toBeVisible()
+    await expect(window.locator('.activity-timeline')).not.toContainText('completed')
     await window.screenshot({ path: 'test-results/norevinq-agent-inline-image.png' })
 
     const topbarActions = window.locator('.topbar-actions')

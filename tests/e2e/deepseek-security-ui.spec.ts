@@ -25,11 +25,12 @@ test('selects DeepSeek Security and completes an isolated local preflight', asyn
     projectPath: project.path,
     createdAt: timestamp,
     updatedAt: timestamp,
-    status: 'cancelled',
+    status: 'failed',
     request: {
       projectId: project.id,
       provider: 'deepseek',
       model: 'deepseek-v4-flash',
+      reportLanguage: 'zh-CN',
       mode: 'standard',
       target: { kind: 'repository' },
       auth: 'api-key',
@@ -56,6 +57,42 @@ test('selects DeepSeek Security and completes an isolated local preflight', asyn
       },
     },
     result: null,
+    error: {
+      code: 'deep_worker_sandbox',
+      message: 'Deep Scan stopped after 3 consecutive unsuccessful discovery workers. Error: failed to initialize in-process app-server client: Operation not permitted.',
+    },
+  })
+  const completedScanId = '71c4bef0-6970-43b1-8f90-59bb2df58ff8'
+  const completedScanRoot = join(profile, 'security', 'scans', completedScanId)
+  mkdirSync(completedScanRoot, { recursive: true })
+  writeFileSync(join(completedScanRoot, 'report.md'), '# 中文安全报告\n\n扫描已完成。\n')
+  database.upsertSecurityScan({
+    id: completedScanId,
+    projectId: project.id,
+    projectName: 'completed-fixture',
+    projectPath: project.path,
+    createdAt: timestamp,
+    updatedAt: timestamp,
+    status: 'completed',
+    request: {
+      projectId: project.id,
+      provider: 'deepseek',
+      model: 'deepseek-v4-pro',
+      reportLanguage: 'zh-CN',
+      mode: 'standard',
+      target: { kind: 'repository' },
+      auth: 'api-key',
+    },
+    progress: null,
+    result: {
+      scanId: 'sealed-fixture',
+      pluginVersion: '0.1.19',
+      threadId: 'security-fixture-thread',
+      reportAvailable: true,
+      sarifAvailable: false,
+      coverage: { mode: 'repository', completeness: 'complete', surfaces: 1, deferred: 0, openQuestions: 0 },
+      findings: [],
+    },
     error: null,
   })
   database.close()
@@ -70,6 +107,9 @@ test('selects DeepSeek Security and completes an isolated local preflight', asyn
     const security = window.getByRole('dialog', { name: 'Norevinq 安全工作台' })
     await security.getByRole('button', { name: '扫描', exact: true }).click()
     await security.getByLabel('模型提供商').selectOption('deepseek')
+    await expect(security.getByLabel('报告语言')).toHaveValue('zh-CN')
+    await security.getByLabel('报告语言').selectOption('en')
+    await expect(security.getByLabel('报告语言')).toHaveValue('en')
     await expect(security.getByLabel('DeepSeek 模型')).toHaveValue('deepseek-v4-pro')
     await expect(security).toContainText('实时显示 token 与人民币估算')
     await expect(security).toContainText('Flash 与 Pro 均已通过')
@@ -84,6 +124,19 @@ test('selects DeepSeek Security and completes an isolated local preflight', asyn
     await expect(security.getByLabel('DeepSeek 实时 Token 与费用')).toContainText('总计 1,250,000')
     await expect(security.getByLabel('DeepSeek 实时 Token 与费用')).toContainText('75.0%')
     await expect(security.getByLabel('DeepSeek 实时 Token 与费用')).toContainText('¥0.381030')
+    const scanError = security.locator('.security-scan-error')
+    await expect(scanError).toContainText('扫描进程权限受限')
+    await expect(scanError).not.toHaveAttribute('open', '')
+    const completedScan = security.locator('.security-scan-list > article').filter({ hasText: 'completed-fixture' })
+    await expect(completedScan.getByLabel('导出格式')).toHaveValue('report')
+    await expect(completedScan.getByRole('button', { name: '导出文件' })).toBeVisible()
+    await completedScan.getByRole('button', { name: '预览' }).click()
+    await expect(security.getByLabel('扫描产物预览')).toContainText('中文安全报告')
+    await security.getByRole('button', { name: '关闭产物' }).click()
+    await expect.poll(() => security.evaluate((element) => {
+      const box = element as unknown as { scrollWidth: number; clientWidth: number }
+      return box.scrollWidth <= box.clientWidth + 1
+    })).toBe(true)
     await window.screenshot({ path: 'test-results/norevinq-security-deepseek.png' })
   } finally {
     await application.close()
