@@ -17,7 +17,7 @@
 
 - [x] 合并开源准备 PR，并确认 `main` CI 全绿；
 - [x] 再运行一次历史密钥检查，确认命中项仅为明确的测试占位符；
-- [x] 确认 README、截图、生成清单和文档不含个人绝对路径、真实凭据或私人仓库内容；
+- [x] 确认中英文 README、截图、生成清单和文档不含个人绝对路径、真实凭据或私人仓库内容；
 - [x] 运行 `pnpm install --frozen-lockfile`、`pnpm audit:dependencies`、`pnpm verify:ci`；
 - [x] 在 macOS 重新生成无签名内部 DMG，并运行 packaged E2E；
 - [x] 在 GitHub 仓库设置中确认描述、主题和默认分支；

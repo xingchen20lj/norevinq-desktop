@@ -13,6 +13,7 @@ const requiredFiles = [
   'LICENSE',
   'NOTICE',
   'README.md',
+  'README.en.md',
   'SECURITY.md',
   'CONTRIBUTING.md',
   'CODE_OF_CONDUCT.md',

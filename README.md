@@ -1,5 +1,7 @@
 # Norevinq
 
+**简体中文** | [English](README.en.md)
+
 [![CI](https://github.com/xingchen20lj/norevinq-desktop/actions/workflows/ci.yml/badge.svg)](https://github.com/xingchen20lj/norevinq-desktop/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 ![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows-lightgrey.svg)

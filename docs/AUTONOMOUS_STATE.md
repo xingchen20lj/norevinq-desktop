@@ -13,6 +13,8 @@
 
 ## 已完成任务
 
+- README 增加完整英文版与中英文双向切换入口；两种语言共享相同的真实产品截图、演示视频、功能边界、构建说明、凭据说明和来源声明，开源就绪检查将英文 README 纳入必需文件。
+
 - 开源准备 PR #11 已经 macOS 15、Windows 2025 和离线 Electron smoke 全绿后合并；仓库已切换为 Public，并启用私密漏洞报告、Secret Scanning、Push Protection、Dependabot Alerts/自动安全更新和 `Protect main` ruleset。所有主线变更必须走 PR，禁止强推和删除，并要求 macOS/Windows 状态检查通过。
 - 创建带注释标签 `v0.1.0` 和仅含 GitHub 自动源码归档的预发布；Release 资产为空，Actions 不构建或上传 DMG、EXE、ZIP、blockmap 和自动更新元数据。
 - 完成开源 sealed 扫描 8 项发现的逐项闭环：3 项中风险全部修复；5 项低风险中 4 项修复或由源码分发架构关闭，1 项 Renderer 确认纵深防御风险在补偿控制下明确接受。Git 项目根边界、`core.fsmonitor=false`、Security 最小权限、同句柄文件预览、目录/大 diff 前置预算均有自动回归。
