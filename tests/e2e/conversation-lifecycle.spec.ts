@@ -90,6 +90,24 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
     await window.getByLabel('搜索任务').press('Enter')
     await taskRow('Lifecycle primary').click()
 
+    const topbarActions = window.locator('.topbar-actions')
+    for (const label of [
+      '长期目标',
+      '重命名任务',
+      '分叉任务',
+      '压缩上下文',
+      '归档任务',
+      '永久删除任务',
+      '折叠侧栏',
+      '文件与产物',
+      '本地网页预览',
+      '终端',
+      '帮助（暂未开放）',
+    ]) {
+      await expect(topbarActions.getByRole('button', { name: label, exact: true })).toHaveAttribute('data-tooltip', label)
+    }
+    await topbarActions.getByRole('button', { name: '重命名任务' }).hover()
+    await window.screenshot({ path: 'test-results/aster-topbar-tooltip.png' })
     await window.getByRole('button', { name: '长期目标' }).click()
     const goalDialog = window.getByRole('dialog', { name: '长期目标' })
     await goalDialog.getByLabel('目标内容').fill('Ship the durable lifecycle')

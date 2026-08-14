@@ -774,18 +774,18 @@ export function App(): React.JSX.Element {
           </div>
           <div className="topbar-actions">
             {selectedThread && !newTask && <>
-              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
-              <button className="icon-button" aria-label="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
-              <button className="icon-button" aria-label="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
-              <button className="icon-button" aria-label="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
-              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
-              <button className="icon-button danger-action" aria-label="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
+              <button className={`icon-button ${selectedGoal ? 'active' : ''}`} aria-label="长期目标" data-tooltip="长期目标" disabled={threadActionBusy} onClick={openGoalDialog}><Target size={15} /></button>
+              <button className="icon-button" aria-label="重命名任务" data-tooltip="重命名任务" disabled={threadActionBusy} onClick={renameSelectedThread}><Pencil size={15} /></button>
+              <button className="icon-button" aria-label="分叉任务" data-tooltip="分叉任务" disabled={threadActionBusy || activeTurn} onClick={() => void forkSelectedThread()}><GitFork size={15} /></button>
+              <button className="icon-button" aria-label="压缩上下文" data-tooltip="压缩上下文" disabled={threadActionBusy || activeTurn} onClick={() => void compactSelectedThread()}><Brain size={15} /></button>
+              <button className="icon-button" aria-label={conversations?.listArchived ? '恢复任务' : '归档任务'} data-tooltip={conversations?.listArchived ? '恢复任务' : '归档任务'} disabled={threadActionBusy || activeTurn} onClick={() => void archiveSelectedThread()}>{conversations?.listArchived ? <ArchiveRestore size={15} /> : <Archive size={15} />}</button>
+              <button className="icon-button danger-action" aria-label="永久删除任务" data-tooltip="永久删除任务" disabled={threadActionBusy || activeTurn} onClick={() => void deleteSelectedThread()}><Trash2 size={15} /></button>
             </>}
-            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
-            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
-            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
-            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
-            <button className="icon-button" aria-label="帮助"><CircleHelp size={17} /></button>
+            <button className="icon-button" aria-label={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} data-tooltip={sidebarCollapsed ? '展开侧栏' : '折叠侧栏'} onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
+            <button className={`icon-button ${filesOpen ? 'active' : ''}`} aria-label="文件与产物" data-tooltip="文件与产物" disabled={!selectedProject} onClick={() => openFiles()}><Files size={17} /></button>
+            <button className={`icon-button ${browserOpen ? 'active' : ''}`} aria-label="本地网页预览" data-tooltip="本地网页预览" onClick={() => { setFilesOpen(false); setTerminalOpen(false); setGitOpen(false); setBrowserOpen(true) }}><Globe2 size={17} /></button>
+            <button className={`icon-button ${terminalOpen ? 'active' : ''}`} aria-label="终端" data-tooltip="终端" onClick={() => void openTerminal()}><TerminalSquare size={17} /></button>
+            <button className="icon-button" aria-label="帮助（暂未开放）" data-tooltip="帮助（暂未开放）"><CircleHelp size={17} /></button>
           </div>
         </header>
 
