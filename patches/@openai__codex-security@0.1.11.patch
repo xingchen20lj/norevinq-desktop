@@ -257,3 +257,15 @@ index 433c837..7969eab 100644
              encoding: "utf8",
              maxBuffer: Infinity,
              windowsHide: true,
+diff --git a/dist/api.js b/dist/api.js
+index a3338c6..c1c3ec9 100644
+--- a/dist/api.js
++++ b/dist/api.js
+@@ -1385,6 +1385,7 @@ function scanPrompt(target, mode, skillName, scanId, hasConfigPath = false, has
+         ...(mode === "deep"
+             ? [
+                 `The SDK has already registered this scan. Call start_codex_security_deep_scan with ${JSON.stringify({ scanId })}; never pass targetPath or create another scan.`,
++                "Before reading repository source or writing any scan artifact, require start_codex_security_deep_scan in the available tool list. If it is unavailable, stop immediately and report that the Deep Scan MCP coordinator is unavailable. Never replace it with manual discovery, delegated discovery, or hand-written canonical artifacts.",
+             ]
+             : skillName === "security-scan"
+                 ? [

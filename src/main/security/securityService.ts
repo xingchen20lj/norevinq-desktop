@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto'
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import {
   chmodSync,
+  cpSync,
   copyFileSync,
   existsSync,
   lstatSync,
@@ -9,6 +10,7 @@ import {
   readFileSync,
   realpathSync,
   renameSync,
+  rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs'
@@ -59,6 +61,8 @@ import {
 
 const MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
 const MAX_FAILURE_MANIFEST_BYTES = 64 * 1024
+const MAX_MCP_MANIFEST_BYTES = 64 * 1024
+const MAX_MCP_PREFLIGHT_OUTPUT_BYTES = 2 * 1024 * 1024
 
 function securityScanPrompt(language: 'zh-CN' | 'en'): string {
   if (language === 'en') {
@@ -81,6 +85,8 @@ export type SecurityServiceOptions = {
   now?: () => Date
   platform?: NodeJS.Platform
   cliRunner?: (cwd: string, args: string[]) => Promise<string>
+  nodeRuntimeExecutable?: string
+  electronNodeRuntime?: boolean
 }
 
 export class SecurityService {
@@ -117,6 +123,13 @@ export class SecurityService {
     process.env.CODEX_SECURITY_STATE_DIR = this.#stateRoot
     this.#sdkFactory = options.sdkFactory ?? ((config) => new CodexSecurity(config))
     this.#pluginPath = options.pluginPath
+      ? prepareSecurityPluginRuntime(
+        this.#stateRoot,
+        options.pluginPath,
+        options.nodeRuntimeExecutable ?? process.execPath,
+        options.electronNodeRuntime ?? Boolean(process.versions.electron),
+      )
+      : undefined
     this.#sdk = this.#sdkFactory(this.#pluginPath ? { pluginPath: this.#pluginPath } : undefined)
     this.#deepSeekCredential = options.deepSeekCredential ?? (() => null)
     this.#codexBinary = options.codexBinary ?? (() => null)
@@ -284,6 +297,10 @@ export class SecurityService {
     let selected: { sdk: SecuritySdk; ephemeral: boolean } | null = null
     try {
       selected = this.#sdkForRequest(initial.request)
+      if (initial.request.mode === 'deep' && this.#pluginPath) {
+        this.#updateProgress(initial.id, { activity: '正在验证深度扫描本地协调器' })
+        await assertDeepScanMcpAvailable(this.#pluginPath, this.#stateRoot, this.#environment, controller.signal)
+      }
       const usageAccumulator = await this.#usageAccumulator(initial.request)
       if (controller.signal.aborted) throw controller.signal.reason
       if (initial.request.mode === 'deep' && this.#platform === 'darwin') {
@@ -610,6 +627,9 @@ function classifySecurityError(error: unknown): string {
   }
   if (mapping[name]) return mapping[name]
   const message = safeErrorMessage(error).toLocaleLowerCase('en-US')
+  if (message.includes('深度扫描本地协调器') || message.includes('深度扫描协调工具')) {
+    return 'deep_mcp_unavailable'
+  }
   if (message.includes('deep scan stopped') || message.includes('deep security scan terminally failed')) {
     return message.includes('operation not permitted')
       ? 'deep_worker_sandbox'
@@ -674,6 +694,226 @@ export function prepareMacDeepScanCodexWrapper(
     chmodSync(wrapperPath, 0o700)
   }
   return wrapperPath
+}
+
+type PluginMcpServer = {
+  command?: unknown
+  args?: unknown
+  cwd?: unknown
+  env?: unknown
+  env_vars?: unknown
+}
+
+type PluginMcpManifest = {
+  mcpServers?: Record<string, PluginMcpServer>
+}
+
+export function prepareSecurityPluginRuntime(
+  stateRoot: string,
+  pluginPath: string,
+  nodeRuntimeExecutable: string = process.execPath,
+  electronNodeRuntime = Boolean(process.versions.electron),
+): string {
+  const canonicalPlugin = realpathSync(pluginPath)
+  const pluginMetadata = lstatSync(canonicalPlugin)
+  if (!pluginMetadata.isDirectory() || pluginMetadata.isSymbolicLink()) {
+    throw new Error('Norevinq 安全插件必须是普通目录。')
+  }
+  assertSafeRuntimePath(nodeRuntimeExecutable)
+  const canonicalNodeRuntime = realpathSync(nodeRuntimeExecutable)
+  assertSafeRuntimePath(canonicalNodeRuntime)
+  const runtimeMetadata = lstatSync(canonicalNodeRuntime)
+  const executableModeMissing = process.platform !== 'win32' && (runtimeMetadata.mode & 0o111) === 0
+  if (!runtimeMetadata.isFile() || runtimeMetadata.isSymbolicLink() || executableModeMissing) {
+    throw new Error('Norevinq 内置 Node 运行时不可执行。')
+  }
+
+  const runtimeParent = join(stateRoot, 'plugin-runtime')
+  preparePrivateDirectory(runtimeParent)
+  const runtimeRoot = join(runtimeParent, 'codex-security')
+  const temporaryRoot = join(runtimeParent, `codex-security.${randomUUID()}.tmp`)
+  try {
+    cpSync(canonicalPlugin, temporaryRoot, {
+      recursive: true,
+      force: false,
+      errorOnExist: true,
+      dereference: false,
+    })
+    const manifestPath = join(temporaryRoot, '.mcp.json')
+    const manifestMetadata = lstatSync(manifestPath)
+    if (!manifestMetadata.isFile() || manifestMetadata.isSymbolicLink()
+      || manifestMetadata.size > MAX_MCP_MANIFEST_BYTES) {
+      throw new Error('Norevinq 安全插件 MCP 清单无效。')
+    }
+    const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PluginMcpManifest
+    const server = manifest.mcpServers?.['codex-security']
+    if (!server || !Array.isArray(server.args) || !server.args.every((argument) => typeof argument === 'string')) {
+      throw new Error('Norevinq 安全插件未声明有效的本地协调器。')
+    }
+    server.command = canonicalNodeRuntime
+    const forwardedEnvironment = isStringArray(server.env_vars) ? server.env_vars : []
+    server.env_vars = [...new Set([...forwardedEnvironment, 'DEEPSEEK_API_KEY'])]
+    if (electronNodeRuntime) {
+      server.env = {
+        ...(isStringRecord(server.env) ? server.env : {}),
+        ELECTRON_RUN_AS_NODE: '1',
+      }
+    }
+    writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+    const pluginManifestPath = join(temporaryRoot, '.codex-plugin', 'plugin.json')
+    const pluginManifestMetadata = lstatSync(pluginManifestPath)
+    if (!pluginManifestMetadata.isFile() || pluginManifestMetadata.isSymbolicLink()
+      || pluginManifestMetadata.size > MAX_MCP_MANIFEST_BYTES) {
+      throw new Error('Norevinq 安全插件元数据无效。')
+    }
+    const pluginManifest = JSON.parse(readFileSync(pluginManifestPath, 'utf8')) as Record<string, unknown>
+    if (typeof pluginManifest.version !== 'string' || !pluginManifest.version.trim()) {
+      throw new Error('Norevinq 安全插件版本无效。')
+    }
+    pluginManifest.version = `${pluginManifest.version.replace(/-norevinq\.\d+$/u, '')}-norevinq.1`
+    writeFileSync(pluginManifestPath, `${JSON.stringify(pluginManifest, null, 2)}\n`, {
+      encoding: 'utf8', mode: 0o600,
+    })
+    rmSync(runtimeRoot, { recursive: true, force: true })
+    renameSync(temporaryRoot, runtimeRoot)
+    if (process.platform !== 'win32') chmodSync(runtimeRoot, 0o700)
+    return runtimeRoot
+  } catch (error) {
+    rmSync(temporaryRoot, { recursive: true, force: true })
+    throw error
+  }
+}
+
+export async function assertDeepScanMcpAvailable(
+  pluginPath: string,
+  stateRoot: string,
+  environment: NodeJS.ProcessEnv = process.env,
+  signal?: AbortSignal,
+  timeoutMs = 15_000,
+): Promise<void> {
+  const manifestPath = join(pluginPath, '.mcp.json')
+  const manifestMetadata = lstatSync(manifestPath)
+  if (!manifestMetadata.isFile() || manifestMetadata.isSymbolicLink()
+    || manifestMetadata.size > MAX_MCP_MANIFEST_BYTES) {
+    throw new Error('深度扫描本地协调器清单无效；扫描未启动，也未产生模型费用。')
+  }
+  const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as PluginMcpManifest
+  const server = manifest.mcpServers?.['codex-security']
+  if (!server || typeof server.command !== 'string' || !isStringArray(server.args)) {
+    throw new Error('深度扫描本地协调器配置缺失；扫描未启动，也未产生模型费用。')
+  }
+  const configuredCwd = typeof server.cwd === 'string' ? server.cwd : '.'
+  const cwd = resolve(pluginPath, configuredCwd)
+  const fromPlugin = relative(realpathSync(pluginPath), realpathSync(cwd))
+  if (fromPlugin.startsWith('..') || isAbsolute(fromPlugin)) {
+    throw new Error('深度扫描本地协调器工作目录越界；扫描未启动，也未产生模型费用。')
+  }
+  const preflightHome = join(stateRoot, 'mcp-preflight-home')
+  preparePrivateDirectory(preflightHome)
+
+  await new Promise<void>((resolvePromise, reject) => {
+    let settled = false
+    let stdout = ''
+    let stderr = ''
+    const child = spawn(server.command as string, server.args as string[], {
+      cwd,
+      env: {
+        ...environment,
+        ...(isStringRecord(server.env) ? server.env : {}),
+        CODEX_HOME: preflightHome,
+        CODEX_SECURITY_STATE_DIR: stateRoot,
+      },
+      stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
+    })
+    const finish = (error?: Error): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', abort)
+      let completed = false
+      const complete = (): void => {
+        if (completed) return
+        completed = true
+        clearTimeout(closeTimer)
+        if (error) reject(error)
+        else resolvePromise()
+      }
+      const closeTimer = setTimeout(complete, 2_000)
+      closeTimer.unref()
+      if (child.exitCode !== null || child.signalCode !== null) {
+        complete()
+        return
+      }
+      child.once('close', complete)
+      child.kill()
+    }
+    const abort = (): void => finish(signal?.reason instanceof Error ? signal.reason : new Error('扫描已取消。'))
+    const timer = setTimeout(() => finish(new Error(
+      '深度扫描本地协调器启动超时；扫描未启动，也未产生模型费用。',
+    )), timeoutMs)
+    signal?.addEventListener('abort', abort, { once: true })
+    child.once('error', (error) => finish(new Error(
+      `深度扫描本地协调器无法启动；扫描未启动，也未产生模型费用。${safeErrorMessage(error)}`,
+    )))
+    child.once('exit', (code) => {
+      if (!settled) finish(new Error(
+        `深度扫描本地协调器意外退出（${String(code ?? 'unknown')}）；扫描未启动，也未产生模型费用。${safeErrorMessage(stderr)}`,
+      ))
+    })
+    child.stderr.setEncoding('utf8')
+    child.stderr.on('data', (chunk: string) => {
+      stderr = `${stderr}${chunk}`.slice(-MAX_MCP_PREFLIGHT_OUTPUT_BYTES)
+    })
+    child.stdout.setEncoding('utf8')
+    child.stdout.on('data', (chunk: string) => {
+      stdout += chunk
+      if (Buffer.byteLength(stdout) > MAX_MCP_PREFLIGHT_OUTPUT_BYTES) {
+        finish(new Error('深度扫描本地协调器输出异常；扫描未启动，也未产生模型费用。'))
+        return
+      }
+      const lines = stdout.split('\n')
+      stdout = lines.pop() ?? ''
+      for (const line of lines) {
+        if (!line.trim()) continue
+        try {
+          const response = JSON.parse(line) as {
+            id?: unknown
+            result?: { tools?: { name?: unknown }[] }
+            error?: unknown
+          }
+          if (response.id !== 2) continue
+          const available = response.result?.tools?.some(({ name }) => name === 'start_codex_security_deep_scan') === true
+          finish(available ? undefined : new Error(
+            '深度扫描协调工具未加载；扫描未启动，也未产生模型费用。',
+          ))
+          return
+        } catch {
+          // Ignore non-protocol stdout until the bounded response arrives.
+        }
+      }
+    })
+    child.stdin.on('error', (error) => finish(new Error(
+      `深度扫描本地协调器通信失败；扫描未启动，也未产生模型费用。${safeErrorMessage(error)}`,
+    )))
+    child.stdin.write(`${JSON.stringify({
+      jsonrpc: '2.0', id: 1, method: 'initialize', params: {
+        protocolVersion: '2025-06-18', capabilities: {},
+        clientInfo: { name: 'norevinq-security-preflight', version: '0.1.0' },
+      },
+    })}\n`)
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized', params: {} })}\n`)
+    child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'tools/list', params: {} })}\n`)
+  })
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+}
+
+function isStringRecord(value: unknown): value is Record<string, string> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    && Object.values(value).every((entry) => typeof entry === 'string')
 }
 
 function assertSafeRuntimePath(path: string): void {

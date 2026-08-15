@@ -4,7 +4,7 @@
 
 Norevinq 固定使用公开 `@openai/codex-security` 0.1.11。该包内置 Codex SDK/可执行文件 0.144.6，并和桌面任务所用的 app-server 0.147.x 分开运行，避免协议与依赖提升互相影响。
 
-上游 0.1.11 的外部提供商白名单只包含 OpenRouter、Fireworks 和 Bedrock，即使 `codexOverrides` 接受 `model_providers`，运行时也会删除其他 provider。Norevinq 因此在 Apache-2.0 许可范围内应用最小公开补丁 `patches/@openai__codex-security@0.1.11.patch`：加入固定 DeepSeek Responses 定义、实例级环境隔离和只读 token usage 回调，并确保传给 Python workbench 的环境继续剔除模型 API Key。补丁不修改扫描提示、技能、sealed contract、finding schema、沙箱或产物校验。该差异由 lockfile、NOTICE、自动测试和开源检查共同审计，不能描述为上游原生未修改能力。
+上游 0.1.11 的外部提供商白名单只包含 OpenRouter、Fireworks 和 Bedrock，即使 `codexOverrides` 接受 `model_providers`，运行时也会删除其他 provider。Norevinq 因此在 Apache-2.0 许可范围内应用最小公开补丁 `patches/@openai__codex-security@0.1.11.patch`：加入固定 DeepSeek Responses 定义、实例级环境隔离和只读 token usage 回调，并确保传给 Python workbench 的环境继续剔除模型 API Key。补丁不改变技能、sealed contract、finding schema、沙箱或产物校验；仅在 Deep Scan 提示中增加 fail-closed 约束：缺少官方协调工具时必须立即停止，不能用手工 discovery 或手写 canonical 产物代替。该差异由 lockfile、NOTICE、自动测试和开源检查共同审计，不能描述为上游原生未修改能力。
 
 SDK 官方运行 profile 必须保留 `:root=read`、`:workspace_roots=write`：前者让扫描智能体读取用户选择的本地仓库，后者只允许向 SDK 选定的私有扫描工作目录写入 draft/sealed 产物。2026-08-15 曾发现 Norevinq 补丁误把两者改为 `:minimal=read`、`:workspace_roots=read`，导致模型只能尝试公共网络回退且无法创建 `scan-manifest.json`、`findings.json`、`coverage.json`。该覆盖已删除，并由安装依赖权限单测和全新上游 tarball 补丁重放检查防止复发。此处恢复的是上游官方权限边界，不是给模型增加任意本机写权限。
 
@@ -17,6 +17,8 @@ macOS 正式包的实际默认路径如下：
 - Security 扫描产物：`~/Library/Application Support/norevinq/security/scans/<scan-id>`。
 
 发布包把 SDK 的 `_bundled_plugin` 显式复制到 `app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin`，因为 SDK 会对插件根执行 `realpath`，不能从 ASAR 虚拟目录运行。包内审计会验证该目录不是符号链接、没有越过 resources 边界，并回读 `.codex-plugin/plugin.json`；主进程只向 SDK 传入这一精确路径。
+
+Finder/启动台启动的桌面应用不保证系统 `PATH` 中存在裸命令 `node`，而官方 plugin 0.1.19 的 `.mcp.json` 正是以该命令启动深度扫描协调器。Norevinq 启动时把官方插件复制到私有 `security/sdk-state/plugin-runtime`，只做两项可审计的发布适配：将 MCP command 固定为当前应用内置的 Electron Node 可执行文件，并将 `DEEPSEEK_API_KEY` 加入 MCP 显式转交白名单，使协调器创建的 discovery worker 能读取本次 SDK 实例的凭据。适配后的本地插件版本标记为 `0.1.19-norevinq.1`，不会修改签名应用包或冒充上游原版。Deep Scan 在进入 SDK 模型调用前还会真实执行 MCP initialize + tools/list；若 `start_codex_security_deep_scan` 不存在，扫描以 `deep_mcp_unavailable` 失败，并明确保证尚未产生模型费用。
 
 Norevinq 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量 `CODEX_HOME`，启动 Security SDK 时设置独立 `CODEX_SECURITY_STATE_DIR`。默认配置不会读取、覆盖或清理官方 Codex 常用的 `~/.codex`，主 app-server 与 Security SDK 的 Codex 版本也在不同进程和依赖树中。不要手动把 `NOREVINQ_AGENT_HOME` 指向 `~/.codex`，否则会主动取消这层隔离。
 
@@ -59,4 +61,5 @@ Norevinq 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量
 - completed finding 的 UI/持久化、取消、错误、报告和导出使用官方数据形状的自动测试覆盖；下一次在线完成扫描需要明确提高模型费用上限。
 - Security SDK 自带的 Codex 0.144.6 已通过固定 provider 直接调用 DeepSeek V4 Pro Responses 并返回精确探测文本，未使用 OpenAI 登录或 OpenAI API Key。
 - 同一 SDK、补丁和一文件仓库夹具的 V4 Pro standard 在线扫描在约 12 分钟内返回完整 `completed + sealed` 结果，token usage 回调非空。V4 Flash 在 SDK 内置 0.144.6/并发组合下的两次早期对照分别出现密封后修改 manifest、以及生成密封产物后未及时返回；这不能单独归因于模型。将运行时固定为 Norevinq 0.147.0、并发限制为 1 后，Flash 同一夹具在 160.9 秒完成并通过 SDK `completed + sealed` 校验，usage 非空。产品因此重新开放 Flash，但保持串行审计以规避已观察到的收敛竞态。
+- 2026-08-15 的发布态故障复盘确认：深度扫描父智能体没有获得 `start_codex_security_deep_scan`，原因是 GUI 环境找不到插件清单中的裸 `node`；修复第一层后又发现协调器环境白名单未转交 `DEEPSEEK_API_KEY`。完成内置 Node 启动器、凭据白名单与零 token MCP 前置验证后，DeepSeek V4 Flash 对一文件仓库真实执行 discovery worker、dedup、父级报告和 SDK 密封，协调器清单为 `succeeded`，最终扫描为 `completed + sealed`，报告、findings、coverage、manifest 与 SARIF 均存在。该闭环用时约 338 秒。
 - `0.1.x` 仍是预览版。对不完全信任的仓库，正式的扫描沙箱与权限边界复验完成前，不应把安全工作台当作强隔离执行环境。

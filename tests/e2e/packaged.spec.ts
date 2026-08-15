@@ -1,9 +1,10 @@
 import { _electron as electron, expect, test } from '@playwright/test'
 import { execFileSync } from 'node:child_process'
-import { existsSync, lstatSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { StateDatabase } from '../../src/main/state/database.js'
+import { assertDeepScanMcpAvailable } from '../../src/main/security/securityService.js'
 
 test('starts the packaged app with its bundled Codex runtime', async () => {
   const executablePath = packagedExecutablePath()
@@ -69,6 +70,26 @@ test('starts the packaged app with its bundled Codex runtime', async () => {
     expect(lstatSync(agentHome).isDirectory()).toBe(true)
     expect(lstatSync(agentHome).isSymbolicLink()).toBe(false)
     if (process.platform !== 'win32') expect(lstatSync(agentHome).mode & 0o777).toBe(0o700)
+    const securityPluginRuntime = join(
+      profile, 'security', 'sdk-state', 'plugin-runtime', 'codex-security',
+    )
+    const mcpManifest = JSON.parse(readFileSync(join(securityPluginRuntime, '.mcp.json'), 'utf8')) as {
+      mcpServers: { 'codex-security': { command: string; env?: Record<string, string>; env_vars: string[] } }
+    }
+    expect(mcpManifest.mcpServers['codex-security']).toMatchObject({
+      command: executablePath,
+      env: { ELECTRON_RUN_AS_NODE: '1' },
+    })
+    expect(mcpManifest.mcpServers['codex-security'].env_vars).toContain('DEEPSEEK_API_KEY')
+    const pluginManifest = JSON.parse(readFileSync(
+      join(securityPluginRuntime, '.codex-plugin', 'plugin.json'), 'utf8',
+    )) as { version: string }
+    expect(pluginManifest.version).toBe('0.1.19-norevinq.1')
+    await expect(assertDeepScanMcpAvailable(
+      securityPluginRuntime,
+      join(profile, 'security', 'sdk-state'),
+      process.env,
+    )).resolves.toBeUndefined()
     const updates = await window.evaluate(async () => {
       const bridge = Reflect.get(window, 'norevinq') as {
         getUpdateState: () => Promise<{ phase: string; configured: boolean; disabledReason: string | null }>
