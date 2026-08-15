@@ -66,6 +66,12 @@
 .security-findings dt { color: var(--subtle); }
 .security-findings dd { margin: 0; }
 .security-findings pre { max-height: 220px; overflow: auto; margin: 0; padding: 9px; border-top: 1px solid var(--border); color: var(--muted); font: 8.5px/1.45 ui-monospace, SFMono-Regular, Menlo, monospace; }
+.finding-action-feedback { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-top: 1px solid var(--border); color: var(--muted); background: var(--surface-2); font-size: 8.5px; }
+.finding-action-feedback strong { flex: none; color: var(--text); font-size: 8.5px; }
+.finding-action-feedback.running { color: var(--accent-strong); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.finding-action-feedback.completed { color: var(--success); background: color-mix(in srgb, var(--success) 7%, transparent); }
+.finding-action-feedback.failed { color: var(--danger); background: color-mix(in srgb, var(--danger) 7%, transparent); }
+.finding-action-feedback span { min-width: 0; overflow-wrap: anywhere; }
 .finding-actions { display: flex; justify-content: flex-end; gap: 5px; padding: 8px; border-top: 1px solid var(--border); }
 .finding-actions button { height: 26px; padding: 0 8px; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); background: var(--surface); font-size: 8.5px; cursor: pointer; }
 .finding-actions button:disabled { opacity: .4; cursor: default; }

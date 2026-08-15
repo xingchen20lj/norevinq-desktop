@@ -59,7 +59,7 @@ flowchart LR
 11. provider key 只从环境或 OS 加密保险库进入 app-server 子进程；配置、SQLite、日志、snapshot 和 renderer 均不含明文。
 12. worktree 路径由主进程创建和登记；renderer/agent 只能传 worktree UUID，不能直接注入 cwd。
 13. Security 输出固定在 userData 私有目录且不位于任何被扫工作树内；只有 completed + sealed contract 的扫描可导入 finding、报告或执行验证/修复。
-14. Security validate/patch/false-positive/export 只通过官方 CLI 参数数组调用；patch 要求 UI 显式二次确认，renderer 不能指定路径或原始命令。
+14. Security validate/patch 使用应用固定智能体和解包后的官方技能，并由主进程绑定原扫描 provider/model；false-positive 由主进程按固定 SDK workbench schema 事务写入 SQLite；export 仅复制密封产物或从密封 finding 本地生成。patch 要求 UI 显式二次确认，renderer 不能指定路径、命令、provider 或模型。
 15. 崩溃诊断只在主进程本地有界持久化；Renderer 无法指定存储路径，只能触发系统保存对话框。ZIP 经字段密钥、自由文本和绝对路径三重脱敏，不包含对话或项目文件，不实现自动上传。
 16. 计划任务只执行已登记项目；同一任务不重叠，崩溃后运行标记失败且不自动重放，避免重复文件或命令副作用。
 17. 文件预览只使用项目相对路径；任何符号链接组件和根目录逃逸都失败关闭，媒体 URL 不包含本地路径且短时过期。

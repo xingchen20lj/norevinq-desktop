@@ -91,8 +91,8 @@
 | 安全 | 深度扫描 | 已测试 | SDK deep 参数、目标约束和 UI 已接入；私有 plugin runtime `0.1.19-norevinq.2` 以应用内置 Electron Node 启动官方父协调器，并向 discovery worker 显式转交 DeepSeek Key 与内层 `cs_artifacts` 所需的 Node 模式；模型调用前真实 tools/list，缺少 `start_codex_security_deep_scan` 即零 token 失败。使用新生成的 Intel 发布态应用主程序与 DeepSeek Flash 完成一文件 discovery、dedup、父级 reporting，coordinator=`succeeded`、最终 `completed + sealed`。macOS 对官方外层已验证沙箱内的 worker 使用非嵌套兼容模式；大型仓库仍会产生显著模型费用 |
 | 安全 | commit/工作区 diff 扫描 | 部分实现 | `DiffTarget.refs/workingTree` 已接入且深度模式本地拒绝；真实在线 diff 扫描待有界验证 |
 | 安全 | 预检、预算、取消、进度 | 已测试 | 真实 SDK preflight、Python/账户诊断和 $2 cost-limit 终止；AbortSignal/进度/费用/Trusted Access 回调自动测试 |
-| 安全 | 漏洞证据、严重程度、攻击路径 | 已测试 | sealed findings 映射、证据/位置/验证/攻击路径 UI 与持久化自动测试；真实扫描未完成所以当前没有伪造漏洞 |
-| 安全 | 验证、修复、修复验证、误报 | 部分实现 | 官方 CLI validate/patch/false-positive 安全参数数组适配与显式确认已实现；需真实 completed finding 做在线闭环，修复验证可重扫 |
+| 安全 | 漏洞证据、严重程度、攻击路径 | 已测试 | sealed findings 映射、证据/位置/验证/攻击路径 UI 与持久化自动测试；大型真实仓库 completed + sealed finding 已在界面展示，不补写扫描器未提供的证据 |
+| 安全 | 验证、修复、修复验证、误报 | 已测试 | 验证/修复绑定原扫描 provider/model，直接使用固定智能体与解包官方技能；DeepSeek V4 Flash 已真实完成 finding 验证和隔离夹具修复，修复关闭命令注入并生成 2 项通过回归。误报以固定 workbench schema 的 SQLite 事务持久化，应用历史同步显示状态；修复验证可重扫 |
 | 安全 | 历史、报告、JSON、CSV、SARIF 导出 | 已测试 | SQLite 独立历史、中文/英文报告选择、固定产物路径与 2 MiB 自动换行预览；报告、密封 JSON、规范 SARIF 直接安全复制，CSV 从已验证 finding 本地生成；四种格式均有系统保存与非空落盘自动回归 |
 | 安全 | 无权限时可诊断降级 | 已测试 | 区分认证、插件/Python、Security access、Trusted Access、cost limit；失败不产生 completed/result |
 | 安全 | DeepSeek Responses 独立扫描与实时计费 | 已测试 | 固定 provider、实例环境隔离和 SDK preflight 自动验证；V4 Pro standard 在线扫描约 12 分钟后完整返回 `completed + sealed`；V4 Flash 固定 Norevinq 0.147.0、单并发后同一夹具于 160.9 秒完整返回 `completed + sealed`；两者均无需 OpenAI 登录且 usage 非空。实时 token/缓存/人民币估算通过单元及真实 UI；发布包将 SDK bundled plugin 置于真实 `app.asar.unpacked` 路径，manifest 检查和打包应用 DeepSeek 预检通过 |

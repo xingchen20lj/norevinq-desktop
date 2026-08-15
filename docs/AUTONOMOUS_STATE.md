@@ -13,6 +13,7 @@
 
 ## 已完成任务
 
+- 修复安全工作台“验证 / 修复 / 标记误报”三个无反馈操作：验证与修复不再重启打包后无法定位插件的 Security CLI，而是使用应用固定的 Norevinq 智能体、已解包安全技能以及原扫描的 provider/model 直接执行；DeepSeek 扫描继续使用同一安全保存的 Key，不会悄然切到 OpenAI。误报状态直接按固定 SDK workbench schema 事务写入 SQLite，并同步到应用扫描历史；结构漂移或在途修复会失败关闭。按钮现在显示处理中、成功和具体失败，修复前明确提示会改仓库。DeepSeek V4 Flash 已真实完成验证与隔离仓库修复烟雾测试；验证前后目标文件哈希不变，修复真实关闭命令注入并生成 2 项通过回归。完整质量门为 226 项通过、2 项按条件跳过。
 - 修复安全工作台仅 Markdown 能实际导出：打包应用不再为 JSON/CSV/SARIF 二次启动无法自举的 Security CLI；JSON 与 SARIF 直接复制已经密封验证的规范产物，CSV 从已验证的领域 finding 本地生成并正确转义引号、换行和中文。定向 14 项与完整 224 项测试、类型检查、代码规范、开源守门、生产构建、包体预算、生产依赖审计及真实发布态目录包启动均通过，三种非 Markdown 格式均有非空落盘回归。
 - 修复归档任务只读打开后无法继续：归档视图仍用 `thread/read` 安全展示历史，但首次发送新指令时会在任何 `turn/start` 之前明确执行 `thread/unarchive`、恢复同一线程、切回活动任务列表并刷新目标，随后只发送这一条新指令；旧命令和工具事件不会重放。新增单元回归与真实 Electron 归档→打开→直接发送闭环；完整 224 项测试、类型检查、代码规范、开源守门、生产构建、包体预算和生产依赖高危审计均通过。
 - 修复发布包大型 Deep Scan 的内层 MCP 握手失败：官方协调器使用 `process.execPath` 启动 `cs_artifacts`，在 Electron Node 父进程下却未把 `ELECTRON_RUN_AS_NODE` 写入该 MCP 的显式环境；Codex 的 MCP 环境收敛会丢弃隐式继承值，导致应用主程序按 GUI 模式启动并在 `initialize response` 前关闭。Norevinq 私有运行时 `0.1.19-norevinq.2` 现以精确、唯一源码标记修补压缩 worker runtime，显式传递 Node 模式并在上游结构漂移时失败关闭。使用新生成的 Intel 发布态 `Norevinq.app` 主程序、包内 Codex 0.147.0 与 DeepSeek V4 Flash 完成一文件 deep 在线回归：276.16 秒内 discovery 与 dedup 均首次成功，coordinator=`succeeded`，最终 manifest=`completed + sealed`、coverage=`complete`。
@@ -300,7 +301,7 @@
 - 安全扫描输出必须位于被扫描工作树之外，并使用私有权限目录。
 - Codex Security 只接受 completed + sealed SDK 结果；cost limit、中断和 contract 失败保留失败状态，不展示部分 finding。
 - Codex Security 的 DeepSeek 支持采用显式固定 provider 与最小公开补丁；Key 只进入每次 SDK 实例的白名单子进程环境，并从 Python workbench 环境剔除，不宣称是上游 0.1.11 未修改原生能力。
-- Security validate/patch/false-positive/export 使用官方 CLI 参数数组；patch 必须显式确认，renderer 不能提交路径或命令。
+- Security validate/patch 使用应用固定智能体与解包后的官方技能，绑定原扫描 provider/model；false-positive 以固定 schema 的 SQLite 事务写入官方 workbench；export 从已密封产物本地生成或复制。patch 必须显式确认，renderer 不能提交路径、命令、provider 或模型。
 - 计划任务由 Electron 主进程本地调度；不安装后台守护进程，也不伪装成 app-server/CLI 的计划任务 API。
 - 计划任务崩溃后不重放活动 turn；应用重新启动只按 run-once/skip 策略处理下一次到期，避免重复副作用。
 - 文件与媒体预览只接受项目相对路径；符号链接失败关闭，流式 token 短时有效且不泄露本地绝对路径。
@@ -314,7 +315,7 @@
 
 ## 当前失败测试
 
-当前质量门无失败测试。DeepSeek Security V4 Pro standard、V4 Flash standard，以及修复发布态父/内层 MCP Node 启动与凭据转交后的 V4 Flash deep 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `pnpm verify` 为 41 个通过文件、1 个按在线开关跳过文件、223 项通过及 2 项跳过；类型、规范、脚本、workflow、开源就绪、构建和 bundle 预算均通过。生产依赖审计此前为 0 已知漏洞；x64 目录包、真实 packaged Electron 启动、Norevinq 智能体运行时 0.147.0、解包 Security plugin 0.1.19 manifest、私有 `0.1.19-norevinq.2` MCP 投影和发布态 deep sealed 回归均已通过。
+当前质量门无失败测试。DeepSeek Security V4 Pro standard、V4 Flash standard，以及修复发布态父/内层 MCP Node 启动与凭据转交后的 V4 Flash deep 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `pnpm verify` 为 41 个通过文件、1 个按在线开关跳过文件、226 项通过及 2 项跳过；类型、规范、脚本、workflow、开源就绪、构建和 bundle 预算均通过。生产依赖审计此前为 0 已知漏洞；x64 目录包、真实 packaged Electron 启动、Norevinq 智能体运行时 0.147.0、解包 Security plugin 0.1.19 manifest、私有 `0.1.19-norevinq.2` MCP 投影和发布态 deep sealed 回归均已通过。
 
 ## 已知问题
 

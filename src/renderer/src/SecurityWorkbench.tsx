@@ -107,7 +107,7 @@ export function SecurityWorkbench({ snapshot, project, close, onError }: {
           {preflight && <div className="security-preflight"><CheckCircle2 size={16} /><div><strong>预检通过</strong><p>{preflight.modelProvider ?? 'openai'} · {preflight.model} · {preflight.reasoningEffort} · {preflight.authentication} · {preflight.outputIsolated ? '产物目录已隔离' : '产物目录异常'}</p></div></div>}
           <ScanList scans={snapshot?.scans ?? []} activeScanId={snapshot?.activeScanId ?? null} busy={busy} run={run} viewArtifact={setArtifact} />
         </div>}
-        {tab === 'findings' && <Findings scans={snapshot?.scans ?? []} busy={busy} run={run} viewResult={setArtifact} />}
+        {tab === 'findings' && <Findings scans={snapshot?.scans ?? []} busy={busy} viewResult={setArtifact} />}
         {tab === 'repositories' && <Repositories scans={snapshot?.scans ?? []} />}
         {tab === 'settings' && <SecuritySettings snapshot={snapshot} busy={busy} refresh={() => run(() => window.norevinq.refreshSecurityRuntime())} />}
       </div>
@@ -197,14 +197,88 @@ function DeepSeekUsage({ usage }: { usage: NonNullable<NonNullable<SecurityScanR
   </div>
 }
 
-function Findings({ scans, busy, run, viewResult }: {
+function Findings({ scans, busy, viewResult }: {
   scans: SecurityScanRecord[]
   busy: boolean
-  run: (action: () => Promise<unknown>) => Promise<void>
   viewResult: (artifact: SecurityArtifact) => void
 }): React.JSX.Element {
+  const [actions, setActions] = useState<Record<string, {
+    action: 'validate' | 'patch' | 'false_positive'
+    status: 'running' | 'completed' | 'failed'
+    message: string
+  }>>({})
   const entries = scans.flatMap((scan) => (scan.result?.findings ?? []).map((finding) => ({ scanId: scan.id, finding })))
-  return <div className="settings-section"><div className="section-heading"><div><h3>漏洞</h3><p>证据、验证和攻击路径来自真实 sealed findings，不由界面补写。</p></div></div>{entries.length === 0 ? <Empty title="没有已验证漏洞" detail="完成扫描后，发现会按严重程度显示在此。" /> : <div className="security-findings">{entries.sort((a, b) => severityRank(a.finding.severity) - severityRank(b.finding.severity)).map(({ scanId, finding }) => <details key={`${scanId}:${finding.occurrenceId}`}><summary><span className={`severity ${finding.severity}`}>{finding.severity}</span><strong>{finding.title}</strong><small>{finding.locations[0] ? `${finding.locations[0].path}:${String(finding.locations[0].startLine)}` : finding.ruleId}</small></summary><p>{finding.summary}</p><dl><dt>置信度</dt><dd>{finding.confidence}</dd><dt>分类</dt><dd>{finding.category} · {finding.cwe.join(', ')}</dd><dt>修复</dt><dd>{finding.remediation}</dd><dt>验证</dt><dd>{finding.validation ? '包含验证证据' : '未提供'}</dd><dt>攻击路径</dt><dd>{finding.attackPath ? '包含攻击路径' : '未提供'}</dd></dl>{finding.evidence.map((evidence) => <pre key={`${evidence.path}:${String(evidence.startLine)}`}>{evidence.code}</pre>)}<div className="finding-actions"><button disabled={busy} onClick={() => void run(async () => { const value = await window.norevinq.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'validate', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) })}>验证</button><button disabled={busy} onClick={() => { if (window.confirm('修复会让 Norevinq 安全工作台修改当前仓库文件。是否继续？')) void run(async () => { const value = await window.norevinq.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'patch', confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>修复</button><button disabled={busy} onClick={() => { const reason = window.prompt('请输入标记误报的原因'); if (reason?.trim()) void run(async () => { const value = await window.norevinq.runSecurityFindingAction({ scanId, occurrenceId: finding.occurrenceId, action: 'false_positive', reason: reason.trim(), confirmed: true }); viewResult({ kind: 'findings', content: value.output, truncated: value.truncated }) }) }}>标记误报</button></div></details>)}</div>}</div>
+  async function execute(
+    scanId: string,
+    finding: SecurityFinding,
+    action: 'validate' | 'patch' | 'false_positive',
+    reason?: string,
+  ): Promise<void> {
+    const key = `${scanId}:${finding.occurrenceId}`
+    const runningMessage = {
+      validate: '正在调用原扫描模型验证该漏洞，请勿关闭应用…',
+      patch: '正在调用原扫描模型修复该漏洞；完成前请勿修改相关文件…',
+      false_positive: '正在把误报状态写入安全工作台数据库…',
+    }[action]
+    setActions((current) => ({ ...current, [key]: { action, status: 'running', message: runningMessage } }))
+    try {
+      const value = await window.norevinq.runSecurityFindingAction({
+        scanId,
+        occurrenceId: finding.occurrenceId,
+        action,
+        confirmed: true,
+        ...(reason === undefined ? {} : { reason }),
+      })
+      const completedMessage = {
+        validate: '验证已完成，结果已打开。',
+        patch: '修复任务已完成，请在代码差异中审阅实际改动和测试结果。',
+        false_positive: '已标记为误报，状态已持久化。',
+      }[action]
+      setActions((current) => ({ ...current, [key]: { action, status: 'completed', message: completedMessage } }))
+      viewResult({ kind: 'findings', content: value.output, truncated: value.truncated })
+    } catch (reasonValue) {
+      setActions((current) => ({
+        ...current,
+        [key]: { action, status: 'failed', message: toErrorMessage(reasonValue) },
+      }))
+    }
+  }
+  return <div className="settings-section">
+    <div className="section-heading"><div><h3>漏洞</h3><p>证据、验证和攻击路径来自真实 sealed findings，不由界面补写。</p></div></div>
+    {entries.length === 0
+      ? <Empty title="没有已验证漏洞" detail="完成扫描后，发现会按严重程度显示在此。" />
+      : <div className="security-findings">{entries
+        .sort((a, b) => severityRank(a.finding.severity) - severityRank(b.finding.severity))
+        .map(({ scanId, finding }) => {
+          const key = `${scanId}:${finding.occurrenceId}`
+          const state = actions[key]
+          const running = state?.status === 'running'
+          const activeAction = state?.action ?? null
+          const actionStatus = state?.status ?? null
+          const falsePositive = finding.triage?.status === 'false_positive'
+          const scan = scans.find(({ id }) => id === scanId)
+          const model = scan?.request.model ?? (scan?.request.provider === 'deepseek' ? 'DeepSeek' : 'OpenAI')
+          return <details key={key}>
+            <summary><span className={`severity ${finding.severity}`}>{finding.severity}</span><strong>{finding.title}{falsePositive ? ' · 已标记误报' : ''}</strong><small>{finding.locations[0] ? `${finding.locations[0].path}:${String(finding.locations[0].startLine)}` : finding.ruleId}</small></summary>
+            <p>{finding.summary}</p>
+            <dl><dt>置信度</dt><dd>{finding.confidence}</dd><dt>分类</dt><dd>{finding.category} · {finding.cwe.join(', ')}</dd><dt>修复</dt><dd>{finding.remediation}</dd><dt>验证</dt><dd>{finding.validation ? '包含验证证据' : '未提供'}</dd><dt>攻击路径</dt><dd>{finding.attackPath ? '包含攻击路径' : '未提供'}</dd></dl>
+            {finding.evidence.map((evidence) => <pre key={`${evidence.path}:${String(evidence.startLine)}`}>{evidence.code}</pre>)}
+            {state && <div className={`finding-action-feedback ${state.status}`} role={state.status === 'failed' ? 'alert' : 'status'}><strong>{state.status === 'running' ? '处理中' : state.status === 'completed' ? '操作成功' : '操作失败'}</strong><span>{state.message}</span></div>}
+            <div className="finding-actions">
+              <button disabled={busy || running} onClick={() => {
+                if (window.confirm(`验证会调用 ${model} 并可能产生模型费用，是否继续？`)) void execute(scanId, finding, 'validate')
+              }}>{running && activeAction === 'validate' ? '验证中…' : '验证'}</button>
+              <button disabled={busy || running} onClick={() => {
+                if (window.confirm(`修复会调用 ${model}、产生模型费用，并修改当前仓库文件。是否继续？`)) void execute(scanId, finding, 'patch')
+              }}>{running && activeAction === 'patch' ? '修复中…' : '修复'}</button>
+              <button disabled={busy || running || falsePositive || (activeAction === 'false_positive' && actionStatus === 'completed')} onClick={() => {
+                const reason = window.prompt('请输入标记误报的原因（会持久化到安全工作台）')
+                if (reason?.trim()) void execute(scanId, finding, 'false_positive', reason.trim())
+              }}>{falsePositive || (activeAction === 'false_positive' && actionStatus === 'completed') ? '已标记误报' : running && activeAction === 'false_positive' ? '标记中…' : '标记误报'}</button>
+            </div>
+          </details>
+        })}</div>}
+  </div>
 }
 
 function Repositories({ scans }: { scans: SecurityScanRecord[] }): React.JSX.Element {
