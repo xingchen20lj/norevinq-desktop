@@ -9,7 +9,7 @@ overrides:
   pdfjs-dist: 6.2.108
 
 patchedDependencies:
-  '@openai/codex-security@0.1.11': 16946e4b97b20cfcb60ba79eeb562020dd01cd1b613a8a490b26c9d47a1b46b5
+  '@openai/codex-security@0.1.11': a6bce3887e7bff04e5f1247c06ea2a334a43ddb227afac17706bb00585befffb
 
 importers:
 
@@ -20,7 +20,7 @@ importers:
         version: 0.147.0
       '@openai/codex-security':
         specifier: 0.1.11
-        version: 0.1.11(patch_hash=16946e4b97b20cfcb60ba79eeb562020dd01cd1b613a8a490b26c9d47a1b46b5)(@types/node@26.2.0)
+        version: 0.1.11(patch_hash=a6bce3887e7bff04e5f1247c06ea2a334a43ddb227afac17706bb00585befffb)(@types/node@26.2.0)
       '@xterm/addon-fit':
         specifier: 0.11.0
         version: 0.11.0
@@ -3613,7 +3613,7 @@ snapshots:
     dependencies:
       '@openai/codex': 0.144.6
 
-  '@openai/codex-security@0.1.11(patch_hash=16946e4b97b20cfcb60ba79eeb562020dd01cd1b613a8a490b26c9d47a1b46b5)(@types/node@26.2.0)':
+  '@openai/codex-security@0.1.11(patch_hash=a6bce3887e7bff04e5f1247c06ea2a334a43ddb227afac17706bb00585befffb)(@types/node@26.2.0)':
     dependencies:
       '@inquirer/prompts': 8.3.0(@types/node@26.2.0)
       '@octokit/core': 7.0.6

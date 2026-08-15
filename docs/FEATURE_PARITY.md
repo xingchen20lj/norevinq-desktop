@@ -88,7 +88,7 @@
 | 计划任务 | 运行历史、未读、重试 | 已测试 | 收件箱、成功/失败/取消/跳过、未读、1–4 次退避、敏感错误脱敏和崩溃不重放 |
 | 安全 | 安全总览 | 已测试 | 总览/扫描/漏洞/仓库/设置五页工作台；Electron 浅色 1320×840 真机截图通过 |
 | 安全 | 普通仓库/路径扫描 | 已测试 | 修复官方权限 profile 回归后，DeepSeek V4 Flash 对一文件真实 Git 仓库于 151.98 秒完成 standard 扫描并返回 `completed + sealed`；2,117 文件大型仓库未为回归再次付费扫描，仍需由用户按费用预期运行 |
-| 安全 | 深度扫描 | 已测试 | SDK deep 参数、目标约束和 UI 已接入；DeepSeek Flash 一文件真实执行 discovery、validation、attack path、reporting 并返回 completed + sealed。macOS 对官方外层已验证沙箱内的 worker 使用非嵌套兼容模式，修复 Seatbelt EPERM；大型仓库仍会产生显著模型费用 |
+| 安全 | 深度扫描 | 已测试 | SDK deep 参数、目标约束和 UI 已接入；发布包以应用内置 Electron Node 启动官方 plugin 0.1.19 MCP，并显式向协调器转交 DeepSeek Key；模型调用前真实 tools/list，缺少 `start_codex_security_deep_scan` 即零 token 失败。DeepSeek Flash 一文件真实执行 discovery worker、dedup、父级 reporting 并返回 coordinator `succeeded`、最终 `completed + sealed`。macOS 对官方外层已验证沙箱内的 worker 使用非嵌套兼容模式；大型仓库仍会产生显著模型费用 |
 | 安全 | commit/工作区 diff 扫描 | 部分实现 | `DiffTarget.refs/workingTree` 已接入且深度模式本地拒绝；真实在线 diff 扫描待有界验证 |
 | 安全 | 预检、预算、取消、进度 | 已测试 | 真实 SDK preflight、Python/账户诊断和 $2 cost-limit 终止；AbortSignal/进度/费用/Trusted Access 回调自动测试 |
 | 安全 | 漏洞证据、严重程度、攻击路径 | 已测试 | sealed findings 映射、证据/位置/验证/攻击路径 UI 与持久化自动测试；真实扫描未完成所以当前没有伪造漏洞 |

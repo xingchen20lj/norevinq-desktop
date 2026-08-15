@@ -16,6 +16,7 @@
 - 修复图片已生成但聊天只显示绝对路径：除官方 `imageGeneration` 和 Markdown 图片外，助手返回的本地 Markdown 普通图片链接与反引号图片路径也会进入同一安全预览链；仅支持明确图片扩展名，主进程仍执行真实路径、根目录、符号链接、格式和 50 MiB 校验。按用户截图中的真实反引号路径形态完成 Electron 回归，图片直接显示且磁盘路径不再裸露。
 - 扩展历史任务恢复：`no rollout found for thread id` 现与 `thread not found` 一样触发无副作用恢复；若任务实际已归档，则自动 `thread/unarchive`、重新 resume 并只重试 turn 一次，缺失历史仍失败关闭。定向 27 项、完整 220 项测试、覆盖率、性能、构建及开源守门均通过。
 - 修复 Security SDK 权限回归：Norevinq 的 0.1.11 补丁不再把官方 `:root=read`、`:workspace_roots=write` 配置错误收紧成只读最小 profile；全新 npm 包 dry-run 能重放补丁，权限单测锁定官方不变量。修复后使用 DeepSeek V4 Flash 对一文件真实 Git 仓库执行 standard 扫描，151.98 秒返回 `completed + sealed`，证明本地仓库读取、私有扫描目录写入、draft 产物和最终密封闭环均正常。缺失 draft 产物现在显示可操作的独立错误，不再归类为 `unknown`。
+- 修复发布版 Deep Scan 协调器缺失：官方 plugin 0.1.19 的 `.mcp.json` 使用裸 `node`，Finder/启动台环境无法解析，父智能体因此没有 `start_codex_security_deep_scan`，却曾误走 20/2117 文件手工扫描并在 SDK 密封阶段失败。Norevinq 现在把官方插件投影为私有 `0.1.19-norevinq.1` 运行时，使用应用内置 Electron Node，并将 `DEEPSEEK_API_KEY` 加入 MCP worker 转交白名单；进入模型调用前真实执行 initialize + tools/list，协调工具缺失时零 token 失败，补丁提示也禁止手工替代。DeepSeek V4 Flash 一文件在线回归完成 worker、dedup、coordinator `succeeded` 和最终 `completed + sealed`，五类正式产物齐全。
 - 对话时间线完成紧凑化：用户气泡与助手正文分层，推理/命令默认折叠，全部状态中文化，消息显示时间戳并提供复制按钮；官方 `imageGeneration` item 进入领域 reducer，通过短期文件协议直接显示真实图片。重新选择已缓存任务不再无条件 resume，避免无意义的 `thread not found`。
 - 安全工作台增加中文/英文报告选择、报告/JSON/CSV/SARIF 格式选择和系统保存对话框真实导出；长错误默认折叠、表单与 token 费用卡重排、产物预览自动换行。安全页 CSS 改为随 lazy workbench 按需加载，首屏样式保持在 72.0 KiB 预算内。
 - 打包钩子同时裁剪 `@napi-rs/canvas` 的跨平台可选原生包；macOS/Windows 只保留目标架构对应的一份 Canvas runtime，包内检查会拒绝漏包或混入其他平台架构，避免内部测试 DMG 无意义膨胀。
@@ -310,7 +311,7 @@
 
 ## 当前失败测试
 
-当前质量门无失败测试。DeepSeek Security V4 Pro 与固定 Norevinq 0.147.0/单并发的 V4 Flash 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `verify:ci` 为 40 个通过文件、1 个按凭据开关跳过文件、208 项通过及 1 项跳过，覆盖率 81.29/70.21/86.39/88.25，2 项性能、类型、规范、脚本、workflow、93 个生产组件声明、构建和 bundle 预算均通过。生产依赖审计为 0 已知漏洞；x64 目录包内 Codex 0.147.0、解包 Security plugin 0.1.19 manifest 和真实打包应用 DeepSeek Security 预检全部通过。
+当前质量门无失败测试。DeepSeek Security V4 Pro standard、V4 Flash standard，以及修复发布态 MCP 启动/凭据转交后的 V4 Flash deep 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `pnpm verify` 为 41 个通过文件、1 个按在线开关跳过文件、223 项通过及 2 项跳过；类型、规范、脚本、workflow、开源就绪、构建和 bundle 预算均通过。生产依赖审计此前为 0 已知漏洞；x64 目录包内 Norevinq 智能体运行时 0.147.0、解包 Security plugin 0.1.19 manifest、私有 `0.1.19-norevinq.1` MCP 投影和真实 packaged tools/list 已通过。
 
 ## 已知问题
 

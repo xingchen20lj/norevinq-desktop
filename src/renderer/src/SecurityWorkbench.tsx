@@ -248,6 +248,7 @@ function targetLabel(target: SecurityTargetKind): string {
 
 function securityErrorLabel(code: string): string {
   return {
+    deep_mcp_unavailable: '深度扫描协调器不可用',
     deep_worker_sandbox: '扫描进程权限受限',
     deep_discovery_failed: '深度发现未完成',
     security_access_required: '缺少安全扫描权限',

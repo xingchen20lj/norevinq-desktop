@@ -1,10 +1,23 @@
 import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
-import { CodexSecurity, type CodexSecurityConfig, type ScanOptions, type ScanPreflight, type ScanResult } from '@openai/codex-security'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import {
+  bootstrapPlugin,
+  CodexSecurity,
+  type CodexSecurityConfig,
+  type ScanOptions,
+  type ScanPreflight,
+  type ScanResult,
+} from '@openai/codex-security'
 import { afterEach, describe, expect, it } from 'vitest'
-import { prepareMacDeepScanCodexWrapper, SecurityService } from '../../src/main/security/securityService.js'
+import {
+  assertDeepScanMcpAvailable,
+  prepareMacDeepScanCodexWrapper,
+  prepareSecurityPluginRuntime,
+  SecurityService,
+} from '../../src/main/security/securityService.js'
 import { createDeepSeekSecurityConfig } from '../../src/main/providers/deepseek.js'
 import { StateDatabase } from '../../src/main/state/database.js'
 import type { SecurityScanRequest } from '../../src/shared/security.js'
@@ -200,17 +213,19 @@ describe('SecurityService', () => {
     fixture.database.close()
   })
 
-  it('pins the real packaged plugin path into both base and DeepSeek SDK instances', async () => {
+  it('stages the packaged plugin with the bundled Node runtime for both SDK instances', async () => {
     const fixture = createFixture()
     const configs: (CodexSecurityConfig | undefined)[] = []
     const sdk = createSdk(() => Promise.reject(new Error('expected fixture stop')))
-    const pluginPath = '/Applications/Norevinq.app/Contents/Resources/app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin'
+    const pluginPath = createTestSecurityPlugin(fixture.securityRoot)
     const service = new SecurityService(fixture.database, fixture.securityRoot, {
       sdkFactory: (config) => {
         configs.push(config)
         return sdk
       },
       pluginPath,
+      nodeRuntimeExecutable: process.execPath,
+      electronNodeRuntime: false,
       deepSeekCredential: () => 'configured-for-test',
       exchangeRateResolver: () => Promise.resolve({ rate: 7, date: '2026-08-14', source: 'fallback' }),
     })
@@ -224,20 +239,91 @@ describe('SecurityService', () => {
     })
     await waitForScan(service, 'failed')
     expect(configs).toHaveLength(2)
-    expect(configs[0]?.pluginPath).toBe(pluginPath)
-    expect(configs[1]?.pluginPath).toBe(pluginPath)
+    const stagedPath = configs[0]?.pluginPath
+    expect(stagedPath).toContain(join(fixture.securityRoot, 'sdk-state', 'plugin-runtime', 'codex-security'))
+    expect(configs[1]?.pluginPath).toBe(stagedPath)
+    const manifest = JSON.parse(readFileSync(join(stagedPath ?? '', '.mcp.json'), 'utf8')) as {
+      mcpServers: { 'codex-security': { command: string; env_vars: string[] } }
+    }
+    expect(manifest.mcpServers['codex-security'].command).toBe(process.execPath)
+    expect(manifest.mcpServers['codex-security'].env_vars).toContain('DEEPSEEK_API_KEY')
+    const pluginManifest = JSON.parse(readFileSync(
+      join(stagedPath ?? '', '.codex-plugin', 'plugin.json'), 'utf8',
+    )) as { version: string }
+    expect(pluginManifest.version).toBe('0.1.19-norevinq.1')
+    await service.dispose()
+    fixture.database.close()
+  })
+
+  it('verifies the real deep-scan MCP tool locally before model execution', async () => {
+    const fixture = createFixture()
+    const pluginPath = createTestSecurityPlugin(fixture.securityRoot)
+    const stagedPath = prepareSecurityPluginRuntime(
+      join(fixture.securityRoot, 'sdk-state'), pluginPath, process.execPath, false,
+    )
+    await expect(assertDeepScanMcpAvailable(
+      stagedPath, join(fixture.securityRoot, 'sdk-state'), process.env,
+    )).resolves.toBeUndefined()
+    fixture.database.close()
+  })
+
+  it('installs the launcher-adapted plugin as a distinct private runtime revision', async () => {
+    const fixture = createFixture()
+    const stateRoot = join(fixture.securityRoot, 'sdk-state')
+    const pluginPath = createTestSecurityPlugin(fixture.securityRoot)
+    const stagedPath = prepareSecurityPluginRuntime(stateRoot, pluginPath, process.execPath, false)
+    const codexHome = join(stateRoot, 'bootstrap-home')
+    mkdirSync(codexHome, { recursive: true })
+    const installed = await bootstrapPlugin(codexHome, stagedPath, {
+      environment: { ...process.env, CODEX_HOME: codexHome },
+    })
+    expect(installed.version).toBe('0.1.19-norevinq.1')
+    const installedManifest = JSON.parse(readFileSync(join(installed.installedRoot, '.mcp.json'), 'utf8')) as {
+      mcpServers: { 'codex-security': { command: string; env_vars: string[] } }
+    }
+    expect(installedManifest.mcpServers['codex-security'].command).toBe(process.execPath)
+    expect(installedManifest.mcpServers['codex-security'].env_vars).toContain('DEEPSEEK_API_KEY')
+    fixture.database.close()
+  })
+
+  it('fails a Deep Scan before SDK model execution when its MCP tool is unavailable', async () => {
+    const fixture = createFixture()
+    const pluginPath = createTestSecurityPlugin(fixture.securityRoot, 'unrelated_tool')
+    let modelRuns = 0
+    const service = new SecurityService(fixture.database, fixture.securityRoot, {
+      sdkFactory: () => createSdk(() => {
+        modelRuns += 1
+        return Promise.reject(new Error('model execution must not start'))
+      }),
+      pluginPath,
+      nodeRuntimeExecutable: process.execPath,
+      electronNodeRuntime: false,
+    })
+    service.startScan({ ...scanRequest(fixture.projectId), mode: 'deep' })
+    const failed = await waitForScan(service, 'failed')
+    expect(modelRuns).toBe(0)
+    expect(failed.scans[0]?.error).toMatchObject({ code: 'deep_mcp_unavailable' })
+    expect(failed.scans[0]?.error?.message).toContain('未产生模型费用')
     await service.dispose()
     fixture.database.close()
   })
 
   it('uses the patched public SDK preflight with DeepSeek credentials and no OpenAI login', async () => {
     const fixture = createFixture()
-    const sdk = new CodexSecurity(createDeepSeekSecurityConfig(
+    const stateRoot = join(fixture.securityRoot, 'sdk-state')
+    const officialPlugin = join(
+      dirname(dirname(fileURLToPath(import.meta.resolve('@openai/codex-security')))), '_bundled_plugin',
+    )
+    const stagedPlugin = prepareSecurityPluginRuntime(stateRoot, officialPlugin, process.execPath, false)
+    const sdk = new CodexSecurity({
+      ...createDeepSeekSecurityConfig(
       'deepseek-v4-flash',
       'sk-deepseek-preflight-only-test',
-      fixture.securityRoot,
+      stateRoot,
       { PATH: process.env.PATH, HOME: process.env.HOME },
-    ))
+      ),
+      pluginPath: stagedPlugin,
+    })
     const result = await sdk.preflight(fixture.database.getProject(fixture.projectId)?.path ?? '', {
       auth: 'api-key',
       outputDir: join(fixture.securityRoot, 'preflight-output'),
@@ -324,6 +410,40 @@ function createFixture(): {
   const database = new StateDatabase(join(root, 'state.sqlite3'))
   const project = database.upsertProject(projectPath)
   return { database, projectId: project.id, securityRoot }
+}
+
+function createTestSecurityPlugin(root: string, deepToolName = 'start_codex_security_deep_scan'): string {
+  const pluginRoot = join(root, 'fixture-security-plugin')
+  mkdirSync(join(pluginRoot, '.codex-plugin'), { recursive: true })
+  mkdirSync(join(pluginRoot, 'mcp'), { recursive: true })
+  writeFileSync(join(pluginRoot, '.codex-plugin', 'plugin.json'), JSON.stringify({
+    name: 'codex-security', version: '0.1.19', description: 'fixture',
+  }))
+  writeFileSync(join(pluginRoot, '.mcp.json'), JSON.stringify({
+    mcpServers: {
+      'codex-security': {
+        command: 'node', args: ['./mcp/server.mjs', '--stdio'], cwd: '.',
+      },
+    },
+  }))
+  writeFileSync(join(pluginRoot, 'mcp', 'server.mjs'), `
+import readline from 'node:readline'
+const lines = readline.createInterface({ input: process.stdin })
+lines.on('line', (line) => {
+  const request = JSON.parse(line)
+  if (request.id === 1) {
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 1, result: {
+      protocolVersion: '2025-06-18', capabilities: { tools: {} }, serverInfo: { name: 'fixture', version: '1' },
+    } }) + '\\n')
+  }
+  if (request.id === 2) {
+    process.stdout.write(JSON.stringify({ jsonrpc: '2.0', id: 2, result: {
+      tools: [{ name: ${JSON.stringify(deepToolName)} }],
+    } }) + '\\n')
+  }
+})
+`)
+  return pluginRoot
 }
 
 function createSdk(run: (repository: string, options?: ScanOptions) => Promise<ScanResult>) {
