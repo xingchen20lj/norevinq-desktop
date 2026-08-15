@@ -1,8 +1,9 @@
-import { chmodSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { brotliDecompressSync } from 'node:zlib'
 import {
   bootstrapPlugin,
   CodexSecurity,
@@ -250,7 +251,7 @@ describe('SecurityService', () => {
     const pluginManifest = JSON.parse(readFileSync(
       join(stagedPath ?? '', '.codex-plugin', 'plugin.json'), 'utf8',
     )) as { version: string }
-    expect(pluginManifest.version).toBe('0.1.19-norevinq.1')
+    expect(pluginManifest.version).toBe('0.1.19-norevinq.2')
     await service.dispose()
     fixture.database.close()
   })
@@ -277,7 +278,7 @@ describe('SecurityService', () => {
     const installed = await bootstrapPlugin(codexHome, stagedPath, {
       environment: { ...process.env, CODEX_HOME: codexHome },
     })
-    expect(installed.version).toBe('0.1.19-norevinq.1')
+    expect(installed.version).toBe('0.1.19-norevinq.2')
     const installedManifest = JSON.parse(readFileSync(join(installed.installedRoot, '.mcp.json'), 'utf8')) as {
       mcpServers: { 'codex-security': { command: string; env_vars: string[] } }
     }
@@ -315,6 +316,15 @@ describe('SecurityService', () => {
       dirname(dirname(fileURLToPath(import.meta.resolve('@openai/codex-security')))), '_bundled_plugin',
     )
     const stagedPlugin = prepareSecurityPluginRuntime(stateRoot, officialPlugin, process.execPath, false)
+    const runtimeParts = readdirSync(join(stagedPlugin, 'mcp'))
+      .filter((name) => name.startsWith('server.mjs.br.part-'))
+      .sort()
+    const runtimeSource = brotliDecompressSync(Buffer.concat(runtimeParts.map(
+      (name) => readFileSync(join(stagedPlugin, 'mcp', name)),
+    ))).toString('utf8')
+    expect(runtimeSource).toContain(
+      '...process.env.ELECTRON_RUN_AS_NODE ? { ELECTRON_RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE } : {},',
+    )
     const sdk = new CodexSecurity({
       ...createDeepSeekSecurityConfig(
       'deepseek-v4-flash',

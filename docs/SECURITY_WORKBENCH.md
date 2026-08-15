@@ -18,7 +18,7 @@ macOS 正式包的实际默认路径如下：
 
 发布包把 SDK 的 `_bundled_plugin` 显式复制到 `app.asar.unpacked/node_modules/@openai/codex-security/_bundled_plugin`，因为 SDK 会对插件根执行 `realpath`，不能从 ASAR 虚拟目录运行。包内审计会验证该目录不是符号链接、没有越过 resources 边界，并回读 `.codex-plugin/plugin.json`；主进程只向 SDK 传入这一精确路径。
 
-Finder/启动台启动的桌面应用不保证系统 `PATH` 中存在裸命令 `node`，而官方 plugin 0.1.19 的 `.mcp.json` 正是以该命令启动深度扫描协调器。Norevinq 启动时把官方插件复制到私有 `security/sdk-state/plugin-runtime`，只做两项可审计的发布适配：将 MCP command 固定为当前应用内置的 Electron Node 可执行文件，并将 `DEEPSEEK_API_KEY` 加入 MCP 显式转交白名单，使协调器创建的 discovery worker 能读取本次 SDK 实例的凭据。适配后的本地插件版本标记为 `0.1.19-norevinq.1`，不会修改签名应用包或冒充上游原版。Deep Scan 在进入 SDK 模型调用前还会真实执行 MCP initialize + tools/list；若 `start_codex_security_deep_scan` 不存在，扫描以 `deep_mcp_unavailable` 失败，并明确保证尚未产生模型费用。
+Finder/启动台启动的桌面应用不保证系统 `PATH` 中存在裸命令 `node`，而官方 plugin 0.1.19 的 `.mcp.json` 正是以该命令启动深度扫描协调器。Norevinq 启动时把官方插件复制到私有 `security/sdk-state/plugin-runtime`，做三项可审计的发布适配：将父协调器 MCP command 固定为当前应用内置的 Electron Node 可执行文件；将 `DEEPSEEK_API_KEY` 加入 MCP 显式转交白名单；让协调器创建的 `cs_artifacts` 内层 MCP 显式继承 `ELECTRON_RUN_AS_NODE`，避免 Finder 启动环境下把 Electron 主程序误当成普通 Node 后在 initialize 阶段断开。适配后的本地插件版本标记为 `0.1.19-norevinq.2`，不会修改签名应用包或冒充上游原版。Deep Scan 在进入 SDK 模型调用前还会真实执行 MCP initialize + tools/list；若 `start_codex_security_deep_scan` 不存在，扫描以 `deep_mcp_unavailable` 失败，并明确保证尚未产生模型费用。
 
 Norevinq 启动主 app-server 时把独立 `agent-home` 作为上游兼容变量 `CODEX_HOME`，启动 Security SDK 时设置独立 `CODEX_SECURITY_STATE_DIR`。默认配置不会读取、覆盖或清理官方 Codex 常用的 `~/.codex`，主 app-server 与 Security SDK 的 Codex 版本也在不同进程和依赖树中。不要手动把 `NOREVINQ_AGENT_HOME` 指向 `~/.codex`，否则会主动取消这层隔离。
 
