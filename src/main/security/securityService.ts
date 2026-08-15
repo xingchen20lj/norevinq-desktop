@@ -723,7 +723,8 @@ export function prepareSecurityPluginRuntime(
   const canonicalNodeRuntime = realpathSync(nodeRuntimeExecutable)
   assertSafeRuntimePath(canonicalNodeRuntime)
   const runtimeMetadata = lstatSync(canonicalNodeRuntime)
-  if (!runtimeMetadata.isFile() || runtimeMetadata.isSymbolicLink() || (runtimeMetadata.mode & 0o111) === 0) {
+  const executableModeMissing = process.platform !== 'win32' && (runtimeMetadata.mode & 0o111) === 0
+  if (!runtimeMetadata.isFile() || runtimeMetadata.isSymbolicLink() || executableModeMissing) {
     throw new Error('Norevinq 内置 Node 运行时不可执行。')
   }
 
@@ -830,9 +831,22 @@ export async function assertDeepScanMcpAvailable(
       settled = true
       clearTimeout(timer)
       signal?.removeEventListener('abort', abort)
+      let completed = false
+      const complete = (): void => {
+        if (completed) return
+        completed = true
+        clearTimeout(closeTimer)
+        if (error) reject(error)
+        else resolvePromise()
+      }
+      const closeTimer = setTimeout(complete, 2_000)
+      closeTimer.unref()
+      if (child.exitCode !== null || child.signalCode !== null) {
+        complete()
+        return
+      }
+      child.once('close', complete)
       child.kill()
-      if (error) reject(error)
-      else resolvePromise()
     }
     const abort = (): void => finish(signal?.reason instanceof Error ? signal.reason : new Error('扫描已取消。'))
     const timer = setTimeout(() => finish(new Error(
