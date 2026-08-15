@@ -18,7 +18,7 @@
 | 项目 | 多项目并存 | 已实现 | SQLite 项目列表与侧栏选择 |
 | 项目 | 项目信任 | 已测试 | 默认不信任、SQLite 持久化、外部技能根目录信任门；单元与 Electron UI 通过 |
 | 项目 | 项目指令 AGENTS.md | 已测试 | 安全预览 + app-server 原生解析；真实 turn 按临时仓库指令返回 `NOREVINQ_INSTRUCTIONS_OK` |
-| 对话 | 新建、读取、继续、重命名、固定、归档 | 已测试 | 真实 app-server 生命周期；归档视图以 `thread/read` 打开且不隐式恢复，活动列表遇到 stale archived session 时受控 unarchive/resume 并同步本地状态；重命名、双视图、SQLite 固定与首屏补读、重载恢复均通过自动测试和 Electron E2E |
+| 对话 | 新建、读取、继续、重命名、固定、归档 | 已测试 | 真实 app-server 生命周期；归档视图以 `thread/read` 只读打开，用户首次发送新指令时会先明确 unarchive/resume、切回活动列表再发送，不重放历史工具；活动列表遇到 stale archived session 时也会受控恢复并同步本地状态；重命名、双视图、SQLite 固定与首屏补读、重载恢复均通过自动测试和 Electron E2E |
 | 对话 | 删除任务 | 已测试 | 明确二次确认、活动 turn/挂起审批失败关闭、SQLite 关联清理和删除后列表重同步；官方 app-server 集成与 Electron E2E 通过 |
 | 对话 | 对话搜索和分页 | 已测试 | `thread/list` cwd/searchTerm/opaque cursor、游标失效保护、分页合并和侧栏搜索/加载更多均通过自动测试 |
 | 对话 | 分叉任务 | 已测试 | `thread/fork`、来源关联、项目关联、历史 hydration 和新任务选择；官方 0.147.0 集成与 Electron E2E 通过 |

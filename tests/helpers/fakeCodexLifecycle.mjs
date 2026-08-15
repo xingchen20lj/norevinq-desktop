@@ -148,6 +148,28 @@ function handle(method, params) {
     queueMicrotask(() => notify('thread/compacted', { threadId: params.threadId }))
     return {}
   }
+  if (method === 'turn/start') {
+    const thread = requireThread(params.threadId)
+    if (archived.has(thread.id)) throw new Error(`thread not found: ${thread.id}`)
+    const turn = {
+      id: `turn-${thread.updatedAt + 1}`,
+      status: 'inProgress',
+      startedAt: Math.floor(Date.now() / 1000),
+      completedAt: null,
+      durationMs: null,
+      error: null,
+      items: [],
+    }
+    thread.updatedAt += 1
+    queueMicrotask(() => {
+      notify('turn/started', { threadId: thread.id, turn })
+      notify('turn/completed', {
+        threadId: thread.id,
+        turn: { ...turn, status: 'completed', completedAt: turn.startedAt, durationMs: 1 },
+      })
+    })
+    return { turn }
+  }
   throw new Error(`Unsupported fake method: ${method}`)
 }
 

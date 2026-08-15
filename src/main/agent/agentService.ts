@@ -499,9 +499,13 @@ export class AgentService {
   }
 
   async startTurn(input: StartTurnInput): Promise<ConversationSnapshot> {
-    const thread = this.#requireIdleVisibleThread(input.threadId)
+    let thread = this.#requireIdleVisibleThread(input.threadId)
     if (this.#handoffThreads.has(input.threadId)) throw new Error('Wait for the conversation handoff to finish.')
     await this.#runtime.start()
+    if (this.#snapshot.listArchived) {
+      await this.#restoreArchivedThreadForTurn(input.threadId)
+      thread = this.#requireIdleVisibleThread(input.threadId)
+    }
     let turnInput = { ...input, text: requirePrompt(input.text) }
     const providerChanged = input.modelProvider !== undefined
       && thread.modelProvider !== 'unknown'
@@ -526,6 +530,37 @@ export class AgentService {
     }
     this.#update({ selectedThreadId: turnInput.threadId, error: null })
     return this.#snapshot
+  }
+
+  async #restoreArchivedThreadForTurn(threadId: string): Promise<void> {
+    const projectId = this.#snapshot.projectId
+    if (!projectId) throw new Error('No project is loaded.')
+    await this.#runtime.request('thread/unarchive', { threadId })
+    this.#database.setThreadArchived(threadId, false)
+    const resumed = asRecord(await this.#runtime.request('thread/resume', {
+      threadId,
+      ...NOREVINQ_THREAD_IDENTITY,
+    }))
+    const resumedThread = asRecord(resumed.thread)
+    if (requireString(resumedThread.id, 'thread.id') !== threadId) {
+      throw new Error('Norevinq 智能体引擎恢复了另一个任务。')
+    }
+    this.#hydrateThread(resumedThread)
+    const restoredSummary = this.#toThreadSummary(resumedThread)
+    this.#update({
+      listArchived: false,
+      listSearchTerm: '',
+      nextCursor: null,
+      selectedThreadId: threadId,
+      error: null,
+    })
+    await this.loadProject({ projectId, archived: false })
+    this.#update({
+      threads: upsertThread(this.#snapshot.threads, restoredSummary),
+      selectedThreadId: threadId,
+      error: null,
+    })
+    await this.#loadThreadGoal(threadId)
   }
 
   async steerTurn(input: SteerTurnInput): Promise<ConversationSnapshot> {

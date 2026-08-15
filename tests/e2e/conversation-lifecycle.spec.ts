@@ -178,9 +178,11 @@ test('searches, paginates, renames, forks, compacts, archives, restores, and del
 
     await window.getByTitle('显示已归档任务').click()
     await taskRow('Renamed primary fork').click()
-    await window.getByRole('button', { name: '恢复任务' }).click()
-    await window.getByTitle('显示活动任务').click()
-    await taskRow('Renamed primary fork').click()
+    await window.getByLabel('任务输入').fill('Continue the archived task')
+    await window.getByRole('button', { name: '发送任务' }).click()
+    await expect(window.getByTitle('显示已归档任务')).toBeVisible()
+    await expect(taskRow('Renamed primary fork')).toBeVisible()
+    await expect(window.locator('.error-banner')).toHaveCount(0)
 
     window.once('dialog', async (dialog) => { await dialog.accept() })
     await window.getByRole('button', { name: '永久删除任务' }).click()
