@@ -566,6 +566,8 @@ export function App(): React.JSX.Element {
         })
       }
       setConversations(snapshot)
+      setShowArchived(snapshot.listArchived)
+      setThreadSearch(snapshot.listSearchTerm)
     } catch (reason) {
       setComposer(text)
       setError(toErrorMessage(reason))

@@ -280,6 +280,41 @@ describe('AgentService', () => {
     database.close()
   })
 
+  it('restores an archived task before continuing it from the archive view', async () => {
+    const { database, projectId } = createDatabase()
+    const runtime = new FakeRuntime()
+    const service = new AgentService(runtime, database)
+    runtime.threadListResponses.push({
+      data: [protocolThread([turn('turn-old', 'completed')], 'thread-1')],
+      nextCursor: null,
+      backwardsCursor: null,
+    })
+    await service.loadProject({ projectId, archived: true })
+    await service.selectThread('thread-1')
+
+    const continued = await service.startTurn({ threadId: 'thread-1', text: 'Continue archived task' })
+
+    expect(continued).toMatchObject({
+      listArchived: false,
+      listSearchTerm: '',
+      selectedThreadId: 'thread-1',
+    })
+    expect(continued.threads.map(({ id }) => id)).toContain('thread-1')
+    expect(runtime.requests.map(({ method }) => method)).toEqual([
+      'thread/list',
+      'thread/read',
+      'thread/goal/get',
+      'thread/unarchive',
+      'thread/resume',
+      'thread/list',
+      'thread/goal/get',
+      'turn/start',
+    ])
+
+    service.dispose()
+    database.close()
+  })
+
   it('resumes and retries a turn when a restarted runtime has not loaded the selected thread', async () => {
     const { database, projectId } = createDatabase()
     const runtime = new FakeRuntime()

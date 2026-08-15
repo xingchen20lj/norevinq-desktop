@@ -72,6 +72,11 @@ export type SecurityFinding = {
   attackPath?: Record<string, unknown> | null
   remediationTests: string[]
   preventiveControls: string[]
+  triage?: {
+    status: 'false_positive'
+    reason: string
+    updatedAt: string
+  }
 }
 
 export type SecurityScanResult = {
