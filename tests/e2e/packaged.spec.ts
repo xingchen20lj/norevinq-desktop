@@ -84,7 +84,7 @@ test('starts the packaged app with its bundled Codex runtime', async () => {
     const pluginManifest = JSON.parse(readFileSync(
       join(securityPluginRuntime, '.codex-plugin', 'plugin.json'), 'utf8',
     )) as { version: string }
-    expect(pluginManifest.version).toBe('0.1.19-norevinq.1')
+    expect(pluginManifest.version).toBe('0.1.19-norevinq.2')
     await expect(assertDeepScanMcpAvailable(
       securityPluginRuntime,
       join(profile, 'security', 'sdk-state'),

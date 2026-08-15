@@ -95,7 +95,9 @@ describe.skipIf(!deepEnabled)('Codex Security Deep Scan with DeepSeek Responses'
     const officialPlugin = join(
       dirname(dirname(fileURLToPath(import.meta.resolve('@openai/codex-security')))), '_bundled_plugin',
     )
-    const stagedPlugin = prepareSecurityPluginRuntime(state, officialPlugin, process.execPath, false)
+    const stagedPlugin = prepareSecurityPluginRuntime(
+      state, officialPlugin, process.execPath, Boolean(process.versions.electron),
+    )
     const config = createDeepSeekSecurityConfig(
       'deepseek-v4-flash', apiKey, state, process.env, wrappedCodexPath,
     )

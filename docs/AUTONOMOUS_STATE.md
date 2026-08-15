@@ -13,6 +13,7 @@
 
 ## 已完成任务
 
+- 修复发布包大型 Deep Scan 的内层 MCP 握手失败：官方协调器使用 `process.execPath` 启动 `cs_artifacts`，在 Electron Node 父进程下却未把 `ELECTRON_RUN_AS_NODE` 写入该 MCP 的显式环境；Codex 的 MCP 环境收敛会丢弃隐式继承值，导致应用主程序按 GUI 模式启动并在 `initialize response` 前关闭。Norevinq 私有运行时 `0.1.19-norevinq.2` 现以精确、唯一源码标记修补压缩 worker runtime，显式传递 Node 模式并在上游结构漂移时失败关闭。使用新生成的 Intel 发布态 `Norevinq.app` 主程序、包内 Codex 0.147.0 与 DeepSeek V4 Flash 完成一文件 deep 在线回归：276.16 秒内 discovery 与 dedup 均首次成功，coordinator=`succeeded`，最终 manifest=`completed + sealed`、coverage=`complete`。
 - 修复图片已生成但聊天只显示绝对路径：除官方 `imageGeneration` 和 Markdown 图片外，助手返回的本地 Markdown 普通图片链接与反引号图片路径也会进入同一安全预览链；仅支持明确图片扩展名，主进程仍执行真实路径、根目录、符号链接、格式和 50 MiB 校验。按用户截图中的真实反引号路径形态完成 Electron 回归，图片直接显示且磁盘路径不再裸露。
 - 扩展历史任务恢复：`no rollout found for thread id` 现与 `thread not found` 一样触发无副作用恢复；若任务实际已归档，则自动 `thread/unarchive`、重新 resume 并只重试 turn 一次，缺失历史仍失败关闭。定向 27 项、完整 220 项测试、覆盖率、性能、构建及开源守门均通过。
 - 修复 Security SDK 权限回归：Norevinq 的 0.1.11 补丁不再把官方 `:root=read`、`:workspace_roots=write` 配置错误收紧成只读最小 profile；全新 npm 包 dry-run 能重放补丁，权限单测锁定官方不变量。修复后使用 DeepSeek V4 Flash 对一文件真实 Git 仓库执行 standard 扫描，151.98 秒返回 `completed + sealed`，证明本地仓库读取、私有扫描目录写入、draft 产物和最终密封闭环均正常。缺失 draft 产物现在显示可操作的独立错误，不再归类为 `unknown`。
@@ -311,7 +312,7 @@
 
 ## 当前失败测试
 
-当前质量门无失败测试。DeepSeek Security V4 Pro standard、V4 Flash standard，以及修复发布态 MCP 启动/凭据转交后的 V4 Flash deep 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `pnpm verify` 为 41 个通过文件、1 个按在线开关跳过文件、223 项通过及 2 项跳过；类型、规范、脚本、workflow、开源就绪、构建和 bundle 预算均通过。生产依赖审计此前为 0 已知漏洞；x64 目录包内 Norevinq 智能体运行时 0.147.0、解包 Security plugin 0.1.19 manifest、私有 `0.1.19-norevinq.1` MCP 投影和真实 packaged tools/list 已通过。
+当前质量门无失败测试。DeepSeek Security V4 Pro standard、V4 Flash standard，以及修复发布态父/内层 MCP Node 启动与凭据转交后的 V4 Flash deep 在线测试均真实返回 `completed + sealed`；跨 provider 的官方运行时契约和真实模型下拉框 E2E 已通过 DeepSeek→OpenAI→DeepSeek 双向回答。最新完整 `pnpm verify` 为 41 个通过文件、1 个按在线开关跳过文件、223 项通过及 2 项跳过；类型、规范、脚本、workflow、开源就绪、构建和 bundle 预算均通过。生产依赖审计此前为 0 已知漏洞；x64 目录包、真实 packaged Electron 启动、Norevinq 智能体运行时 0.147.0、解包 Security plugin 0.1.19 manifest、私有 `0.1.19-norevinq.2` MCP 投影和发布态 deep sealed 回归均已通过。
 
 ## 已知问题
 

@@ -9,11 +9,13 @@ import {
   mkdirSync,
   readFileSync,
   realpathSync,
+  readdirSync,
   renameSync,
   rmSync,
   statSync,
   writeFileSync,
 } from 'node:fs'
+import { brotliCompressSync, brotliDecompressSync } from 'node:zlib'
 import { fileURLToPath } from 'node:url'
 import { basename, dirname, isAbsolute, join, relative, resolve } from 'node:path'
 import {
@@ -63,6 +65,13 @@ const MAX_ARTIFACT_BYTES = 2 * 1024 * 1024
 const MAX_FAILURE_MANIFEST_BYTES = 64 * 1024
 const MAX_MCP_MANIFEST_BYTES = 64 * 1024
 const MAX_MCP_PREFLIGHT_OUTPUT_BYTES = 2 * 1024 * 1024
+const SECURITY_PLUGIN_RUNTIME_REVISION = 2
+const MCP_RUNTIME_CHUNK_PREFIX = 'server.mjs.br.part-'
+const ARTIFACT_MCP_ENV_MARKER = `        env: {
+          CODEX_SECURITY_ARTIFACT_ROOT: assigned.root,`
+const ARTIFACT_MCP_ENV_REPLACEMENT = `        env: {
+          ...process.env.ELECTRON_RUN_AS_NODE ? { ELECTRON_RUN_AS_NODE: process.env.ELECTRON_RUN_AS_NODE } : {},
+          CODEX_SECURITY_ARTIFACT_ROOT: assigned.root,`
 
 function securityScanPrompt(language: 'zh-CN' | 'en'): string {
   if (language === 'en') {
@@ -760,6 +769,7 @@ export function prepareSecurityPluginRuntime(
       }
     }
     writeFileSync(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 })
+    patchArtifactWriterNodeMode(temporaryRoot)
     const pluginManifestPath = join(temporaryRoot, '.codex-plugin', 'plugin.json')
     const pluginManifestMetadata = lstatSync(pluginManifestPath)
     if (!pluginManifestMetadata.isFile() || pluginManifestMetadata.isSymbolicLink()
@@ -770,7 +780,7 @@ export function prepareSecurityPluginRuntime(
     if (typeof pluginManifest.version !== 'string' || !pluginManifest.version.trim()) {
       throw new Error('Norevinq 安全插件版本无效。')
     }
-    pluginManifest.version = `${pluginManifest.version.replace(/-norevinq\.\d+$/u, '')}-norevinq.1`
+    pluginManifest.version = `${pluginManifest.version.replace(/-norevinq\.\d+$/u, '')}-norevinq.${String(SECURITY_PLUGIN_RUNTIME_REVISION)}`
     writeFileSync(pluginManifestPath, `${JSON.stringify(pluginManifest, null, 2)}\n`, {
       encoding: 'utf8', mode: 0o600,
     })
@@ -781,6 +791,30 @@ export function prepareSecurityPluginRuntime(
   } catch (error) {
     rmSync(temporaryRoot, { recursive: true, force: true })
     throw error
+  }
+}
+
+function patchArtifactWriterNodeMode(pluginRoot: string): void {
+  const mcpRoot = join(pluginRoot, 'mcp')
+  const chunkNames = readdirSync(mcpRoot)
+    .filter((name) => name.startsWith(MCP_RUNTIME_CHUNK_PREFIX))
+    .sort()
+  // Lightweight unit-test plugins do not carry the official compressed runtime.
+  if (chunkNames.length === 0) return
+
+  const compressed = Buffer.concat(chunkNames.map((name) => readFileSync(join(mcpRoot, name))))
+  const source = brotliDecompressSync(compressed).toString('utf8')
+  if (!source.includes(ARTIFACT_MCP_ENV_MARKER)
+    || source.indexOf(ARTIFACT_MCP_ENV_MARKER) !== source.lastIndexOf(ARTIFACT_MCP_ENV_MARKER)) {
+    throw new Error('Norevinq 安全插件 worker 运行时与当前适配不兼容。')
+  }
+  const patched = source.replace(ARTIFACT_MCP_ENV_MARKER, ARTIFACT_MCP_ENV_REPLACEMENT)
+  const patchedChunk = brotliCompressSync(Buffer.from(patched, 'utf8'))
+  const firstChunkPath = join(mcpRoot, `${MCP_RUNTIME_CHUNK_PREFIX}000`)
+  writeFileSync(firstChunkPath, patchedChunk, { mode: 0o600 })
+  for (const name of chunkNames) {
+    const path = join(mcpRoot, name)
+    if (path !== firstChunkPath) rmSync(path, { force: true })
   }
 }
 
