@@ -54,12 +54,7 @@ describe('SecurityService', () => {
       sdkFactory: () => sdk,
       pythonResolver: () => Promise.resolve('/private/python3.12'),
       cliRunner: (_cwd, args) => {
-        if (args[0] === 'export') {
-          const outputIndex = args.indexOf('--output')
-          const output = args[outputIndex + 1]
-          if (!output) return Promise.reject(new Error('Missing export output'))
-          writeFileSync(output, '{"exported":true}')
-        }
+        if (args[0] === 'export') return Promise.reject(new Error('Completed-scan exports must not restart the CLI'))
         return Promise.resolve('CLI_ACTION_OK')
       },
     })
@@ -85,7 +80,14 @@ describe('SecurityService', () => {
       scanId: scan?.id ?? '', occurrenceId: 'occurrence-1', action: 'validate', confirmed: true,
     })).toMatchObject({ output: 'CLI_ACTION_OK', truncated: false })
     expect(await service.exportFindings({ scanId: scan?.id ?? '', format: 'json' })).toMatchObject({
-      content: '{"exported":true}', format: 'json', truncated: false,
+      content: '{}', format: 'json', truncated: false,
+    })
+    const csv = await service.exportFindings({ scanId: scan?.id ?? '', format: 'csv' })
+    expect(csv).toMatchObject({ format: 'csv', truncated: false })
+    expect(csv.content).toContain('"occurrence-1"')
+    expect(csv.content).toContain('"命令注入"')
+    expect(await service.exportFindings({ scanId: scan?.id ?? '', format: 'sarif' })).toMatchObject({
+      content: '{}', format: 'sarif', truncated: false,
     })
     expect(observedScanPrompt).toContain('简体中文')
     const savedReport = join(fixture.securityRoot, '..', 'saved-security-report.md')
@@ -93,6 +95,13 @@ describe('SecurityService', () => {
       exported: true, fileName: 'saved-security-report.md', bytes: 17,
     })
     expect(readFileSync(savedReport, 'utf8')).toBe('# Security report')
+    for (const format of ['json', 'csv', 'sarif'] as const) {
+      const saved = join(fixture.securityRoot, '..', `saved-security-findings.${format}`)
+      expect(await service.saveExport({ scanId: scan?.id ?? '', format }, saved)).toMatchObject({
+        exported: true, fileName: `saved-security-findings.${format}`,
+      })
+      expect(statSync(saved).size).toBeGreaterThan(0)
+    }
     expect(fixture.database.listSecurityScans()[0]?.status).toBe('completed')
     await service.dispose()
     fixture.database.close()

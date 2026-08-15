@@ -264,29 +264,29 @@ export class SecurityService {
     }
   }
 
-  async exportFindings(input: SecurityExportInput): Promise<SecurityExportResult> {
-    const canonicalOutput = await this.#prepareExportFile(input)
+  exportFindings(input: SecurityExportInput): Promise<SecurityExportResult> {
+    const canonicalOutput = this.#prepareExportFile(input)
     const size = statSync(canonicalOutput).size
-    return {
+    return Promise.resolve({
       format: input.format,
       content: readFileSync(canonicalOutput).subarray(0, MAX_ARTIFACT_BYTES).toString('utf8'),
       truncated: size > MAX_ARTIFACT_BYTES,
-    }
+    })
   }
 
-  async saveExport(input: SecuritySaveExportInput, destinationPath: string): Promise<SecuritySaveExportResult> {
+  saveExport(input: SecuritySaveExportInput, destinationPath: string): Promise<SecuritySaveExportResult> {
     if (!isAbsolute(destinationPath)) throw new Error('导出目标必须是绝对路径。')
     const sourcePath = input.format === 'report'
       ? this.#resolveArtifactPath(input.scanId, 'report')
-      : await this.#prepareExportFile({ scanId: input.scanId, format: input.format })
+      : this.#prepareExportFile({ scanId: input.scanId, format: input.format })
     mkdirSync(dirname(destinationPath), { recursive: true, mode: 0o700 })
     copyFileSync(sourcePath, destinationPath)
     chmodSync(destinationPath, 0o600)
-    return {
+    return Promise.resolve({
       exported: true,
       fileName: basename(destinationPath),
       bytes: statSync(destinationPath).size,
-    }
+    })
   }
 
   async dispose(): Promise<void> {
@@ -381,14 +381,29 @@ export class SecurityService {
     return options
   }
 
-  async #prepareExportFile(input: SecurityExportInput): Promise<string> {
+  #prepareExportFile(input: SecurityExportInput): string {
     const scan = this.#requireCompletedScan(input.scanId)
     const scanDir = join(this.#outputRoot, scan.id)
+    if (input.format === 'json') return this.#resolveArtifactPath(scan.id, 'findings')
+    if (input.format === 'sarif') return this.#resolveArtifactPath(scan.id, 'sarif')
+
     const outputPath = join(scanDir, 'exports', `norevinq-findings.${input.format}`)
     mkdirSync(dirname(outputPath), { recursive: true, mode: 0o700 })
-    await this.#cliRunner(scan.projectPath, [
-      'export', scanDir, '--export-format', input.format, '--output', outputPath,
-    ])
+    const temporaryPath = join(dirname(outputPath), `.${basename(outputPath)}.${randomUUID()}.tmp`)
+    try {
+      writeFileSync(temporaryPath, findingsCsv(scan.result.findings), {
+        encoding: 'utf8', mode: 0o600, flag: 'wx',
+      })
+      if (existsSync(outputPath)) {
+        if (lstatSync(outputPath).isDirectory()) throw new Error('CSV 导出目标不是普通文件。')
+        rmSync(outputPath, { force: true })
+      }
+      renameSync(temporaryPath, outputPath)
+    } catch (error) {
+      rmSync(temporaryPath, { force: true })
+      throw error
+    }
+    if (this.#platform !== 'win32') chmodSync(outputPath, 0o600)
     return this.#requireContainedFile(scanDir, outputPath, '导出路径越界。')
   }
 
@@ -1009,6 +1024,47 @@ function findingActionText(finding: SecurityFinding): string {
     `Severity: ${finding.severity}`,
     `Remediation: ${finding.remediation}`,
   ].filter(Boolean).join('\n')
+}
+
+function findingsCsv(findings: readonly SecurityFinding[]): string {
+  const header = [
+    'occurrence_id',
+    'finding_id',
+    'rule_id',
+    'title',
+    'severity',
+    'confidence',
+    'category',
+    'cwe',
+    'locations',
+    'summary',
+    'root_cause',
+    'remediation',
+  ]
+  const rows = findings.map((finding) => [
+    finding.occurrenceId,
+    finding.findingId,
+    finding.ruleId,
+    finding.title,
+    finding.severity,
+    finding.confidence,
+    finding.category,
+    finding.cwe.join('; '),
+    finding.locations.map((location) => {
+      const endLine = location.endLine === undefined || location.endLine === location.startLine
+        ? ''
+        : `-${String(location.endLine)}`
+      return `${location.path}:${String(location.startLine)}${endLine}`
+    }).join('; '),
+    finding.summary,
+    finding.rootCause ?? '',
+    finding.remediation,
+  ])
+  return [header, ...rows].map((row) => row.map(csvCell).join(',')).join('\r\n') + '\r\n'
+}
+
+function csvCell(value: string): string {
+  return `"${value.replaceAll('"', '""')}"`
 }
 
 function runSecurityCli(stateRoot: string, cwd: string, args: string[]): Promise<string> {

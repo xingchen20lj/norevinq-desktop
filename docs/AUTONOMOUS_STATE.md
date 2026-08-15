@@ -13,6 +13,7 @@
 
 ## 已完成任务
 
+- 修复安全工作台仅 Markdown 能实际导出：打包应用不再为 JSON/CSV/SARIF 二次启动无法自举的 Security CLI；JSON 与 SARIF 直接复制已经密封验证的规范产物，CSV 从已验证的领域 finding 本地生成并正确转义引号、换行和中文。定向 14 项与完整 224 项测试、类型检查、代码规范、开源守门、生产构建、包体预算、生产依赖审计及真实发布态目录包启动均通过，三种非 Markdown 格式均有非空落盘回归。
 - 修复归档任务只读打开后无法继续：归档视图仍用 `thread/read` 安全展示历史，但首次发送新指令时会在任何 `turn/start` 之前明确执行 `thread/unarchive`、恢复同一线程、切回活动任务列表并刷新目标，随后只发送这一条新指令；旧命令和工具事件不会重放。新增单元回归与真实 Electron 归档→打开→直接发送闭环；完整 224 项测试、类型检查、代码规范、开源守门、生产构建、包体预算和生产依赖高危审计均通过。
 - 修复发布包大型 Deep Scan 的内层 MCP 握手失败：官方协调器使用 `process.execPath` 启动 `cs_artifacts`，在 Electron Node 父进程下却未把 `ELECTRON_RUN_AS_NODE` 写入该 MCP 的显式环境；Codex 的 MCP 环境收敛会丢弃隐式继承值，导致应用主程序按 GUI 模式启动并在 `initialize response` 前关闭。Norevinq 私有运行时 `0.1.19-norevinq.2` 现以精确、唯一源码标记修补压缩 worker runtime，显式传递 Node 模式并在上游结构漂移时失败关闭。使用新生成的 Intel 发布态 `Norevinq.app` 主程序、包内 Codex 0.147.0 与 DeepSeek V4 Flash 完成一文件 deep 在线回归：276.16 秒内 discovery 与 dedup 均首次成功，coordinator=`succeeded`，最终 manifest=`completed + sealed`、coverage=`complete`。
 - 修复图片已生成但聊天只显示绝对路径：除官方 `imageGeneration` 和 Markdown 图片外，助手返回的本地 Markdown 普通图片链接与反引号图片路径也会进入同一安全预览链；仅支持明确图片扩展名，主进程仍执行真实路径、根目录、符号链接、格式和 50 MiB 校验。按用户截图中的真实反引号路径形态完成 Electron 回归，图片直接显示且磁盘路径不再裸露。
